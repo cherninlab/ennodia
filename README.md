@@ -1,6 +1,11 @@
 <div align="center">
 
-<h1>Ennοdία</h1>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="docs/assets/logo.svg">
+  <img alt="Ennodia" src="docs/assets/logo.svg" width="235" height="50">
+</picture>
+
 <p><strong>Helps AI tools work together</strong></p>
 
 <p>
@@ -9,7 +14,7 @@
 
 </div>
 
-## Why Ennοdία?
+## Why Ennodia?
 
 **No single model or agent is best at everything.**
 
@@ -19,16 +24,12 @@ Ennodia gives them a shared routing, tracing, and Compare layer.
 
 ## Bring your own tools
 
-Ennodia is built around pluggable adapters for tools like:
+Ennodia currently ships pluggable adapters for:
 
-- Codex
+- Codex CLI
 - Claude Code
-- Gemini CLI
-- OpenRouter
-- local model runners
-- command-line agents
-- provider APIs
-- custom internal tools
+- OpenCode
+- Antigravity
 
 ## When to use Ennodia
 
@@ -46,7 +47,7 @@ Ennodia turns one request into a visible execution graph.
 2. **Plan** the best route
 3. **Execute** through adapters
 4. **Watch** every running task, log, and ETA
-5. **Recover** with retries, fallbacks, or partial results
+5. **Recover** with explicit failure states or partial results
 6. **Compare** outputs when multiple agents respond
 7. **Return** one final result with a trace you can inspect
 

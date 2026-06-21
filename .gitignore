@@ -1,11 +1,18 @@
 # Environment files
 .env
+.env.*
+.dev.vars
+.dev.vars.*
 
 # Dependencies
 node_modules/
 
 # Build output
 dist/
+website/dist/
+website/.astro/
+website/src/content/docs/docs/
+.wrangler/
 
 # OS files
 .DS_Store

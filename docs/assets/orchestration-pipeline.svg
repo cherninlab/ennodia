@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="500" viewBox="0 0 1100 500" role="img" aria-labelledby="title desc">
+  <title id="title">Ennodia orchestration pipeline</title>
+  <desc id="desc">A code-review request is classified, routed through project rules to Claude Code and Codex CLI, compared, resolved, and returned as a final review.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#7aa7ff" />
+    </marker>
+    <style>
+      .canvas { fill: #0d1117; }
+      .node { fill: #172131; stroke: #314157; stroke-width: 2; }
+      .hub { fill: #10251f; stroke: #65d0b6; stroke-width: 2; }
+      .label { fill: #f3f6fb; font: 700 21px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      .small { fill: #a9b4c2; font: 500 15px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      .line { stroke: #7aa7ff; stroke-width: 3; fill: none; marker-end: url(#arrow); }
+      .accent { fill: #65d0b6; }
+      .gold { fill: #ffd166; }
+    </style>
+  </defs>
+  <rect class="canvas" width="1100" height="500" rx="24" />
+
+  <g>
+    <rect class="node" x="42" y="207" width="130" height="86" rx="14" />
+    <text class="label" x="107" y="242" text-anchor="middle">Request</text>
+    <text class="small" x="107" y="267" text-anchor="middle">code review</text>
+  </g>
+  <path class="line" d="M 172 250 H 226" />
+
+  <g>
+    <rect class="node" x="236" y="207" width="130" height="86" rx="14" />
+    <text class="label" x="301" y="242" text-anchor="middle">Classify</text>
+    <text class="small" x="301" y="267" text-anchor="middle">task shape</text>
+  </g>
+  <path class="line" d="M 366 250 H 420" />
+
+  <g>
+    <rect class="hub" x="430" y="207" width="130" height="86" rx="14" />
+    <text class="label" x="495" y="242" text-anchor="middle">Rules</text>
+    <text class="small" x="495" y="267" text-anchor="middle">route tools</text>
+  </g>
+
+  <path class="line" d="M 560 231 C 602 175, 629 150, 680 140" />
+  <path class="line" d="M 560 269 C 602 325, 629 350, 680 360" />
+
+  <g>
+    <rect class="node" x="690" y="97" width="130" height="86" rx="14" />
+    <circle class="accent" cx="716" cy="140" r="8" />
+    <text class="label" x="765" y="135" text-anchor="middle">Claude</text>
+    <text class="small" x="765" y="160" text-anchor="middle">Code</text>
+  </g>
+
+  <g>
+    <rect class="node" x="690" y="317" width="130" height="86" rx="14" />
+    <circle class="gold" cx="716" cy="360" r="8" />
+    <text class="label" x="765" y="355" text-anchor="middle">Codex</text>
+    <text class="small" x="765" y="380" text-anchor="middle">CLI</text>
+  </g>
+
+  <path class="line" d="M 820 140 C 856 159, 872 185, 884 217" />
+  <path class="line" d="M 820 360 C 856 341, 872 315, 884 283" />
+
+  <g>
+    <rect class="hub" x="890" y="207" width="130" height="86" rx="14" />
+    <text class="label" x="955" y="242" text-anchor="middle">Compare</text>
+    <text class="small" x="955" y="267" text-anchor="middle">judge + synth</text>
+  </g>
+
+  <path class="line" d="M 955 293 V 342" />
+  <g>
+    <rect class="node" x="890" y="352" width="130" height="70" rx="14" />
+    <text class="label" x="955" y="394" text-anchor="middle">Review</text>
+  </g>
+
+  <text class="small" x="550" y="454" text-anchor="middle">Every child task remains visible: status, logs, ETA, failure state, and final synthesis.</text>
+</svg>

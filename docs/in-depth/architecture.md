@@ -1,42 +1,21 @@
-
-## How Ennodia works
+---
+title: How Ennodia works
+description: A visible orchestration pipeline for routing, task watching, recovery, Compare, and final synthesis.
+---
 
 When an MCP client submits a high-level run, Ennodia processes it through a visible orchestration pipeline. The `ennodia_run` tool is the current end-to-end entrypoint; the lower-level task and Compare tools stay available for direct debugging.
 
 ### 1. Discover
 
-Ennodia maintains a registry of connected execution backends, such as Claude Code, Codex, Gemini CLI, OpenRouter, local model runners, MCP servers, shell-based agents, and internal tools.
+Ennodia maintains a registry of connected execution backends. The current adapters cover Claude Code, Codex CLI, OpenCode, and Antigravity; additional adapters can be added behind the same thin interface.
 
 ### 2. Plan
 
 The router combines the task classification with user-defined rules and the currently available backends.
 
 For example:
-```mermaid
-flowchart TD
-    request["Code-review request"]
-    classify["Classify task"]
-    rules["Apply project rules"]
 
-    claude["Claude Code"]
-    codex["Codex"]
-
-    compare["Compare findings"]
-    resolve["Resolve conflicts"]
-    review["Produce final review"]
-
-    request --> classify
-    classify --> rules
-
-    rules --> claude
-    rules --> codex
-
-    claude --> compare
-    codex --> compare
-
-    compare --> resolve
-    resolve --> review
-```
+![A code-review request is classified, routed through project rules to Claude Code and Codex CLI, compared, resolved, and returned as a final review.](../assets/orchestration-pipeline.svg)
 
 ### 3. Execute
 
@@ -50,7 +29,7 @@ Every model call, agent, subagent, tool invocation, and shell process becomes a 
 
 Failure handling is part of the execution plan.
 
-Nodes can time out, retry, fall back to another backend, or return partial results without hiding what happened.
+Nodes can time out, fail, or return partial results without hiding what happened.
 
 
 ### 6. Compare

@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
+  <title id="title">Ennodia</title>
+  <desc id="desc">Ennodia helps AI tools work together through visible routing, tracing, recovery, and Compare.</desc>
+  <defs>
+    <linearGradient id="panel" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#172131" />
+      <stop offset="1" stop-color="#101820" />
+    </linearGradient>
+    <style>
+      .bg { fill: #0d1117; }
+      .grid { stroke: #263345; stroke-width: 1; opacity: .7; }
+      .card { fill: url(#panel); stroke: #33455d; stroke-width: 2; }
+      .mark { fill: #65d0b6; }
+      .gold { fill: #ffd166; }
+      .rust { fill: #e78f6d; }
+      .blue { fill: #7aa7ff; }
+      .title { fill: #f3f6fb; font: 800 92px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      .lede { fill: #a9b4c2; font: 500 34px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      .label { fill: #f3f6fb; font: 700 27px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      .small { fill: #a9b4c2; font: 500 19px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      .line { stroke: #7aa7ff; stroke-width: 5; stroke-linecap: round; }
+    </style>
+  </defs>
+
+  <rect class="bg" width="1200" height="630" />
+  <g>
+    <path class="grid" d="M0 90H1200M0 180H1200M0 270H1200M0 360H1200M0 450H1200M0 540H1200" />
+    <path class="grid" d="M120 0V630M240 0V630M360 0V630M480 0V630M600 0V630M720 0V630M840 0V630M960 0V630M1080 0V630" />
+  </g>
+
+  <g transform="translate(82 90)">
+    <rect x="0" y="0" width="72" height="72" rx="18" fill="#10251f" stroke="#65d0b6" stroke-width="3" />
+    <text x="36" y="51" text-anchor="middle" fill="#65d0b6" font-family="system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="42" font-weight="800">E</text>
+    <text class="title" x="0" y="180">Ennodia</text>
+    <text class="lede" x="0" y="240">Visible routing, recovery, and Compare.</text>
+    <text class="small" x="0" y="300">Routing. Recovery. Compare. One final answer.</text>
+  </g>
+
+  <g transform="translate(690 94)">
+    <rect class="card" x="0" y="0" width="384" height="410" rx="24" />
+    <circle class="rust" cx="36" cy="38" r="9" />
+    <circle class="gold" cx="66" cy="38" r="9" />
+    <circle class="mark" cx="96" cy="38" r="9" />
+
+    <g transform="translate(40 94)">
+      <rect x="0" y="0" width="130" height="68" rx="12" fill="#1b2738" stroke="#33455d" />
+      <text class="label" x="65" y="43" text-anchor="middle">Plan</text>
+
+      <rect x="210" y="0" width="130" height="68" rx="12" fill="#10251f" stroke="#65d0b6" />
+      <text class="label" x="275" y="43" text-anchor="middle">Run</text>
+
+      <line class="line" x1="138" y1="34" x2="202" y2="34" />
+
+      <rect x="0" y="132" width="130" height="68" rx="12" fill="#1b2738" stroke="#33455d" />
+      <text class="label" x="65" y="175" text-anchor="middle">Watch</text>
+
+      <rect x="210" y="132" width="130" height="68" rx="12" fill="#10251f" stroke="#65d0b6" />
+      <text class="label" x="275" y="175" text-anchor="middle">Compare</text>
+
+      <line class="line" x1="275" y1="68" x2="275" y2="124" />
+      <line class="line" x1="138" y1="166" x2="202" y2="166" />
+
+      <rect x="0" y="264" width="340" height="64" rx="12" fill="#151f2b" stroke="#33455d" />
+      <text class="small" x="170" y="304" text-anchor="middle">complete trace + final synthesis</text>
+    </g>
+  </g>
+</svg>

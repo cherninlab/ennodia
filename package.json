@@ -5,6 +5,9 @@
   "description": "Make local and online AI tools work together.",
   "license": "MIT",
   "type": "module",
+  "workspaces": [
+    "website"
+  ],
   "bin": {
     "ennodia": "./src/index.ts"
   },
@@ -18,7 +21,10 @@
     "smoke": "bun run src/dev/smoke.ts",
     "mcp:smoke": "bun run src/dev/mcp-smoke.ts",
     "task:smoke": "bun run src/dev/task-smoke.ts",
-    "verify": "bun run check && bun run lint && bun run test && bun run task:smoke && bun run mcp:smoke"
+    "website:dev": "bun run --cwd website dev",
+    "website:build": "bun run --cwd website build",
+    "website:deploy": "bun run --cwd website deploy",
+    "verify": "bun run check && bun run lint && bun run test && bun run website:build && bun run task:smoke && bun run mcp:smoke"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",

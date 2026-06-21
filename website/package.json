@@ -1,0 +1,22 @@
+{
+  "name": "@ennodia/website",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "sync:docs": "bun run scripts/sync-docs.ts",
+    "dev": "bun run sync:docs && astro dev",
+    "build": "bun run sync:docs && astro build",
+    "preview": "astro preview",
+    "ensure:cloudflare-project": "bun run scripts/ensure-cloudflare-pages-project.ts",
+    "deploy": "bun run build && wrangler pages deploy dist --project-name ennodia --branch main"
+  },
+  "dependencies": {
+    "@astrojs/starlight": "^0.36.0",
+    "astro": "^5.16.4",
+    "sharp": "^0.35.2"
+  },
+  "devDependencies": {
+    "wrangler": "^4.103.0"
+  }
+}

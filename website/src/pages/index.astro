@@ -1,0 +1,248 @@
+---
+import "../styles/landing.css";
+import logoSrc from "../../../docs/assets/logo.svg?url";
+import antigravityLogoSrc from "../../../docs/assets/agents/antigravity-color.svg?url";
+import arrowIconSrc from "../../../docs/assets/icons/arrow.svg?url";
+import claudeLogoSrc from "../../../docs/assets/agents/claudecode-color.svg?url";
+import codexLogoSrc from "../../../docs/assets/agents/codex-color.svg?url";
+import githubIconSrc from "../../../docs/assets/icons/github.svg?url";
+import mouseDownAudioSrc from "../../../docs/assets/audio/mouse-down.mp3?url";
+import mouseUpAudioSrc from "../../../docs/assets/audio/mouse-up.mp3?url";
+import opencodeLogoSrc from "../../../docs/assets/agents/opencode-dark.svg?url";
+
+const pageTitle = "Ennodia - MCP-native peer review for AI agents";
+const pageDescription =
+  "Ennodia is a local MCP server for routing AI work, tracking each run, and comparing agent outputs before you answer.";
+const siteUrl = Astro.site ?? new URL("https://ennodia.cherninlab.com");
+const canonicalUrl = new URL(Astro.url.pathname, siteUrl).toString();
+const socialImageUrl = new URL("/og.png", siteUrl).toString();
+const socialImageAlt =
+  "Ennodia wordmark with a trace-style orchestration diagram.";
+
+const adapters = [
+  {
+    name: "Codex CLI",
+    detail: "code, reviews, repo work",
+    logo: codexLogoSrc
+  },
+  {
+    name: "Claude Code",
+    detail: "reasoning, code, docs",
+    logo: claudeLogoSrc
+  },
+  {
+    name: "OpenCode",
+    detail: "GLM, Kimi, Minimax",
+    logo: opencodeLogoSrc
+  },
+  {
+    name: "Antigravity",
+    detail: "Gemini and browser work",
+    logo: antigravityLogoSrc
+  }
+];
+
+const pipeline = [
+  "Discover available harnesses",
+  "Plan the route",
+  "Run selected agents",
+  "Watch status, logs, and ETA",
+  "Compare successful outputs",
+  "Return one answer with trace"
+];
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content={pageDescription} />
+    <link rel="canonical" href={canonicalUrl} />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <meta name="theme-color" content="#fbfbfa" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Ennodia" />
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={pageDescription} />
+    <meta property="og:url" content={canonicalUrl} />
+    <meta property="og:image" content={socialImageUrl} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content={socialImageAlt} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={pageTitle} />
+    <meta name="twitter:description" content={pageDescription} />
+    <meta name="twitter:image" content={socialImageUrl} />
+    <title>{pageTitle}</title>
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">Skip to content</a>
+
+    <main id="main-content">
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero-inner">
+          <h1 id="hero-title">
+            <img class="hero-logo" src={logoSrc} alt="Ennodia" />
+          </h1>
+          <p class="hero-subtitle">MCP-native peer review for AI agents.</p>
+          <div class="hero-actions" aria-label="Primary actions">
+            <a class="button button-primary" href="/docs/" data-click-sound>
+              Read the docs
+              <img src={arrowIconSrc} alt="" aria-hidden="true" />
+            </a>
+            <a class="button button-plain" href="https://github.com/cherninlab/ennodia" data-click-sound>
+              <img src={githubIconSrc} alt="" aria-hidden="true" />
+              GitHub
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <section class="section intro-section" aria-labelledby="intro-title">
+        <div class="section-label">Overview</div>
+        <article class="article">
+          <h2 id="intro-title">Ask other agents while keeping the trace visible.</h2>
+          <p>
+            Ennodia is a local MCP server that lets one agent consult other AI tools in the middle of a task. It routes the request, starts the selected harnesses, tracks progress, captures failures, and keeps enough context to explain what happened.
+          </p>
+          <p>
+            When several agents answer, Compare turns their outputs into a structured review: consensus, contradictions, unique insights, blind spots, and one synthesized result.
+          </p>
+        </article>
+      </section>
+
+      <section class="section two-column" aria-labelledby="loop-title">
+        <div class="section-label">Execution loop</div>
+        <div class="section-body">
+          <h2 id="loop-title">The work is the product.</h2>
+          <ol class="pipeline-list">
+            {pipeline.map((step, index) => (
+              <li>
+                <span>{String(index + 1).padStart(2, "0")}</span>
+                {step}
+              </li>
+            ))}
+          </ol>
+        </div>
+      </section>
+
+      <section class="section code-section" aria-labelledby="install-title">
+        <div class="section-label">Local first</div>
+        <div class="section-body">
+          <h2 id="install-title">Run it from the repo you can inspect.</h2>
+          <div class="code-grid">
+            <div>
+              <p>
+                Ennodia is Bun-first and private/local by default. Use the repository as the source of truth, then connect it as a stdio MCP server from your client.
+              </p>
+            </div>
+            <pre><code>git clone https://github.com/cherninlab/ennodia
+cd ennodia
+bun install
+bun run verify</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <section class="section adapters-section" aria-labelledby="adapters-title">
+        <div class="section-label">Harnesses</div>
+        <div class="section-body">
+          <h2 id="adapters-title">Thin adapters. Real tools.</h2>
+          <ul class="adapter-list">
+            {adapters.map((adapter) => (
+              <li>
+                <img src={adapter.logo} alt="" aria-hidden="true" />
+                <div>
+                  <strong>{adapter.name}</strong>
+                  <span>{adapter.detail}</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
+      <section class="section compare-section" aria-labelledby="compare-title">
+        <div class="section-label">Compare</div>
+        <div class="section-body">
+          <h2 id="compare-title">Not a paste-together answer.</h2>
+          <div class="compare-grid">
+            <article>
+              <h3>Judge</h3>
+              <p>Reads completed outputs and names where they agree, disagree, miss context, or add unique value.</p>
+            </article>
+            <article>
+              <h3>Synthesizer</h3>
+              <p>Uses the judge analysis and original outputs to produce one answer the caller can act on.</p>
+            </article>
+            <article>
+              <h3>Trace</h3>
+              <p>Preserves task IDs, failures, partial output, timing, and final status instead of flattening the run.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section credits-section" aria-labelledby="credits-title">
+        <div class="section-label">Credits</div>
+        <div class="section-body">
+          <article class="credits-card">
+            <p class="credits-kicker">Acknowledgement</p>
+            <h2 id="credits-title">
+              Ennodia starts with the idea made legible by <a href="https://github.com/karpathy/llm-council">karpathy/llm-council</a>.
+            </h2>
+            <p>
+              LLM Council shows the basic pattern clearly: ask several models independently, let them review each other's work, then have a final model compile the answer. Ennodia takes that council shape into local agent workflows, MCP, task tracing, failure visibility, and reusable harness adapters.
+            </p>
+          </article>
+        </div>
+      </section>
+
+    </main>
+
+    <footer class="site-footer">
+      <div class="footer-inner">
+        <img src={logoSrc} alt="Ennodia" />
+        <p>Open source. Local first. MIT licensed. Built with Bun.</p>
+      </div>
+    </footer>
+    <script define:vars={{ mouseDownAudioSrc, mouseUpAudioSrc }}>
+      const clickSoundTargets = document.querySelectorAll("[data-click-sound]");
+
+      const createCue = (src) => {
+        const audio = new Audio(src);
+        audio.preload = "auto";
+        audio.volume = 0.18;
+        return audio;
+      };
+
+      const downCue = createCue(mouseDownAudioSrc);
+      const upCue = createCue(mouseUpAudioSrc);
+
+      const playCue = (audio) => {
+        audio.currentTime = 0;
+        const play = audio.play();
+        if (play) {
+          play.catch(() => {});
+        }
+      };
+
+      for (const target of clickSoundTargets) {
+        target.addEventListener("pointerdown", () => playCue(downCue));
+        target.addEventListener("pointerup", () => playCue(upCue));
+        target.addEventListener("pointercancel", () => playCue(upCue));
+        target.addEventListener("keydown", (event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            playCue(downCue);
+          }
+        });
+        target.addEventListener("keyup", (event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            playCue(upCue);
+          }
+        });
+      }
+    </script>
+  </body>
+</html>
