@@ -77,6 +77,8 @@ function assertPackedFiles(paths: string[]): void {
     "README.md",
     "LICENSE",
     "CONTRIBUTING.md",
+    "bin/ennodia",
+    "src/cli.ts",
     "src/index.ts",
     "src/server.ts",
     "src/version.ts",

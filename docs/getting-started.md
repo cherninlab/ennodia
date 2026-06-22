@@ -17,11 +17,15 @@ The current adapters detect:
 - Codex CLI
 - Claude Code
 - OpenCode
+- Kilo Code
+- Kiro CLI
+- Cline CLI
+- Hermes Agent
 - Antigravity
 
 ## Local checkout
 
-Use the repository directly until the npm package is published:
+Use a checkout when you are changing Ennodia itself:
 
 ```sh
 git clone https://github.com/cherninlab/ennodia
@@ -32,25 +36,28 @@ bun run verify
 
 ## Install from npm
 
-After the first package publish, prerelease builds use the `next` dist-tag:
+The public prerelease channel uses npm's `next` dist-tag:
 
 ```sh
-bunx ennodia@next
+npx -y ennodia@next
 ```
 
-`npx ennodia@next` can also launch Ennodia when `bun` is already available on
-`PATH`.
+Requires Bun `1.3.14` or newer. `npx` downloads Ennodia; Bun runs it. Prefer
+Bun directly? Use `bunx ennodia@next`.
+
+The JSR package `@cherninlab/ennodia` exposes TypeScript modules for import.
+Use the npm package for the stdio MCP executable.
 
 ## MCP client config
 
-Use this after the npm package is published:
+Use the npm package for normal MCP client setup:
 
 ```json
 {
   "mcpServers": {
     "ennodia": {
-      "command": "bunx",
-      "args": ["ennodia@next"]
+      "command": "npx",
+      "args": ["-y", "ennodia@next"]
     }
   }
 }
@@ -63,7 +70,7 @@ For local development from a checkout:
   "mcpServers": {
     "ennodia": {
       "command": "bun",
-      "args": ["run", "/absolute/path/to/ennodia/src/index.ts"]
+      "args": ["run", "/absolute/path/to/ennodia/src/cli.ts"]
     }
   }
 }
@@ -86,10 +93,12 @@ From an MCP client, start with:
 1. `ennodia_list_harnesses`
 2. `ennodia_plan`
 3. `ennodia_run`
+4. `ennodia_get_run`
 
 `ennodia_run` is the main end-to-end entrypoint. It plans the route, starts the
-selected task or tasks, optionally compares successful outputs, and returns one
-final answer.
+selected task or tasks, optionally compares successful outputs, and returns a
+run ID. Poll `ennodia_get_run` with that ID until the run reaches `succeeded`,
+`failed`, or `cancelled`.
 
 ## Expected behavior
 

@@ -21,9 +21,18 @@ Ennodia is a local MCP server that lets one AI agent ask other agents for help w
 
 It is built for workflows where no single model or agent should be trusted as the only reviewer.
 
-## Local Setup
+## Install
 
-From a checkout:
+Run Ennodia as a stdio MCP server from the npm prerelease channel:
+
+```sh
+npx -y ennodia@next
+```
+
+Requires Bun `1.3.14` or newer. `npx` downloads Ennodia; Bun runs it. Prefer
+Bun directly? Use `bunx ennodia@next`.
+
+For local development from a checkout:
 
 ```sh
 git clone https://github.com/cherninlab/ennodia
@@ -31,10 +40,6 @@ cd ennodia
 bun install
 bun run verify
 ```
-
-After the npm package is published, the prerelease channel will be available as
-`bunx ennodia@next`. `npx` can also launch Ennodia, but only when `bun` is
-already available on `PATH`.
 
 ## What Ennodia Does
 
@@ -53,6 +58,10 @@ Current adapters:
 - Codex CLI
 - Claude Code
 - OpenCode
+- Kilo Code
+- Kiro CLI
+- Cline CLI
+- Hermes Agent
 - Antigravity
 
 Adapters stay thin. Shared routing, tracing, task state, recovery, and Compare
@@ -65,8 +74,8 @@ Common entrypoints:
 - `ennodia_list_harnesses` - show detected tools
 - `ennodia_plan` - preview routing for a prompt
 - `ennodia_start` - start direct child tasks without run-level synthesis
-- `ennodia_run` - plan, execute, optionally Compare, and return a final answer
-- `ennodia_get_run` - inspect run state, events, ETA, and final output
+- `ennodia_run` - plan, execute, optionally Compare, and return a run ID
+- `ennodia_get_run` - inspect run state, events, ETA, and final answer
 - `ennodia_cancel_run` - cancel a running orchestration
 - `ennodia_start_compare` - compare completed task outputs or supplied responses
 
@@ -77,13 +86,13 @@ Lower-level task tools are available for polling and cancellation.
 - [Getting started](docs/getting-started.md)
 - [How Ennodia works](docs/in-depth/architecture.md)
 - [MCP tools](docs/reference/mcp-tools.md)
+- [Running better audits](docs/in-depth/auditing.md)
 - [Releasing Ennodia](docs/in-depth/releasing.md)
 
 ## Benchmarks
 
-The first benchmark is `multi-model-bug-recall`: small TypeScript review
-fixtures scored against committed bug oracles. Run the deterministic fixture
-suite with:
+The current benchmark is `multi-model-bug-recall`: small TypeScript review
+fixtures scored against committed bug oracles. Run the deterministic suite with:
 
 ```sh
 bun run bench:bug-recall

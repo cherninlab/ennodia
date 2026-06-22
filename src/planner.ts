@@ -20,16 +20,25 @@ export function planRoute(
   const reasons: string[] = [];
 
   let category: RoutePlan["category"] = "general";
+  const browserSignals = /\b(browser|website|site|landing|frontend|ui|page|viewport|mobile|desktop|click|screenshot|rendered)\b/.test(
+    lower,
+  );
+  const imageSignals = /\b(image|visual|design|mockup)\b/.test(lower);
+  const explicitCodeSignals = /\b(code|bug|diff|repo|typescript|javascript|python|test)\b/.test(
+    lower,
+  );
+  const codeSignals = explicitCodeSignals ||
+    (/\breview\b/.test(lower) && !browserSignals && !imageSignals);
 
-  if (/\b(code|bug|diff|repo|typescript|javascript|python|test|review)\b/.test(lower)) {
-    category = "code";
-    reasons.push("The prompt looks code-oriented.");
-  } else if (/\b(browser|website|click|screenshot|ui|page|automation)\b/.test(lower)) {
+  if (browserSignals) {
     category = "browser";
-    reasons.push("The prompt mentions browser or UI automation.");
-  } else if (/\b(image|visual|design|screenshot|mockup)\b/.test(lower)) {
+    reasons.push("The prompt mentions a website, UI, or rendered page.");
+  } else if (imageSignals) {
     category = "image";
     reasons.push("The prompt mentions visual or image work.");
+  } else if (codeSignals) {
+    category = "code";
+    reasons.push("The prompt looks code-oriented.");
   } else if (/\b(research|compare|latest|source|web|investigate)\b/.test(lower)) {
     category = "research";
     reasons.push("The prompt looks research-oriented.");
@@ -38,11 +47,55 @@ export function planRoute(
   }
 
   const preferredByCategory: Record<RoutePlan["category"], string[]> = {
-    code: ["codex", "claude-code", "opencode", "antigravity"],
-    research: ["claude-code", "codex", "opencode"],
-    browser: ["antigravity", "opencode", "claude-code", "codex"],
-    image: ["antigravity", "claude-code", "opencode", "codex"],
-    general: ["claude-code", "codex", "opencode", "antigravity"],
+    code: [
+      "codex",
+      "claude-code",
+      "opencode",
+      "kilo",
+      "kiro",
+      "cline",
+      "hermes-agent",
+      "antigravity",
+    ],
+    research: [
+      "claude-code",
+      "codex",
+      "opencode",
+      "kilo",
+      "kiro",
+      "cline",
+      "hermes-agent",
+    ],
+    browser: [
+      "antigravity",
+      "opencode",
+      "kilo",
+      "kiro",
+      "cline",
+      "hermes-agent",
+      "claude-code",
+      "codex",
+    ],
+    image: [
+      "antigravity",
+      "claude-code",
+      "opencode",
+      "kilo",
+      "kiro",
+      "cline",
+      "hermes-agent",
+      "codex",
+    ],
+    general: [
+      "claude-code",
+      "codex",
+      "opencode",
+      "kilo",
+      "kiro",
+      "cline",
+      "hermes-agent",
+      "antigravity",
+    ],
   };
 
   const candidates = [
@@ -52,7 +105,7 @@ export function planRoute(
     ),
   ];
 
-  const complexSignals = /\b(compare|several|multiple|parallel|architecture|review|tradeoff|best|judge)\b/.test(
+  const complexSignals = /\b(audit|assess|compare|critique|evaluate|inspect|judge|multiple|parallel|review|several|tradeoff|best)\b/.test(
     lower,
   );
   const parallelSuggested = candidates.length > 1 && complexSignals;

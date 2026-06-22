@@ -11,18 +11,19 @@ manual control.
 ### 1. Discover
 
 Ennodia maintains a registry of execution backends. The current adapters cover
-Claude Code, Codex CLI, OpenCode, and Antigravity. Each adapter is intentionally
-thin: it reports whether the tool is available, identifies the installed
-version, and starts the tool through its supported command-line surface.
+Claude Code, Codex CLI, OpenCode, Kilo Code, Kiro CLI, Cline CLI, Hermes Agent,
+and Antigravity. Each adapter is intentionally thin: it reports whether the tool
+is available, identifies the installed version, and starts the tool through its
+supported command-line surface.
 
 ### 2. Plan
 
-The router combines task classification, available harnesses, and simple project
-rules to decide where work should go.
+The router combines prompt classification and the currently available harnesses
+to decide where work should go.
 
 For example:
 
-![A code-review request is classified, routed through project rules to Claude Code and Codex CLI, compared, resolved, and returned as a final review.](../assets/orchestration-pipeline.svg)
+![A request is classified, routed to available harnesses, watched, recovered when needed, compared, and returned with a trace.](../assets/orchestration-pipeline.svg)
 
 ### 3. Execute
 
@@ -40,7 +41,6 @@ the child process exits and captured output has drained.
 Failure handling is part of the execution plan. Nodes can time out, fail, be
 cancelled, or return partial output without hiding what happened.
 
-
 ### 6. Compare
 
 When several agents produce answers, Ennodia does not concatenate them. A judge
@@ -50,4 +50,5 @@ outputs to create the final result.
 
 ### 7. Return
 
-The MCP client receives the final output, while Ennodia retains the complete execution record.
+The MCP client receives the final output and can inspect the in-memory run
+record while the MCP server process remains alive.

@@ -114,6 +114,9 @@ describe("Compare prompts and parsing", () => {
     expect(buildJudgePrompt("Prompt", candidates)).toContain(
       "ENNODIA_COMPARE_JUDGE",
     );
+    expect(buildJudgePrompt("Prompt", candidates)).toContain(
+      "Judge the candidate set against the original prompt",
+    );
     expect(buildSynthesizerPrompt("Prompt", candidates)).toContain(
       "ENNODIA_COMPARE_SYNTHESIZER",
     );

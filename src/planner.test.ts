@@ -30,6 +30,15 @@ describe("planRoute", () => {
     expect(plan.selected).toBe("antigravity");
   });
 
+  it("treats website review prompts as rendered UI work", () => {
+    const plan = planRoute("Audit and review the landing page website for first-time users.", harnesses);
+
+    expect(plan.category).toBe("browser");
+    expect(plan.selected).toBe("antigravity");
+    expect(plan.parallelSuggested).toBe(true);
+    expect(plan.compareSuggested).toBe(true);
+  });
+
   it("suggests parallel Compare for complex comparison prompts", () => {
     const plan = planRoute("Compare several models and judge the tradeoffs.", harnesses);
 

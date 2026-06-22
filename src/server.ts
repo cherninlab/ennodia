@@ -209,7 +209,7 @@ export function createEnnodiaServer(): McpServer {
           .string()
           .optional()
           .describe(
-            "Harness to use as the Compare judge. Omit to use the default priority: claude-code, codex, antigravity, then opencode.",
+            "Harness to use as the Compare judge. Omit to use the default priority: claude-code, codex, antigravity, opencode, kilo, kiro, cline, then hermes-agent.",
           ),
         judgeModel: z
           .string()
@@ -450,7 +450,7 @@ export function createEnnodiaServer(): McpServer {
           .string()
           .optional()
           .describe(
-            "Harness to use as the Compare judge. Omit to use the default priority: claude-code, codex, antigravity, then opencode.",
+            "Harness to use as the Compare judge. Omit to use the default priority: claude-code, codex, antigravity, opencode, kilo, kiro, cline, then hermes-agent.",
           ),
         judgeModel: z
           .string()
@@ -717,7 +717,16 @@ async function resolveRunnableHarness(harnessId?: string) {
   const harnesses = await discoverHarnesses();
   const preferredIds = harnessId
     ? [harnessId]
-    : ["claude-code", "codex", "antigravity", "opencode"];
+    : [
+      "claude-code",
+      "codex",
+      "antigravity",
+      "opencode",
+      "kilo",
+      "kiro",
+      "cline",
+      "hermes-agent",
+    ];
 
   for (const id of preferredIds) {
     const adapter = findHarnessAdapter(id);

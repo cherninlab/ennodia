@@ -4,62 +4,99 @@ import logoSrc from "../../../docs/assets/logo.svg?url";
 import antigravityLogoSrc from "../../../docs/assets/agents/antigravity-color.svg?url";
 import arrowIconSrc from "../../../docs/assets/icons/arrow.svg?url";
 import claudeLogoSrc from "../../../docs/assets/agents/claudecode-color.svg?url";
+import clineLogoSrc from "../../../docs/assets/agents/cline.svg?url";
 import codexLogoSrc from "../../../docs/assets/agents/codex-color.svg?url";
 import githubIconSrc from "../../../docs/assets/icons/github.svg?url";
-import mouseDownAudioSrc from "../../../docs/assets/audio/mouse-down.mp3?url";
-import mouseUpAudioSrc from "../../../docs/assets/audio/mouse-up.mp3?url";
+import hermesLogoSrc from "../../../docs/assets/agents/hermesagent.svg?url";
+import kiloLogoSrc from "../../../docs/assets/agents/kilocode.svg?url";
+import kiroLogoSrc from "../../../docs/assets/agents/kiro-color.svg?url";
 import opencodeLogoSrc from "../../../docs/assets/agents/opencode-dark.svg?url";
 
 const pageTitle =
   "Ennodia - MCP server that lets one AI agent ask other agents for help";
 const pageDescription =
-  "Ennodia is a local MCP server that lets AI agents ask other agents for review, track each run, and compare outputs before answering.";
+  "Ennodia lets one AI agent ask other agents for help.";
 const siteUrl = Astro.site ?? new URL("https://ennodia.cherninlab.com");
 const canonicalUrl = new URL(Astro.url.pathname, siteUrl).toString();
 const socialImageUrl = new URL("/og.png", siteUrl).toString();
-const socialImageAlt =
-  "Ennodia wordmark with a trace-style orchestration diagram.";
+const socialImageAlt = "Ennodia wordmark.";
 
 const adapters = [
-  {
-    name: "Codex CLI",
-    detail: "code, reviews, repo work",
-    logo: codexLogoSrc,
-  },
-  {
-    name: "Claude Code",
-    detail: "reasoning, code, docs",
-    logo: claudeLogoSrc,
-  },
-  {
-    name: "OpenCode",
-    detail: "GLM, Kimi, Minimax",
-    logo: opencodeLogoSrc,
-  },
-  {
-    name: "Antigravity",
-    detail: "Gemini and browser work",
-    logo: antigravityLogoSrc,
-  },
+  { name: "Codex CLI", logo: codexLogoSrc },
+  { name: "Claude Code", logo: claudeLogoSrc },
+  { name: "OpenCode", logo: opencodeLogoSrc },
+  { name: "Kilo Code", logo: kiloLogoSrc },
+  { name: "Kiro CLI", logo: kiroLogoSrc },
+  { name: "Cline CLI", logo: clineLogoSrc },
+  { name: "Hermes Agent", logo: hermesLogoSrc },
+  { name: "Antigravity", logo: antigravityLogoSrc },
 ];
 
-const pipeline = [
-  "Discover available harnesses",
-  "Plan the route",
-  "Run selected agents",
-  "Watch status, logs, and timing",
-  "Compare successful outputs",
-  "Return one answer with trace",
-];
-
+const installCommand = "npx -y ennodia@next";
 const mcpConfigSnippet = `{
   "mcpServers": {
     "ennodia": {
-      "command": "bunx",
-      "args": ["ennodia@next"]
+      "command": "npx",
+      "args": ["-y", "ennodia@next"]
     }
   }
 }`;
+const examplePrompt = `Use Ennodia to ask Codex, Claude, and Gemini:
+"Review this change before I ship it. Find the highest-risk issue, docs drift, and install confusion. Compare disagreements and give me the next action."`;
+const faqItems = [
+  {
+    question: "What is Ennodia?",
+    answer:
+      "Ennodia is a local MCP server that lets one AI agent ask other AI agents for help.",
+  },
+  {
+    question: "Why would one AI agent ask other agents for help?",
+    answer:
+      "Different agents catch different risks. Ennodia is useful when you want another pass on a bug hunt, release, architecture decision, documentation change, or product review.",
+  },
+  {
+    question: "Does Ennodia replace my main AI agent?",
+    answer:
+      "No. Your primary agent stays in charge. Ennodia gives it a way to route a question to other local agents and bring their answers back into the same workflow.",
+  },
+  {
+    question: "Which agents can Ennodia ask?",
+    answer:
+      "Ennodia works through local harness adapters for agent CLIs such as Codex CLI, Claude Code, OpenCode, Kilo Code, Kiro CLI, Cline CLI, Hermes Agent, and Antigravity.",
+  },
+  {
+    question: "Does Ennodia send my code to Ennodia servers?",
+    answer:
+      "No. Ennodia runs locally and does not use an Ennodia-hosted service. The child agent CLIs you choose may still call their own model providers according to their own settings.",
+  },
+  {
+    question: "Why not manually copy prompts between tools?",
+    answer:
+      "Manual copy-paste loses traceability. Ennodia keeps selected agents, task IDs, failures, timing, outputs, Compare, and the final answer in one run.",
+  },
+  {
+    question: "Does Ennodia support files and screenshots?",
+    answer:
+      "File and screenshot workflows depend on what each local harness can access. Include file paths and short descriptions today; better attachment staging is an important next step.",
+  },
+  {
+    question: "Is Ennodia only for code review?",
+    answer:
+      "No. Code review is a good fit, but Ennodia also works for docs audits, release checks, migrations, research checks, and design critique.",
+  },
+];
+const faqStructuredData = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: faqItems.map((item) => ({
+    "@type": "Question",
+    name: item.question,
+    acceptedAnswer: {
+      "@type": "Answer",
+      text: item.answer,
+    },
+  })),
+};
 ---
 
 <!doctype html>
@@ -78,12 +115,16 @@ const mcpConfigSnippet = `{
     <meta property="og:url" content={canonicalUrl} />
     <meta property="og:image" content={socialImageUrl} />
     <meta property="og:image:width" content="1200" />
-    <meta property="og:image:height" content="630" />
+    <meta property="og:image:height" content="628" />
     <meta property="og:image:alt" content={socialImageAlt} />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={pageTitle} />
     <meta name="twitter:description" content={pageDescription} />
     <meta name="twitter:image" content={socialImageUrl} />
+    <script
+      type="application/ld+json"
+      set:html={JSON.stringify(faqStructuredData)}
+    />
     <title>{pageTitle}</title>
   </head>
   <body>
@@ -97,17 +138,16 @@ const mcpConfigSnippet = `{
             <img class="hero-logo" src={logoSrc} alt="" aria-hidden="true" />
           </h1>
           <p class="hero-subtitle">
-            MCP server that lets one AI agent ask other agents for help
+            Let one AI agent ask other agents for help.
           </p>
           <div class="hero-actions" aria-label="Primary actions">
-            <a class="button button-primary" href="/docs/" data-click-sound>
-              Read the docs
+            <a class="button button-primary" href="/docs/">
+              Get started
               <img src={arrowIconSrc} alt="" aria-hidden="true" />
             </a>
             <a
               class="button button-plain"
               href="https://github.com/cherninlab/ennodia"
-              data-click-sound
             >
               <img src={githubIconSrc} alt="" aria-hidden="true" />
               GitHub
@@ -116,72 +156,150 @@ const mcpConfigSnippet = `{
         </div>
       </section>
 
-      <section class="section intro-section" aria-labelledby="intro-title">
-        <div class="section-label">Overview</div>
-        <div class="section-body intro-layout">
-          <article class="article intro-copy">
-            <h2 id="intro-title">
-              Ask other agents while keeping the trace visible.
-            </h2>
-            <p>
-              Ennodia is a local MCP server that lets one AI agent consult other
-              agents in the middle of a task. It routes the request, starts the
-              selected harnesses, tracks progress, captures failures, and keeps
-              enough context to explain what happened.
-            </p>
-            <p>
-              When several agents answer, Compare turns their outputs into a
-              structured review: consensus, contradictions, unique insights,
-              blind spots, and one synthesized result.
-            </p>
-          </article>
-          <figure
-            class="flow-figure"
-            aria-label="Animation showing one request routed through Ennodia to several peer agents, then merged into judge, synthesizer, and trace steps."
-          >
-            <div
-              class="flow-animation"
-              data-lottie="/lottie/ennodia-peer-review.json"
-            >
-            </div>
-          </figure>
-        </div>
-      </section>
-
-      <section class="section two-column" aria-labelledby="loop-title">
-        <div class="section-label">Execution loop</div>
-        <div class="section-body">
-          <h2 id="loop-title">A visible run, not an invisible subprocess.</h2>
-          <ol class="pipeline-list">
-            {
-              pipeline.map((step, index) => (
-                <li>
-                  <span>{String(index + 1).padStart(2, "0")}</span>
-                  {step}
-                </li>
-              ))
-            }
-          </ol>
-        </div>
-      </section>
-
       <section class="section code-section" aria-labelledby="install-title">
-        <div class="section-label">Local first</div>
+        <div class="section-label">Install</div>
         <div class="section-body">
-          <h2 id="install-title">Install it as a stdio MCP server.</h2>
-          <div class="code-grid">
+          <h2 id="install-title">Install Ennodia.</h2>
+          <div class="install-layout">
             <div>
               <p>
-                Ennodia is Bun-first. After the first package publish, the npm
-                prerelease channel will run through <code>bunx</code>, and <code
-                  >npx</code
-                > will work when <code>bun</code> is already available on <code
-                  >PATH</code
-                >.
+                Add Ennodia to your MCP client.
+              </p>
+              <p class="inline-note">
+                Use <code>npx</code> in MCP configs, or <code
+                  >bunx ennodia@next</code
+                > if your client supports it. Requires Bun 1.3.14 or newer.
               </p>
             </div>
-            <pre><code>{mcpConfigSnippet}</code></pre>
+            <div class="install-snippets">
+              <div>
+                <p class="snippet-label">Command</p>
+                <div class="code-copy">
+                  <pre><code>{installCommand}</code></pre>
+                  <button
+                    class="copy-button"
+                    type="button"
+                    data-copy-code={installCommand}
+                    aria-label="Copy install command"
+                  ></button>
+                  <span class="copy-status" data-copy-status aria-live="polite"
+                  ></span>
+                </div>
+              </div>
+              <div>
+                <p class="snippet-label">MCP config</p>
+                <div class="code-copy">
+                  <pre><code>{mcpConfigSnippet}</code></pre>
+                  <button
+                    class="copy-button"
+                    type="button"
+                    data-copy-code={mcpConfigSnippet}
+                    aria-label="Copy MCP config"
+                  ></button>
+                  <span class="copy-status" data-copy-status aria-live="polite"
+                  ></span>
+                </div>
+              </div>
+            </div>
           </div>
+        </div>
+      </section>
+
+      <section class="section intro-section" aria-labelledby="intro-title">
+        <div class="section-label">Good fits</div>
+        <div class="section-body">
+          <article class="article intro-copy">
+            <h2 id="intro-title">Work that needs review.</h2>
+            <ul class="use-list">
+              <li>A bug hunt where one model may miss the cause</li>
+              <li>A release or docs pass before publishing</li>
+              <li>An architecture decision with tradeoffs</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section class="section example-section" aria-labelledby="example-title">
+        <div class="section-label">Prompt</div>
+        <div class="section-body">
+          <h2 id="example-title">Copy this prompt.</h2>
+          <div class="code-copy">
+            <pre><code>{examplePrompt}</code></pre>
+            <button
+              class="copy-button"
+              type="button"
+              data-copy-code={examplePrompt}
+              aria-label="Copy example prompt"
+            ></button>
+            <span class="copy-status" data-copy-status aria-live="polite"
+            ></span>
+          </div>
+        </div>
+      </section>
+
+      <section class="section process-section" aria-labelledby="loop-title">
+        <div class="section-label">Process</div>
+        <div class="section-body">
+          <h2 id="loop-title">How Ennodia runs.</h2>
+          <ol class="process-diagram" aria-label="Ennodia request flow">
+            <li>
+              <div class="process-number">1</div>
+              <div class="process-copy">
+                <h3>Ask</h3>
+                <p>Your primary agent sends one request.</p>
+              </div>
+              <div class="process-visual">
+                <span class="process-node">Agent</span>
+                <span class="process-line" aria-hidden="true"></span>
+                <span class="process-node process-node-dark">Ennodia</span>
+              </div>
+            </li>
+            <li>
+              <div class="process-number">2</div>
+              <div class="process-copy">
+                <h3>Route</h3>
+                <p>Available local harnesses are selected.</p>
+              </div>
+              <div class="process-visual process-visual-cluster">
+                <span class="process-node process-node-dark">Ennodia</span>
+                <span class="process-line" aria-hidden="true"></span>
+                <span class="process-cluster" aria-label="Selected agents">
+                  <span class="process-node process-node-small">Codex</span>
+                  <span class="process-node process-node-small">Claude</span>
+                  <span class="process-node process-node-small">Gemini</span>
+                </span>
+              </div>
+            </li>
+            <li>
+              <div class="process-number">3</div>
+              <div class="process-copy">
+                <h3>Review</h3>
+                <p>Each agent answers independently.</p>
+              </div>
+              <div class="process-visual process-visual-cluster">
+                <span class="process-cluster" aria-label="Agent answers">
+                  <span class="process-node process-node-small">A</span>
+                  <span class="process-node process-node-small">B</span>
+                  <span class="process-node process-node-small">C</span>
+                </span>
+                <span class="process-line" aria-hidden="true"></span>
+                <span class="process-node process-node-dotted">Compare</span>
+              </div>
+            </li>
+            <li>
+              <div class="process-number">4</div>
+              <div class="process-copy">
+                <h3>Return</h3>
+                <p>You get the answer and the trace.</p>
+              </div>
+              <div class="process-visual">
+                <span class="process-node process-node-dotted">Judge</span>
+                <span class="process-line" aria-hidden="true"></span>
+                <span class="process-node process-node-dark">Answer</span>
+                <span class="process-node process-node-small">Trace</span>
+              </div>
+            </li>
+          </ol>
         </div>
       </section>
 
@@ -189,18 +307,15 @@ const mcpConfigSnippet = `{
         class="section adapters-section"
         aria-labelledby="adapters-title"
       >
-        <div class="section-label">Harnesses</div>
+        <div class="section-label">Agents</div>
         <div class="section-body">
-          <h2 id="adapters-title">Thin adapters. Real tools.</h2>
+          <h2 id="adapters-title">Compatible with local agent CLIs.</h2>
           <ul class="adapter-list">
             {
               adapters.map((adapter) => (
                 <li>
                   <img src={adapter.logo} alt="" aria-hidden="true" />
-                  <div>
-                    <strong>{adapter.name}</strong>
-                    <span>{adapter.detail}</span>
-                  </div>
+                  <strong>{adapter.name}</strong>
                 </li>
               ))
             }
@@ -211,30 +326,39 @@ const mcpConfigSnippet = `{
       <section class="section compare-section" aria-labelledby="compare-title">
         <div class="section-label">Compare</div>
         <div class="section-body">
-          <h2 id="compare-title">Not a paste-together answer.</h2>
-          <div class="compare-grid">
-            <article>
-              <h3><span aria-hidden="true">🗡️</span> Judge</h3>
-              <p>
-                Reads completed outputs and names where they agree, disagree,
-                miss context, or add unique value.
-              </p>
-            </article>
-            <article>
-              <h3><span aria-hidden="true">🗝️</span> Synthesizer</h3>
-              <p>
-                Uses the judge analysis and original outputs to produce one
-                answer the caller can act on.
-              </p>
-            </article>
-            <article>
-              <h3><span aria-hidden="true">🔥</span> Trace</h3>
-              <p>
-                Preserves task IDs, failures, partial output, timing, and final
-                status instead of flattening the run.
-              </p>
-            </article>
-          </div>
+          <h2 id="compare-title">How Ennodia compares.</h2>
+          <ol class="compare-flow" aria-label="Ennodia compare flow">
+            <li>
+              <div class="concept-mark" aria-hidden="true">🗡️</div>
+              <div>
+                <h3>Judge</h3>
+                <p>
+                  Names agreements, disagreements, missing context, unique
+                  value, and risk.
+                </p>
+              </div>
+            </li>
+            <li>
+              <div class="concept-mark" aria-hidden="true">🗝️</div>
+              <div>
+                <h3>Synthesizer</h3>
+                <p>
+                  Turns the original answers and judge notes into one answer
+                  the caller can use.
+                </p>
+              </div>
+            </li>
+            <li>
+              <div class="concept-mark" aria-hidden="true">🔥</div>
+              <div>
+                <h3>Trace</h3>
+                <p>
+                  Keeps task IDs, failures, timing, partial output, and final
+                  status visible.
+                </p>
+              </div>
+            </li>
+          </ol>
         </div>
       </section>
 
@@ -242,21 +366,60 @@ const mcpConfigSnippet = `{
         <div class="section-label">Credits</div>
         <div class="section-body">
           <article class="credits-card">
-            <p class="credits-kicker">Acknowledgement</p>
             <h2 id="credits-title">
-              Ennodia starts with the idea made legible by <a
+              Inspired by <a
                 href="https://github.com/karpathy/llm-council"
                 >karpathy/llm-council</a
               >.
             </h2>
             <p>
-              LLM Council shows the basic pattern clearly: ask several models
-              independently, let them review each other's work, then have a
-              final model compile the answer. Ennodia takes that council shape
+              LLM Council demonstrates the pattern: ask several models
+              independently, compare, synthesize. Ennodia brings that pattern
               into local agent workflows, MCP, task tracing, failure visibility,
               and reusable harness adapters.
             </p>
           </article>
+        </div>
+      </section>
+
+      <section class="section faq-section" aria-labelledby="faq-title">
+        <div class="section-label">FAQ</div>
+        <div class="section-body">
+          <h2 id="faq-title">Common questions.</h2>
+          <div class="faq-list">
+            {
+              faqItems.map((item) => (
+                <details>
+                  <summary>{item.question}</summary>
+                  <p>{item.answer}</p>
+                </details>
+              ))
+            }
+          </div>
+        </div>
+      </section>
+
+      <section class="section cta-section" aria-labelledby="cta-title">
+        <div class="section-label">Get started</div>
+        <div class="section-body">
+          <h2 id="cta-title">Ask other agents for help.</h2>
+          <p>
+            Connect Ennodia as an MCP server, then ask your primary agent to
+            bring in reviewers.
+          </p>
+          <div class="hero-actions cta-actions" aria-label="Final actions">
+            <a class="button button-primary" href="/docs/getting-started/">
+              Read setup
+              <img src={arrowIconSrc} alt="" aria-hidden="true" />
+            </a>
+            <a
+              class="button button-plain"
+              href="https://github.com/cherninlab/ennodia"
+            >
+              <img src={githubIconSrc} alt="" aria-hidden="true" />
+              GitHub
+            </a>
+          </div>
         </div>
       </section>
     </main>
@@ -264,75 +427,54 @@ const mcpConfigSnippet = `{
     <footer class="site-footer">
       <div class="footer-inner">
         <img src={logoSrc} alt="Ennodia" />
-        <p>Open source. Local first. MIT licensed. Built with Bun.</p>
+        <p>Open source. Local first. MIT licensed.</p>
       </div>
     </footer>
     <script>
-      import lottie from "lottie-web/build/player/lottie_light";
+      const copyButtons = document.querySelectorAll("[data-copy-code]");
 
-      const reducedMotion = window.matchMedia(
-        "(prefers-reduced-motion: reduce)",
-      );
-      const animationTargets = document.querySelectorAll("[data-lottie]");
-
-      for (const target of animationTargets) {
-        const path = target.getAttribute("data-lottie");
-        if (!path) {
-          continue;
+      async function copyText(text) {
+        if (navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(text);
+          return;
         }
 
-        const animation = lottie.loadAnimation({
-          container: target,
-          renderer: "svg",
-          loop: !reducedMotion.matches,
-          autoplay: !reducedMotion.matches,
-          path,
-          rendererSettings: {
-            preserveAspectRatio: "xMidYMid meet",
-          },
-        });
-
-        if (reducedMotion.matches) {
-          animation.addEventListener("DOMLoaded", () => {
-            animation.goToAndStop(185, true);
-          });
-        }
+        const textarea = document.createElement("textarea");
+        textarea.value = text;
+        textarea.setAttribute("readonly", "");
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.append(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        textarea.remove();
       }
-    </script>
-    <script define:vars={{ mouseDownAudioSrc, mouseUpAudioSrc }}>
-      const clickSoundTargets = document.querySelectorAll("[data-click-sound]");
 
-      const createCue = (src) => {
-        const audio = new Audio(src);
-        audio.preload = "auto";
-        audio.volume = 0.18;
-        return audio;
-      };
+      for (const button of copyButtons) {
+        button.addEventListener("click", async () => {
+          const code = button.getAttribute("data-copy-code") ?? "";
+          const status = button.parentElement?.querySelector(
+            "[data-copy-status]",
+          );
 
-      const downCue = createCue(mouseDownAudioSrc);
-      const upCue = createCue(mouseUpAudioSrc);
-
-      const playCue = (audio) => {
-        audio.currentTime = 0;
-        const play = audio.play();
-        if (play) {
-          play.catch(() => {});
-        }
-      };
-
-      for (const target of clickSoundTargets) {
-        target.addEventListener("pointerdown", () => playCue(downCue));
-        target.addEventListener("pointerup", () => playCue(upCue));
-        target.addEventListener("pointercancel", () => playCue(upCue));
-        target.addEventListener("keydown", (event) => {
-          if (event.key === "Enter" || event.key === " ") {
-            playCue(downCue);
+          try {
+            await copyText(code);
+            button.setAttribute("data-copied", "true");
+            if (status) {
+              status.textContent = "Copied";
+            }
+          } catch {
+            if (status) {
+              status.textContent = "Copy failed";
+            }
           }
-        });
-        target.addEventListener("keyup", (event) => {
-          if (event.key === "Enter" || event.key === " ") {
-            playCue(upCue);
-          }
+
+          window.setTimeout(() => {
+            button.removeAttribute("data-copied");
+            if (status) {
+              status.textContent = "";
+            }
+          }, 1800);
         });
       }
     </script>

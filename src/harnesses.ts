@@ -142,6 +142,118 @@ export const harnessAdapters: HarnessAdapter[] = [
     },
   },
   {
+    id: "kilo",
+    name: "Kilo Code",
+    kind: "cli",
+    commandCandidates: [
+      "kilo",
+      "kilocode",
+      "kilocode-cli",
+      "kilo-code",
+      "kilo-code-cli",
+    ],
+    versionArgs: ["--version"],
+    capabilities: ["reasoning", "code", "agents", "non-interactive-cli"],
+    notes: [
+      "Runs through `kilo run` without auto-approval or permission-bypass flags.",
+      "Detects Kilo Code command-name variants when they are available on PATH.",
+    ],
+    buildCommand: (commandPath, input) => {
+      const args = ["run"];
+
+      if (input.cwd) {
+        args.push("--dir", input.cwd);
+      }
+
+      if (input.model) {
+        args.push("--model", input.model);
+      }
+
+      args.push(input.prompt);
+      return { command: commandPath, args, cwd: input.cwd };
+    },
+  },
+  {
+    id: "hermes-agent",
+    name: "Hermes Agent",
+    kind: "cli",
+    commandCandidates: ["hermes-agent", "hermes"],
+    versionArgs: ["--version"],
+    capabilities: ["reasoning", "code", "agents", "non-interactive-cli"],
+    notes: [
+      "Runs through `hermes chat --query --quiet` without `--yolo`.",
+    ],
+    buildCommand: (commandPath, input) => {
+      const args = [
+        "chat",
+        "--query",
+        input.prompt,
+        "--quiet",
+        "--source",
+        "ennodia",
+      ];
+
+      if (input.model) {
+        args.push("--model", input.model);
+      }
+
+      return { command: commandPath, args, cwd: input.cwd };
+    },
+  },
+  {
+    id: "kiro",
+    name: "Kiro CLI",
+    kind: "cli",
+    commandCandidates: ["kiro-cli", "kiro"],
+    versionArgs: ["--version"],
+    appPaths: ["/Applications/Kiro CLI.app"],
+    capabilities: ["reasoning", "code", "agents", "non-interactive-cli"],
+    notes: [
+      "Runs through `kiro-cli chat --no-interactive` without trusting tools by default.",
+    ],
+    buildCommand: (commandPath, input) => {
+      const args = [
+        "chat",
+        "--no-interactive",
+        "--trust-tools=",
+        "--wrap",
+        "never",
+      ];
+
+      if (input.model) {
+        args.push("--model", input.model);
+      }
+
+      args.push(input.prompt);
+      return { command: commandPath, args, cwd: input.cwd };
+    },
+  },
+  {
+    id: "cline",
+    name: "Cline CLI",
+    kind: "cli",
+    commandCandidates: ["cline", "cline-cli"],
+    versionArgs: ["--version"],
+    capabilities: ["reasoning", "code", "agents", "non-interactive-cli"],
+    notes: [
+      "Runs through `cline` with auto-approval explicitly disabled.",
+    ],
+    buildCommand: (commandPath, input) => {
+      const args = ["--auto-approve", "false", "--json"];
+
+      if (input.cwd) {
+        args.push("--cwd", input.cwd);
+      }
+
+      if (input.model) {
+        args.push("--model", input.model);
+      }
+
+      args.push(input.prompt);
+      return { command: commandPath, args, cwd: input.cwd };
+    },
+  },
+  {
     id: "antigravity",
     name: "Antigravity",
     kind: "cli",
@@ -253,7 +365,7 @@ async function readVersion(
   });
 
   const text = `${result.stdout}\n${result.stderr}`.trim();
-  return text || undefined;
+  return text.split(/\r?\n/).find((line) => line.trim())?.trim();
 }
 
 async function capture(

@@ -9,7 +9,7 @@ const client = new Client({
 
 const transport = new StdioClientTransport({
   command: "bun",
-  args: ["run", "src/index.ts"],
+  args: ["run", "src/cli.ts"],
   cwd: process.cwd(),
   stderr: "pipe",
 });

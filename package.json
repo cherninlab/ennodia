@@ -27,12 +27,14 @@
     "peer-review"
   ],
   "files": [
+    "bin/ennodia",
     "CONTRIBUTING.md",
     "bench/README.md",
     "bench/bug-recall/run.ts",
     "bench/bug-recall/scorer.ts",
     "bench/fixtures/**/*",
     "bench/results/.gitkeep",
+    "src/cli.ts",
     "src/compare.ts",
     "src/diagnosis.ts",
     "src/harnesses.ts",
@@ -48,15 +50,18 @@
   "publishConfig": {
     "access": "public"
   },
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "workspaces": [
     "website"
   ],
   "bin": {
-    "ennodia": "./src/index.ts"
+    "ennodia": "bin/ennodia"
   },
   "scripts": {
-    "dev": "bun run src/index.ts",
-    "start": "bun run src/index.ts",
+    "dev": "bun run src/cli.ts",
+    "start": "bun run src/cli.ts",
     "check": "tsc --noEmit",
     "lint": "oxlint",
     "test": "bun test",
@@ -67,9 +72,10 @@
     "bench:bug-recall": "bun run bench/bug-recall/run.ts",
     "bench:bug-recall:live": "bun run bench/bug-recall/run.ts --live",
     "pack:check": "npm pack --dry-run",
+    "publish:dry-run": "npm publish --dry-run --tag next",
     "jsr:check": "npx jsr publish --dry-run --allow-dirty",
     "package:smoke": "bun run src/dev/package-smoke.ts",
-    "release:check": "bun run verify && bun run pack:check && bun run jsr:check && bun run package:smoke",
+    "release:check": "bun run verify && bun run pack:check && bun run publish:dry-run && bun run jsr:check && bun run package:smoke",
     "website:dev": "bun run --cwd website dev",
     "website:build": "bun run --cwd website build",
     "website:deploy": "bun run --cwd website deploy",

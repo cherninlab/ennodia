@@ -7,7 +7,7 @@ export default defineConfig({
   integrations: [
     starlight({
       title: "Ennodia",
-      description: "A shared routing, tracing, and Compare layer for AI tools.",
+      description: "MCP server that lets one AI agent ask other agents for help.",
       favicon: "/favicon.svg",
       logo: {
         src: "./src/content/docs/docs/assets/logo.svg",

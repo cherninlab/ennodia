@@ -23,7 +23,27 @@ export type CompareCandidate = {
   metadata?: Record<string, unknown>;
 };
 
-export type CompareAnalysis = z.infer<typeof CompareAnalysisSchema>;
+export type CompareAnalysis = {
+  consensus: string[];
+  contradictions: {
+    topic: string;
+    stances: {
+      source_id: string;
+      stance: string;
+    }[];
+  }[];
+  partial_coverage: {
+    source_ids: string[];
+    point: string;
+  }[];
+  unique_insights: {
+    source_id: string;
+    insight: string;
+  }[];
+  blind_spots: string[];
+  risks: string[];
+  confidence: "low" | "medium" | "high";
+};
 
 export type CompareEvent = {
   at: string;
@@ -118,7 +138,7 @@ type InternalCompare = {
   events: CompareEvent[];
 };
 
-export const CompareAnalysisSchema = z.object({
+export const CompareAnalysisSchema: z.ZodType<CompareAnalysis> = z.object({
   consensus: z.array(z.string()).default([]),
   contradictions: z
     .array(
@@ -569,10 +589,12 @@ export function buildJudgePrompt(
     JSON.stringify(schemaExample(), null, 2),
     "",
     "Rules:",
+    "- Judge the candidate set against the original prompt, not only against each other.",
     "- Treat agreement across independent candidates as stronger signal, but not as proof.",
     "- Surface contradictions and partial coverage clearly.",
     "- Preserve unique insights with source IDs.",
-    "- Flag blind spots none of the candidates covered.",
+    "- Flag blind spots none of the candidates covered, including missing files, screenshots, rendered views, commands, or external sources needed to answer well.",
+    "- If the original prompt asks for audit, review, critique, or assessment, identify what evidence the candidates used and what they did not verify.",
     "- Do not invent sources or claims.",
     "",
     "Original prompt:",

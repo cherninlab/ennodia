@@ -1,16 +1,21 @@
 ---
 title: Documentation
-description: Start here for Ennodia setup, tools, architecture, and release notes.
+description: Start here for Ennodia setup, MCP tools, architecture, and releases.
 ---
 
-Ennodia is a Bun-first MCP server for mid-task peer review between AI agents.
+Ennodia is an MCP server that lets one AI agent ask other agents for help.
+
+Start with [Getting started](./getting-started.md): requirements, MCP config,
+and the first checks.
+
+Once it is running, [MCP tools](./reference/mcp-tools.md) covers the public tool
+surface. [How Ennodia works](./in-depth/architecture.md) explains routing,
+visible task state, Compare, and synthesis.
 
 Use these pages first:
 
-- [Getting started](./getting-started/)
-- [MCP tools](./reference/mcp-tools/)
-- [How Ennodia works](./in-depth/architecture/)
-- [Releasing Ennodia](./in-depth/releasing/)
-
-The short version: connect Ennodia as a stdio MCP server, ask it to route work
-to available local AI tools, then inspect the run trace and final synthesis.
+- [Getting started](./getting-started.md)
+- [MCP tools](./reference/mcp-tools.md)
+- [How Ennodia works](./in-depth/architecture.md)
+- [Running better audits](./in-depth/auditing.md)
+- [Releasing Ennodia](./in-depth/releasing.md)
