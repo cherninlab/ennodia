@@ -1,0 +1,1 @@
+{"findings":[{"line":19,"summary":"Using input.maxEvents || 25 loses the valid maxEvents 0 boundary value."},{"line":20,"summary":"slice(-maxEvents) should handle 0 explicitly and return an empty event list."}]}

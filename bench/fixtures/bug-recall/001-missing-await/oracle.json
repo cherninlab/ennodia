@@ -1,0 +1,28 @@
+{
+  "id": "001-missing-await",
+  "title": "Missing await before user lookup",
+  "prompt": "Review the TypeScript fixture and list correctness bugs.",
+  "requiredFindings": [
+    {
+      "id": "missing-await-fetch-user",
+      "severity": "high",
+      "line": 24,
+      "description": "fetchUser returns a Promise but sendWelcomeEmail reads active, email, and name without awaiting it.",
+      "keywords": ["await", "fetchUser"]
+    },
+    {
+      "id": "promise-property-access",
+      "severity": "medium",
+      "line": 26,
+      "description": "The branch reads user.active on a Promise, so the inactive-user skip path is broken.",
+      "keywords": ["active", "Promise"]
+    }
+  ],
+  "knownFalsePositives": [
+    {
+      "id": "mailer-not-awaited",
+      "description": "Claims mailer.send is not awaited even though it is awaited.",
+      "terms": ["mailer.send", "not awaited"]
+    }
+  ]
+}

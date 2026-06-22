@@ -1,0 +1,1 @@
+{"findings":[{"line":20,"summary":"The loop finds running child tasks but never calls task.cancel, leaving running tasks alive."},{"line":17,"summary":"cancelRun mutates the run to cancelled before child cancellation succeeds, so children can continue running under a cancelled run."}]}

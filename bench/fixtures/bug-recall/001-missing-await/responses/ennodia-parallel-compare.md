@@ -1,0 +1,1 @@
+{"findings":[{"line":24,"summary":"Missing await before fetchUser leaves user as a Promise."},{"line":26,"summary":"The active check reads active on a Promise instead of the loaded User, so inactive users are not skipped."}]}

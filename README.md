@@ -1,57 +1,99 @@
 <div align="center">
 
+<a href="https://ennodia.cherninlab.com">
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.svg">
   <source media="(prefers-color-scheme: light)" srcset="docs/assets/logo.svg">
   <img alt="Ennodia" src="docs/assets/logo.svg" width="235" height="50">
 </picture>
+</a>
 
-<p><strong>Helps AI tools work together</strong></p>
+<p><strong>MCP server that lets one AI agent ask other agents for help</strong></p>
 
 <p>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-informational"></a>
+  <img alt="CI" src="https://github.com/cherninlab/ennodia/actions/workflows/ci.yml/badge.svg" />
 </p>
 
 </div>
 
-## Why Ennodia?
+Ennodia is a local MCP server that lets one AI agent ask other agents for help while a task is still in progress. It routes the request, runs selected command line tools, tracks status and output, and can compare several answers before returning one result.
 
-**No single model or agent is best at everything.**
+It is built for workflows where no single model or agent should be trusted as the only reviewer.
 
-One may be better at reasoning, another at code, another at research, and another at browser or image automation. Some run locally, some through APIs, and some as autonomous command-line agents.
+## Local Setup
 
-Ennodia gives them a shared routing, tracing, and Compare layer.
+From a checkout:
 
-## Bring your own tools
+```sh
+git clone https://github.com/cherninlab/ennodia
+cd ennodia
+bun install
+bun run verify
+```
 
-Ennodia currently ships pluggable adapters for:
+After the npm package is published, the prerelease channel will be available as
+`bunx ennodia@next`. `npx` can also launch Ennodia, but only when `bun` is
+already available on `PATH`.
+
+## What Ennodia Does
+
+- Discovers available local AI tools
+- Plans which tool should handle a request
+- Starts and monitors child tasks
+- Shows status, timing, logs, and failures
+- Cancels tasks and runs explicitly
+- Compares multiple completed outputs
+- Synthesizes one answer from the comparison
+
+## Supported Harnesses
+
+Current adapters:
 
 - Codex CLI
 - Claude Code
 - OpenCode
 - Antigravity
 
-## When to use Ennodia
+Adapters stay thin. Shared routing, tracing, task state, recovery, and Compare
+logic live in the core modules.
 
-Use Ennodia when a task needs more than one model, agent, or tool.
+## MCP Tools
 
+Common entrypoints:
 
-## How Ennodia works
+- `ennodia_list_harnesses` - show detected tools
+- `ennodia_plan` - preview routing for a prompt
+- `ennodia_start` - start direct child tasks without run-level synthesis
+- `ennodia_run` - plan, execute, optionally Compare, and return a final answer
+- `ennodia_get_run` - inspect run state, events, ETA, and final output
+- `ennodia_cancel_run` - cancel a running orchestration
+- `ennodia_start_compare` - compare completed task outputs or supplied responses
 
-> [!NOTE]  
-> See the full [architecture.md](docs/in-depth/architecture.md) for more details.
+Lower-level task tools are available for polling and cancellation.
 
-Ennodia turns one request into a visible execution graph.
+## Documentation
 
-1. **Discover** available tools
-2. **Plan** the best route
-3. **Execute** through adapters
-4. **Watch** every running task, log, and ETA
-5. **Recover** with explicit failure states or partial results
-6. **Compare** outputs when multiple agents respond
-7. **Return** one final result with a trace you can inspect
+- [Getting started](docs/getting-started.md)
+- [How Ennodia works](docs/in-depth/architecture.md)
+- [MCP tools](docs/reference/mcp-tools.md)
+- [Releasing Ennodia](docs/in-depth/releasing.md)
 
+## Benchmarks
+
+The first benchmark is `multi-model-bug-recall`: small TypeScript review
+fixtures scored against committed bug oracles. Run the deterministic fixture
+suite with:
+
+```sh
+bun run bench:bug-recall
+```
+
+Live harness runs are available through `bun run bench:bug-recall:live` and are
+kept out of `bun run verify`.
 
 ## Contributing
 
-Ennodia is under active development. Report bugs and request features through [GitHub Issues](https://github.com/cherninlab/ennodia/issues). PRs are welcome but will likely only be merged if they're small and target a specific problem. See [the contributing guide](CONTRIBUTING.md) for more details.
+Ennodia is under active development. Bug reports and small, focused pull requests
+are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for the local verification
+workflow.

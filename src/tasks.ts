@@ -70,7 +70,7 @@ type InternalTask = Omit<
   updatedAtMs: number;
   endedAtMs?: number;
   lastOutputAtMs?: number;
-  process?: Bun.Subprocess<"ignore", "pipe", "pipe">;
+  process?: Bun.Subprocess<"ignore" | "pipe", "pipe", "pipe">;
   streamsDone?: Promise<void>;
   settled?: Promise<void>;
   streamReaders: Set<ReadableStreamDefaultReader<Uint8Array>>;
@@ -138,6 +138,7 @@ export class TaskManager {
       command: [
         basename(commandSpec.command),
         ...commandSpec.args.map((arg) => arg === input.prompt ? "<prompt>" : arg),
+        ...(commandSpec.stdin === undefined ? [] : ["<stdin-prompt>"]),
       ],
       promptPreview: preview(input.prompt),
       createdAtMs: now,
@@ -159,12 +160,23 @@ export class TaskManager {
       cmd: [commandSpec.command, ...commandSpec.args],
       cwd,
       env: { ...process.env, ...commandSpec.env },
+      stdin: commandSpec.stdin === undefined ? "ignore" : "pipe",
       stdout: "pipe",
       stderr: "pipe",
     });
 
     task.process = child;
     task.pid = child.pid;
+
+    if (commandSpec.stdin !== undefined) {
+      const childStdin = child.stdin;
+      if (!childStdin) {
+        throw new Error("Child stdin pipe was not available.");
+      }
+
+      childStdin.write(commandSpec.stdin);
+      childStdin.end();
+    }
 
     task.streamsDone = Promise.all([
       this.pipeStreamSafely(task, "stdout", child.stdout),
@@ -290,7 +302,7 @@ export class TaskManager {
 
   private async watchExit(
     task: InternalTask,
-    child: Bun.Subprocess<"ignore", "pipe", "pipe">,
+    child: Bun.Subprocess<"ignore" | "pipe", "pipe", "pipe">,
   ): Promise<void> {
     try {
       const exitCode = await child.exited;

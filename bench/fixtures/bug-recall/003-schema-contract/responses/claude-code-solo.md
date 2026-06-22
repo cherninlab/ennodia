@@ -1,0 +1,1 @@
+{"findings":[{"line":19,"summary":"maxEvents 0 is valid but input.maxEvents || 25 replaces it with the default."},{"line":20,"summary":"The slice call needs an explicit 0 case so maxEvents 0 returns no events."}]}

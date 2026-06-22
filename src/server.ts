@@ -11,6 +11,7 @@ import {
 import { planRoute } from "./planner";
 import { RunManager } from "./runs";
 import { TaskManager } from "./tasks";
+import { ENNODIA_VERSION } from "./version";
 
 const taskManager = new TaskManager();
 const compareManager = new CompareManager(taskManager, resolveRunnableHarness);
@@ -29,16 +30,22 @@ export type EnnodiaShutdownOptions = {
 export function createEnnodiaServer(): McpServer {
   const server = new McpServer({
     name: "ennodia",
-    version: "0.0.0",
+    version: ENNODIA_VERSION,
   });
 
   server.registerTool(
     "ennodia_list_harnesses",
     {
       title: "List Ennodia harnesses",
-      description: "Discover local AI tools that Ennodia can see.",
+      description:
+        "Discover supported local AI harnesses and report availability, runnable state, command path, version, capabilities, and adapter notes. Use first when setup or routing fails.",
       inputSchema: {
-        refresh: z.boolean().default(false),
+        refresh: z
+          .boolean()
+          .default(false)
+          .describe(
+            "Re-scan available harnesses instead of returning the short-lived discovery cache.",
+          ),
       },
     },
     async ({ refresh }) => jsonResult(await discoverHarnesses({ refresh })),
@@ -48,10 +55,17 @@ export function createEnnodiaServer(): McpServer {
     "ennodia_plan",
     {
       title: "Plan an Ennodia route",
-      description: "Classify a prompt and preview the route Ennodia would take.",
+      description:
+        "Classify a prompt and preview the route Ennodia would take without starting any child process. Use before ennodia_run when you want to inspect routing.",
       inputSchema: {
-        prompt: z.string().min(1),
-        refresh: z.boolean().default(false),
+        prompt: z
+          .string()
+          .min(1)
+          .describe("The task to classify and route."),
+        refresh: z
+          .boolean()
+          .default(false)
+          .describe("Re-scan harnesses before planning."),
       },
     },
     async ({ prompt, refresh }) => {
@@ -65,15 +79,45 @@ export function createEnnodiaServer(): McpServer {
     {
       title: "Start an Ennodia task",
       description:
-        "Start one or more local AI tool tasks and return task IDs for monitoring.",
+        "Start raw child harness tasks without run-level Compare or final synthesis. Use for debugging, direct harness calls, or manual Compare workflows; prefer ennodia_run for normal end-to-end use.",
       inputSchema: {
-        prompt: z.string().min(1),
-        harnessId: z.string().optional(),
-        mode: z.enum(["single", "parallel"]).default("single"),
-        cwd: z.string().optional(),
-        model: z.string().optional(),
-        timeoutMs: z.number().int().positive().max(60 * 60 * 1000).optional(),
-        refresh: z.boolean().default(false),
+        prompt: z
+          .string()
+          .min(1)
+          .describe("The task to send to the selected local harness or harnesses."),
+        harnessId: z
+          .string()
+          .optional()
+          .describe(
+            "Force one harness by ID, such as codex or claude-code. Omit to let Ennodia pick from the plan.",
+          ),
+        mode: z
+          .enum(["single", "parallel"])
+          .default("single")
+          .describe(
+            "single starts the selected or top-ranked harness; parallel starts every planned candidate.",
+          ),
+        cwd: z
+          .string()
+          .optional()
+          .describe("Working directory for child harness commands."),
+        model: z
+          .string()
+          .optional()
+          .describe("Optional model override passed through to harnesses that support it."),
+        timeoutMs: z
+          .number()
+          .int()
+          .positive()
+          .max(60 * 60 * 1000)
+          .optional()
+          .describe(
+            "Per-task timeout in milliseconds. Defaults to the task manager timeout and is capped at one hour.",
+          ),
+        refresh: z
+          .boolean()
+          .default(false)
+          .describe("Re-scan harnesses before planning and starting tasks."),
       },
     },
     async ({ prompt, harnessId, mode, cwd, model, timeoutMs, refresh }) => {
@@ -116,21 +160,80 @@ export function createEnnodiaServer(): McpServer {
     {
       title: "Run Ennodia",
       description:
-        "Plan a request, start child tasks, optionally Compare successful outputs, and return a monitorable run.",
+        "Start a high-level Ennodia orchestration. Use this as the default entrypoint: it plans routing, starts one or more local harness tasks, optionally compares successful outputs, and returns a run ID to inspect with ennodia_get_run.",
       inputSchema: {
-        prompt: z.string().min(1),
-        harnessId: z.string().optional(),
-        mode: z.enum(["auto", "single", "parallel"]).default("auto"),
-        compare: z.union([z.literal("auto"), z.boolean()]).default("auto"),
-        cwd: z.string().optional(),
-        model: z.string().optional(),
-        timeoutMs: z.number().int().positive().max(60 * 60 * 1000).optional(),
-        refresh: z.boolean().default(false),
-        judgeHarnessId: z.string().optional(),
-        judgeModel: z.string().optional(),
-        synthesizerHarnessId: z.string().optional(),
-        synthesizerModel: z.string().optional(),
-        maxOutputChars: z.number().int().positive().max(200_000).optional(),
+        prompt: z
+          .string()
+          .min(1)
+          .describe("The user task to route to local AI harnesses."),
+        harnessId: z
+          .string()
+          .optional()
+          .describe(
+            "Force one harness by ID, such as codex or claude-code. Omit to let Ennodia plan.",
+          ),
+        mode: z
+          .enum(["auto", "single", "parallel"])
+          .default("auto")
+          .describe(
+            "auto follows the planner; single runs one selected harness; parallel runs all candidate harnesses.",
+          ),
+        compare: z
+          .union([z.literal("auto"), z.boolean()])
+          .default("auto")
+          .describe(
+            "Whether to run Compare after tasks finish. auto compares when the planner sees value and at least two tasks produce output.",
+          ),
+        cwd: z
+          .string()
+          .optional()
+          .describe("Working directory for child harness commands."),
+        model: z
+          .string()
+          .optional()
+          .describe("Optional model override passed to the selected task harnesses."),
+        timeoutMs: z
+          .number()
+          .int()
+          .positive()
+          .max(60 * 60 * 1000)
+          .optional()
+          .describe(
+            "Per-task timeout in milliseconds. Defaults to the task manager timeout and is capped at one hour.",
+          ),
+        refresh: z
+          .boolean()
+          .default(false)
+          .describe("Re-scan harnesses before planning the run."),
+        judgeHarnessId: z
+          .string()
+          .optional()
+          .describe(
+            "Harness to use as the Compare judge. Omit to use the default priority: claude-code, codex, antigravity, then opencode.",
+          ),
+        judgeModel: z
+          .string()
+          .optional()
+          .describe("Optional model override for the Compare judge."),
+        synthesizerHarnessId: z
+          .string()
+          .optional()
+          .describe(
+            "Harness that writes the final synthesized answer. Defaults to the judge harness selection.",
+          ),
+        synthesizerModel: z
+          .string()
+          .optional()
+          .describe("Optional model override for the Compare synthesizer."),
+        maxOutputChars: z
+          .number()
+          .int()
+          .nonnegative()
+          .max(200_000)
+          .optional()
+          .describe(
+            "Maximum characters from each successful task output to pass into Compare. Use 0 to suppress candidate text.",
+          ),
       },
     },
     async ({
@@ -173,9 +276,26 @@ export function createEnnodiaServer(): McpServer {
       title: "List Ennodia runs",
       description: "List high-level Ennodia runs started by this MCP server process.",
       inputSchema: {
-        includeEvents: z.boolean().default(false),
-        maxEvents: z.number().int().nonnegative().max(300).default(25),
-        maxAnswerChars: z.number().int().nonnegative().max(200_000).default(2_000),
+        includeEvents: z
+          .boolean()
+          .default(false)
+          .describe("Include bounded run event history for each listed run."),
+        maxEvents: z
+          .number()
+          .int()
+          .nonnegative()
+          .max(300)
+          .default(25)
+          .describe("Maximum run events to include per run when includeEvents is true."),
+        maxAnswerChars: z
+          .number()
+          .int()
+          .nonnegative()
+          .max(200_000)
+          .default(2_000)
+          .describe(
+            "Maximum final-answer characters to include per run. Use 0 to omit answer text.",
+          ),
       },
     },
     async ({ includeEvents, maxEvents, maxAnswerChars }) =>
@@ -195,10 +315,27 @@ export function createEnnodiaServer(): McpServer {
       description:
         "Inspect run status, selected harnesses, child task IDs, Compare ID, final answer, events, and ETA.",
       inputSchema: {
-        runId: z.string().min(1),
-        includeEvents: z.boolean().default(true),
-        maxEvents: z.number().int().nonnegative().max(300).default(100),
-        maxAnswerChars: z.number().int().nonnegative().max(200_000).default(80_000),
+        runId: z.string().min(1).describe("Run ID returned by ennodia_run."),
+        includeEvents: z
+          .boolean()
+          .default(true)
+          .describe("Include bounded run event history."),
+        maxEvents: z
+          .number()
+          .int()
+          .nonnegative()
+          .max(300)
+          .default(100)
+          .describe("Maximum run events to include. Use 0 to omit events."),
+        maxAnswerChars: z
+          .number()
+          .int()
+          .nonnegative()
+          .max(200_000)
+          .default(80_000)
+          .describe(
+            "Maximum final-answer characters to include. Use 0 to omit answer text.",
+          ),
       },
     },
     async ({ runId, includeEvents, maxEvents, maxAnswerChars }) => {
@@ -221,7 +358,7 @@ export function createEnnodiaServer(): McpServer {
       title: "Cancel Ennodia run",
       description: "Cancel a high-level run and any active child task or Compare.",
       inputSchema: {
-        runId: z.string().min(1),
+        runId: z.string().min(1).describe("Run ID returned by ennodia_run."),
       },
     },
     async ({ runId }) => jsonResult(runManager.cancel(runId)),
@@ -233,10 +370,30 @@ export function createEnnodiaServer(): McpServer {
       title: "List Ennodia tasks",
       description: "List tasks started by this Ennodia MCP server process.",
       inputSchema: {
-        includeOutput: z.boolean().default(false),
-        includeEvents: z.boolean().default(false),
-        maxOutputChars: z.number().int().nonnegative().max(200_000).default(4_000),
-        maxEvents: z.number().int().nonnegative().max(300).default(25),
+        includeOutput: z
+          .boolean()
+          .default(false)
+          .describe("Include bounded stdout and stderr previews for each task."),
+        includeEvents: z
+          .boolean()
+          .default(false)
+          .describe("Include bounded task event history for each task."),
+        maxOutputChars: z
+          .number()
+          .int()
+          .nonnegative()
+          .max(200_000)
+          .default(4_000)
+          .describe(
+            "Maximum stdout and stderr characters to include per task. Use 0 to omit output text.",
+          ),
+        maxEvents: z
+          .number()
+          .int()
+          .nonnegative()
+          .max(300)
+          .default(25)
+          .describe("Maximum task events to include per task when includeEvents is true."),
       },
     },
     async ({ includeOutput, includeEvents, maxOutputChars, maxEvents }) =>
@@ -255,27 +412,82 @@ export function createEnnodiaServer(): McpServer {
     {
       title: "Start Ennodia Compare",
       description:
-        "Run an LLM judge and synthesizer over completed task outputs or supplied responses.",
+        "Compare completed Ennodia task outputs or caller-supplied responses. Runs a judge pass, then a synthesizer pass, and returns a Compare ID to inspect with ennodia_get_compare.",
       inputSchema: {
-        prompt: z.string().min(1),
-        taskIds: z.array(z.string().min(1)).default([]),
+        prompt: z
+          .string()
+          .min(1)
+          .describe("Original user task or question the candidate responses answer."),
+        taskIds: z
+          .array(z.string().min(1).describe("Completed Ennodia task ID."))
+          .default([])
+          .describe(
+            "IDs of completed tasks from this server session to include as candidates.",
+          ),
         responses: z
           .array(
             z.object({
-              id: z.string().min(1),
-              label: z.string().optional(),
-              text: z.string(),
-              metadata: z.record(z.string(), z.unknown()).optional(),
+              id: z
+                .string()
+                .min(1)
+                .describe("Stable candidate ID used in judge analysis."),
+              label: z
+                .string()
+                .optional()
+                .describe("Human-readable candidate label."),
+              text: z.string().describe("Candidate response text to compare."),
+              metadata: z
+                .record(z.string(), z.unknown())
+                .optional()
+                .describe("Optional structured metadata to retain with the candidate."),
             }),
           )
-          .default([]),
-        judgeHarnessId: z.string().optional(),
-        judgeModel: z.string().optional(),
-        synthesizerHarnessId: z.string().optional(),
-        synthesizerModel: z.string().optional(),
-        cwd: z.string().optional(),
-        timeoutMs: z.number().int().positive().max(60 * 60 * 1000).optional(),
-        maxOutputChars: z.number().int().positive().max(200_000).optional(),
+          .default([])
+          .describe(
+            "Freeform text responses to compare directly when you do not have task IDs.",
+          ),
+        judgeHarnessId: z
+          .string()
+          .optional()
+          .describe(
+            "Harness to use as the Compare judge. Omit to use the default priority: claude-code, codex, antigravity, then opencode.",
+          ),
+        judgeModel: z
+          .string()
+          .optional()
+          .describe("Optional model override for the Compare judge."),
+        synthesizerHarnessId: z
+          .string()
+          .optional()
+          .describe(
+            "Harness that writes the final synthesized answer. Defaults to the judge harness selection.",
+          ),
+        synthesizerModel: z
+          .string()
+          .optional()
+          .describe("Optional model override for the Compare synthesizer."),
+        cwd: z
+          .string()
+          .optional()
+          .describe("Working directory for judge and synthesizer child tasks."),
+        timeoutMs: z
+          .number()
+          .int()
+          .positive()
+          .max(60 * 60 * 1000)
+          .optional()
+          .describe(
+            "Per-child timeout for judge and synthesizer tasks in milliseconds, capped at one hour.",
+          ),
+        maxOutputChars: z
+          .number()
+          .int()
+          .nonnegative()
+          .max(200_000)
+          .optional()
+          .describe(
+            "Maximum characters from each task output to include as a Compare candidate. Use 0 to suppress task output text.",
+          ),
       },
     },
     async ({
@@ -312,10 +524,32 @@ export function createEnnodiaServer(): McpServer {
       title: "List Ennodia compares",
       description: "List Compare runs started by this Ennodia MCP server process.",
       inputSchema: {
-        includeCandidates: z.boolean().default(false),
-        includeEvents: z.boolean().default(false),
-        maxCandidateChars: z.number().int().nonnegative().max(200_000).default(2_000),
-        maxEvents: z.number().int().nonnegative().max(300).default(25),
+        includeCandidates: z
+          .boolean()
+          .default(false)
+          .describe("Include bounded candidate response previews for each Compare."),
+        includeEvents: z
+          .boolean()
+          .default(false)
+          .describe("Include bounded Compare event history."),
+        maxCandidateChars: z
+          .number()
+          .int()
+          .nonnegative()
+          .max(200_000)
+          .default(2_000)
+          .describe(
+            "Maximum characters to include per candidate. Use 0 to omit candidate text.",
+          ),
+        maxEvents: z
+          .number()
+          .int()
+          .nonnegative()
+          .max(300)
+          .default(25)
+          .describe(
+            "Maximum Compare events to include when includeEvents is true.",
+          ),
       },
     },
     async ({ includeCandidates, includeEvents, maxCandidateChars, maxEvents }) =>
@@ -336,11 +570,34 @@ export function createEnnodiaServer(): McpServer {
       description:
         "Inspect Compare status, candidate inputs, judge analysis, final synthesis, child task IDs, and ETA.",
       inputSchema: {
-        compareId: z.string().min(1),
-        includeCandidates: z.boolean().default(true),
-        includeEvents: z.boolean().default(true),
-        maxCandidateChars: z.number().int().nonnegative().max(200_000).default(8_000),
-        maxEvents: z.number().int().nonnegative().max(300).default(100),
+        compareId: z
+          .string()
+          .min(1)
+          .describe("Compare ID returned by ennodia_start_compare or ennodia_run."),
+        includeCandidates: z
+          .boolean()
+          .default(true)
+          .describe("Include bounded candidate response previews."),
+        includeEvents: z
+          .boolean()
+          .default(true)
+          .describe("Include bounded Compare event history."),
+        maxCandidateChars: z
+          .number()
+          .int()
+          .nonnegative()
+          .max(200_000)
+          .default(8_000)
+          .describe(
+            "Maximum characters to include per candidate. Use 0 to omit candidate text.",
+          ),
+        maxEvents: z
+          .number()
+          .int()
+          .nonnegative()
+          .max(300)
+          .default(100)
+          .describe("Maximum Compare events to include. Use 0 to omit events."),
       },
     },
     async ({
@@ -370,7 +627,10 @@ export function createEnnodiaServer(): McpServer {
       title: "Cancel Ennodia Compare",
       description: "Cancel a running Compare and its active child task.",
       inputSchema: {
-        compareId: z.string().min(1),
+        compareId: z
+          .string()
+          .min(1)
+          .describe("Compare ID returned by ennodia_start_compare or ennodia_run."),
       },
     },
     async ({ compareId }) => jsonResult(compareManager.cancel(compareId)),
@@ -382,11 +642,34 @@ export function createEnnodiaServer(): McpServer {
       title: "Get Ennodia task",
       description: "Inspect task status, captured output, events, and ETA.",
       inputSchema: {
-        taskId: z.string().min(1),
-        includeOutput: z.boolean().default(true),
-        includeEvents: z.boolean().default(true),
-        maxOutputChars: z.number().int().nonnegative().max(200_000).default(20_000),
-        maxEvents: z.number().int().nonnegative().max(300).default(100),
+        taskId: z
+          .string()
+          .min(1)
+          .describe("Task ID returned by ennodia_start, ennodia_run, or Compare."),
+        includeOutput: z
+          .boolean()
+          .default(true)
+          .describe("Include bounded stdout and stderr previews."),
+        includeEvents: z
+          .boolean()
+          .default(true)
+          .describe("Include bounded task event history."),
+        maxOutputChars: z
+          .number()
+          .int()
+          .nonnegative()
+          .max(200_000)
+          .default(20_000)
+          .describe(
+            "Maximum stdout and stderr characters to include. Use 0 to omit output text.",
+          ),
+        maxEvents: z
+          .number()
+          .int()
+          .nonnegative()
+          .max(300)
+          .default(100)
+          .describe("Maximum task events to include. Use 0 to omit events."),
       },
     },
     async ({ taskId, includeOutput, includeEvents, maxOutputChars, maxEvents }) => {
@@ -410,7 +693,10 @@ export function createEnnodiaServer(): McpServer {
       title: "Cancel Ennodia task",
       description: "Cancel a running task by task ID.",
       inputSchema: {
-        taskId: z.string().min(1),
+        taskId: z
+          .string()
+          .min(1)
+          .describe("Task ID returned by ennodia_start, ennodia_run, or Compare."),
       },
     },
     async ({ taskId }) => jsonResult(taskManager.cancel(taskId)),

@@ -22,6 +22,21 @@ describe("TaskManager", () => {
     expect(result.events.map((event) => event.type)).toContain("exit");
   });
 
+  it("can send prompts through stdin for CLIs that do not accept prompt args", async () => {
+    const manager = new TaskManager();
+    const { task } = manager.start(stdinEchoAdapter, shellDiscovery, {
+      prompt: "from stdin",
+      timeoutMs: 5_000,
+    });
+
+    const result = await waitForTask(manager, task.id);
+
+    expect(result.status).toBe("succeeded");
+    expect(result.stdout).toBe("stdin:from stdin\n");
+    expect(result.command).toContain("<stdin-prompt>");
+    expect(result.command).not.toContain("from stdin");
+  });
+
   it("returns lightweight task list views by default", async () => {
     const manager = new TaskManager();
     const { task } = manager.start(echoAdapter, echoDiscovery, {
@@ -189,6 +204,19 @@ const echoDiscovery: HarnessDiscovery = {
   commandPath: "/bin/sh",
   capabilities: echoAdapter.capabilities,
   notes: [],
+};
+
+const stdinEchoAdapter: HarnessAdapter = {
+  id: "stdin-echo-agent",
+  name: "Stdin Echo Agent",
+  kind: "cli",
+  commandCandidates: ["sh"],
+  capabilities: ["smoke-test"],
+  buildCommand: (commandPath, input) => ({
+    command: commandPath,
+    args: ["-c", "IFS= read -r line; printf 'stdin:%s\\n' \"$line\""],
+    stdin: input.prompt,
+  }),
 };
 
 const LARGE_STDOUT_CHARS = 180_000;

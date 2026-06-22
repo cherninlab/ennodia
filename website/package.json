@@ -4,9 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build:lottie": "bun run scripts/build-lottie.ts",
     "sync:docs": "bun run scripts/sync-docs.ts",
-    "dev": "bun run sync:docs && astro dev",
-    "build": "bun run sync:docs && astro build",
+    "dev": "bun run build:lottie && bun run sync:docs && astro dev",
+    "build": "bun run build:lottie && bun run sync:docs && astro build",
     "preview": "astro preview",
     "ensure:cloudflare-project": "bun run scripts/ensure-cloudflare-pages-project.ts",
     "deploy": "bun run build && wrangler pages deploy dist --project-name ennodia --branch main"
@@ -14,6 +15,7 @@
   "dependencies": {
     "@astrojs/starlight": "^0.36.0",
     "astro": "^5.16.4",
+    "lottie-web": "^5.13.0",
     "sharp": "^0.35.2"
   },
   "devDependencies": {

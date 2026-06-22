@@ -1,0 +1,28 @@
+{
+  "id": "004-cancel-propagation",
+  "title": "Run cancellation does not cancel child tasks",
+  "prompt": "Review the TypeScript fixture and list correctness bugs.",
+  "requiredFindings": [
+    {
+      "id": "missing-task-cancel-call",
+      "severity": "high",
+      "line": 20,
+      "description": "The loop finds running child tasks but never calls task.cancel(), leaving them running after the run is cancelled.",
+      "keywords": ["task.cancel", "running"]
+    },
+    {
+      "id": "mutates-run-in-place",
+      "severity": "medium",
+      "line": 17,
+      "description": "The function mutates the Run object in place before child task cancellation has succeeded, so callers can observe cancelled state while children continue running.",
+      "keywords": ["mutates", "cancelled", "children"]
+    }
+  ],
+  "knownFalsePositives": [
+    {
+      "id": "task-id-order",
+      "description": "Claims task ID order causes the cancellation bug.",
+      "terms": ["taskIds", "order"]
+    }
+  ]
+}

@@ -14,6 +14,7 @@ export type CommandSpec = {
   args: string[];
   cwd?: string;
   env?: Record<string, string>;
+  stdin?: string;
 };
 
 export type HarnessAdapter = {
@@ -154,6 +155,7 @@ export const harnessAdapters: HarnessAdapter[] = [
     notes: [
       "Runs through the supported `agy` CLI surface.",
       "Defaults to Antigravity sandbox mode for Ennodia-launched tasks.",
+      "Sends prompts through stdin because `agy --print` does not consume positional prompts.",
     ],
     buildCommand: (commandPath, input) => {
       const args = [
@@ -171,8 +173,7 @@ export const harnessAdapters: HarnessAdapter[] = [
         args.push("--model", input.model);
       }
 
-      args.push(input.prompt);
-      return { command: commandPath, args, cwd: input.cwd };
+      return { command: commandPath, args, cwd: input.cwd, stdin: input.prompt };
     },
   },
 ];

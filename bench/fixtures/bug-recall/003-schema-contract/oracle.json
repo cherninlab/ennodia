@@ -1,0 +1,28 @@
+{
+  "id": "003-schema-contract",
+  "title": "Boundary value lost by defaulting",
+  "prompt": "Review the TypeScript fixture and list correctness bugs.",
+  "requiredFindings": [
+    {
+      "id": "zero-max-events-ignored",
+      "severity": "high",
+      "line": 19,
+      "description": "maxEvents: 0 is valid in the schema, but input.maxEvents || 25 turns it into 25.",
+      "keywords": ["maxEvents", "0"]
+    },
+    {
+      "id": "negative-slice-with-default",
+      "severity": "low",
+      "line": 20,
+      "description": "The code relies on slice(-maxEvents), so the zero case should be handled explicitly to return no events.",
+      "keywords": ["slice", "0"]
+    }
+  ],
+  "knownFalsePositives": [
+    {
+      "id": "schema-allows-negative",
+      "description": "Claims the schema allows negative maxEvents even though nonnegative is used.",
+      "terms": ["negative", "maxEvents", "allowed"]
+    }
+  ]
+}

@@ -1,10 +1,53 @@
 {
   "name": "ennodia",
-  "version": "0.0.0",
-  "private": true,
-  "description": "Make local and online AI tools work together.",
+  "version": "0.1.0-rc.0",
+  "description": "MCP server that lets one AI agent ask other agents for help",
   "license": "MIT",
   "type": "module",
+  "packageManager": "bun@1.3.14",
+  "engines": {
+    "bun": ">=1.3.14"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cherninlab/ennodia.git"
+  },
+  "homepage": "https://ennodia.cherninlab.com/",
+  "bugs": {
+    "url": "https://github.com/cherninlab/ennodia/issues"
+  },
+  "keywords": [
+    "ai",
+    "agents",
+    "cli",
+    "llm",
+    "mcp",
+    "model-context-protocol",
+    "multi-agent",
+    "peer-review"
+  ],
+  "files": [
+    "CONTRIBUTING.md",
+    "bench/README.md",
+    "bench/bug-recall/run.ts",
+    "bench/bug-recall/scorer.ts",
+    "bench/fixtures/**/*",
+    "bench/results/.gitkeep",
+    "src/compare.ts",
+    "src/diagnosis.ts",
+    "src/harnesses.ts",
+    "src/index.ts",
+    "src/planner.ts",
+    "src/runs.ts",
+    "src/server.ts",
+    "src/tasks.ts",
+    "src/version.ts",
+    "docs/**/*.md",
+    "docs/assets/**/*.svg"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "workspaces": [
     "website"
   ],
@@ -21,6 +64,12 @@
     "smoke": "bun run src/dev/smoke.ts",
     "mcp:smoke": "bun run src/dev/mcp-smoke.ts",
     "task:smoke": "bun run src/dev/task-smoke.ts",
+    "bench:bug-recall": "bun run bench/bug-recall/run.ts",
+    "bench:bug-recall:live": "bun run bench/bug-recall/run.ts --live",
+    "pack:check": "npm pack --dry-run",
+    "jsr:check": "npx jsr publish --dry-run --allow-dirty",
+    "package:smoke": "bun run src/dev/package-smoke.ts",
+    "release:check": "bun run verify && bun run pack:check && bun run jsr:check && bun run package:smoke",
     "website:dev": "bun run --cwd website dev",
     "website:build": "bun run --cwd website build",
     "website:deploy": "bun run --cwd website deploy",

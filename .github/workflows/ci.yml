@@ -33,3 +33,9 @@ jobs:
 
       - name: Run verification
         run: bun run verify
+
+      - name: Inspect package contents
+        run: bun run pack:check
+
+      - name: Smoke packaged CLI
+        run: bun run package:smoke

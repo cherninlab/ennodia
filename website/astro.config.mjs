@@ -9,6 +9,11 @@ export default defineConfig({
       title: "Ennodia",
       description: "A shared routing, tracing, and Compare layer for AI tools.",
       favicon: "/favicon.svg",
+      logo: {
+        src: "./src/content/docs/docs/assets/logo.svg",
+        alt: "Ennodia",
+        replacesTitle: true
+      },
       social: [
         {
           icon: "github",

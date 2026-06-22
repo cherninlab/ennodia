@@ -1,0 +1,1 @@
+{"findings":[{"line":24,"summary":"fetchUser returns a Promise and must be awaited before reading active/email/name."},{"line":26,"summary":"Because user is still a Promise, user.active never checks the loaded user's active flag."}]}

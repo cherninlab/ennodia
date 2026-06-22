@@ -1,0 +1,28 @@
+{
+  "id": "002-timeout-drain",
+  "title": "Exit observed before output streams drain",
+  "prompt": "Review the TypeScript fixture and list correctness bugs.",
+  "requiredFindings": [
+    {
+      "id": "returns-before-stream-drain",
+      "severity": "high",
+      "line": 35,
+      "description": "collectChild returns after child.exited without awaiting the stdout and stderr reader loops, so captured output can be truncated.",
+      "keywords": ["await", "stdout", "stderr"]
+    },
+    {
+      "id": "timeout-resolves-as-normal-exit",
+      "severity": "medium",
+      "line": 31,
+      "description": "The timeout kills the child but the result does not record that the process timed out.",
+      "keywords": ["timeout", "kill", "timed out"]
+    }
+  ],
+  "knownFalsePositives": [
+    {
+      "id": "leaks-timeout-on-success",
+      "description": "Claims the timeout is never cleared even though clearTimeout is called.",
+      "terms": ["timeout", "never cleared"]
+    }
+  ]
+}

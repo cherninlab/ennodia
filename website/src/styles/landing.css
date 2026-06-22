@@ -31,21 +31,8 @@ body {
   margin: 0;
   min-width: 320px;
   color: var(--text);
-  background:
-    linear-gradient(var(--line) 1px, transparent 1px),
-    linear-gradient(90deg, var(--line) 1px, transparent 1px),
-    var(--bg);
-  background-size: 100% 240px, min(22vw, 320px) 100%;
+  background: var(--bg);
   line-height: 1.6;
-}
-
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background: linear-gradient(180deg, rgba(251, 251, 250, 0.18), var(--bg) 52%);
 }
 
 a {
@@ -77,6 +64,18 @@ a:focus-visible {
 
 .skip-link:focus-visible {
   transform: translateY(0);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+  padding: 0;
 }
 
 .section,
@@ -198,6 +197,39 @@ a:focus-visible {
 
 .intro-section {
   padding-top: 72px;
+}
+
+.intro-section .section-body {
+  max-width: none;
+}
+
+.intro-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
+  gap: 44px;
+  align-items: center;
+}
+
+.intro-copy {
+  max-width: 620px;
+}
+
+.flow-figure {
+  width: 100%;
+  margin: 0;
+}
+
+.flow-animation {
+  aspect-ratio: 800 / 520;
+  width: 100%;
+  min-height: 220px;
+  overflow: visible;
+}
+
+.flow-animation svg {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
 }
 
 .section-label {
@@ -380,6 +412,12 @@ code {
   border-top-color: var(--amber);
 }
 
+.compare-grid h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .compare-grid p {
   font-size: 0.984375rem;
   line-height: 1.62;
@@ -449,10 +487,6 @@ code {
 }
 
 @media (max-width: 860px) {
-  body {
-    background-size: 100% 220px, 50vw 100%;
-  }
-
   .hero {
     min-height: 590px;
     padding-top: 74px;
@@ -473,9 +507,14 @@ code {
     font-size: 2rem;
   }
 
+  .intro-layout,
   .code-grid,
   .compare-grid {
     grid-template-columns: 1fr;
+  }
+
+  .flow-figure {
+    max-width: 440px;
   }
 
 }
