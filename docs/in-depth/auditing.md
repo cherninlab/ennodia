@@ -53,6 +53,22 @@ short text description. Then check the child outputs for access errors. If a
 harness cannot read the files, stage them somewhere it can access and rerun; do
 not treat that failure as a normal design review.
 
+## Ground standards in sources
+
+When the audit depends on an external standard, registry convention, or product
+behavior, include the sources in the prompt and ask reviewers to separate facts
+from judgment. Otherwise a model council can confidently optimize the wrong
+model of the world.
+
+Agent Skills are the cautionary example: they are not an Ennodia-private prompt
+format. They are portable `SKILL.md` folders discovered by tools such as Codex,
+Claude Code, OpenCode, and Antigravity in native locations. A useful audit for
+skills must start from those product docs before recommending an Ennodia API.
+
+The bundled `source-grounded-audit` skill exists for this case. Install it into
+the harnesses you use for standards-sensitive audits, then ask Ennodia to use
+that skill when the answer depends on external docs.
+
 ## Good prompt shape
 
 ```text

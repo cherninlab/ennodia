@@ -17,43 +17,49 @@
 
 </div>
 
-Ennodia is a local MCP server that lets one AI agent ask other agents for help while a task is still in progress. It routes the request, runs selected command line tools, tracks status and output, and can compare several answers before returning one result.
-
-It is built for workflows where no single model or agent should be trusted as the only reviewer.
+Ennodia is a local MCP server that lets one AI agent ask the agent CLIs you
+already have installed for help while a task is still in progress. It routes
+the request, runs the selected command-line tools, estimates the preflight
+input-token budget, tracks status and output, and can ask a model to compare
+several answers before returning one result — built for workflows where no
+single model or agent should be trusted as the only reviewer.
 
 ## Install
 
-Run Ennodia as a stdio MCP server from the npm prerelease channel:
+Send this to your primary agent and let it handle setup:
+
+```text
+Install and turn on Ennodia: https://ennodia.cherninlab.com/install
+```
+
+Or run it directly as a stdio MCP server from the npm prerelease channel:
 
 ```sh
 npx -y ennodia@next
 ```
 
-Requires Bun `1.3.14` or newer. `npx` downloads Ennodia; Bun runs it. Prefer
-Bun directly? Use `bunx ennodia@next`.
+Requires Bun `1.3.14` or newer — `npx` downloads Ennodia, Bun runs it. Prefer
+Bun directly? Use `bunx ennodia@next`. For manual setup, local development,
+or a full walkthrough, see
+[Getting started](https://ennodia.cherninlab.com/docs/getting-started/).
 
-For local development from a checkout:
-
-```sh
-git clone https://github.com/cherninlab/ennodia
-cd ennodia
-bun install
-bun run verify
-```
-
-## What Ennodia Does
+## What Ennodia does
 
 - Discovers available local AI tools
 - Plans which tool should handle a request
+- Estimates and enforces preflight input-token budget limits
 - Starts and monitors child tasks
 - Shows status, timing, logs, and failures
 - Cancels tasks and runs explicitly
 - Compares multiple completed outputs
 - Synthesizes one answer from the comparison
 
-## Supported Harnesses
+The main entrypoint is `ennodia_run`: it plans, executes, optionally
+compares, and returns a run ID to poll with `ennodia_get_run`. See
+[MCP tools](https://ennodia.cherninlab.com/docs/reference/mcp-tools/) for the
+full tool and parameter reference.
 
-Current adapters:
+## Supported harnesses
 
 - Codex CLI
 - Claude Code
@@ -64,30 +70,17 @@ Current adapters:
 - Hermes Agent
 - Antigravity
 
-Adapters stay thin. Shared routing, tracing, task state, recovery, and Compare
-logic live in the core modules.
-
-## MCP Tools
-
-Common entrypoints:
-
-- `ennodia_list_harnesses` - show detected tools
-- `ennodia_plan` - preview routing for a prompt
-- `ennodia_start` - start direct child tasks without run-level synthesis
-- `ennodia_run` - plan, execute, optionally Compare, and return a run ID
-- `ennodia_get_run` - inspect run state, events, ETA, and final answer
-- `ennodia_cancel_run` - cancel a running orchestration
-- `ennodia_start_compare` - compare completed task outputs or supplied responses
-
-Lower-level task tools are available for polling and cancellation.
+Adapters stay thin — shared routing, tracing, task state, recovery, and
+Compare logic live in core modules.
 
 ## Documentation
 
-- [Getting started](docs/getting-started.md)
-- [How Ennodia works](docs/in-depth/architecture.md)
-- [MCP tools](docs/reference/mcp-tools.md)
-- [Running better audits](docs/in-depth/auditing.md)
-- [Releasing Ennodia](docs/in-depth/releasing.md)
+- [Install Ennodia](https://ennodia.cherninlab.com/docs/install/) — the agent-driven setup path
+- [Getting started](https://ennodia.cherninlab.com/docs/getting-started/) — manual setup and local development
+- [MCP tools](https://ennodia.cherninlab.com/docs/reference/mcp-tools/) — full tool parameter reference
+- [How Ennodia works](https://ennodia.cherninlab.com/docs/in-depth/architecture/) — the orchestration pipeline
+- [Positioning and related work](https://ennodia.cherninlab.com/docs/in-depth/positioning/) — how Ennodia compares to adjacent tools
+- [Running better audits](https://ennodia.cherninlab.com/docs/in-depth/auditing/) — prompt rubrics for Compare
 
 ## Benchmarks
 

@@ -81,7 +81,12 @@ function assertPackedFiles(paths: string[]): void {
     "src/cli.ts",
     "src/index.ts",
     "src/server.ts",
+    "src/skills.ts",
     "src/version.ts",
+    "skills/benchmark-critic/SKILL.md",
+    "skills/release-readiness/SKILL.md",
+    "skills/rigorous-review/SKILL.md",
+    "skills/source-grounded-audit/SKILL.md",
   ];
 
   for (const path of expected) {

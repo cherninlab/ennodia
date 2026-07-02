@@ -97,7 +97,7 @@ async function runLiveBenchmark(
   });
   const transport = new StdioClientTransport({
     command: "bun",
-    args: ["run", "src/index.ts"],
+    args: ["run", "src/cli.ts"],
     cwd: new URL("../../", import.meta.url).pathname,
     stderr: "pipe",
   });

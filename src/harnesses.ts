@@ -1,4 +1,5 @@
 import { existsSync } from "node:fs";
+import { type Skill } from "./skills";
 
 export type HarnessKind = "cli" | "app";
 
@@ -7,6 +8,7 @@ export type HarnessRunInput = {
   cwd?: string;
   model?: string;
   timeoutMs?: number;
+  skills?: Skill[];
 };
 
 export type CommandSpec = {

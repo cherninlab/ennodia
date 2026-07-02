@@ -1,4 +1,10 @@
 import { randomUUID } from "node:crypto";
+import {
+  checkBudgetLimits,
+  estimateRunBudget,
+  type BudgetCheck,
+  type BudgetLimits,
+} from "./budget";
 import type { CompareManager, CompareView } from "./compare";
 import { diagnoseTasks, type TaskDiagnosis } from "./diagnosis";
 import type {
@@ -8,6 +14,12 @@ import type {
 } from "./harnesses";
 import type { RoutePlan } from "./planner";
 import type { TaskManager, TaskView } from "./tasks";
+import {
+  assertSkillsSupportHarnesses,
+  toAppliedSkillInfo,
+  type Skill,
+  type AppliedSkillInfo,
+} from "./skills";
 
 export type RunMode = "auto" | "single" | "parallel";
 export type RunCompareMode = "auto" | boolean;
@@ -26,6 +38,8 @@ export type RunEvent = {
     | "task-succeeded"
     | "task-failed"
     | "task-cancelled"
+    | "skills-applied"
+    | "budget-checked"
     | "compare-skipped"
     | "compare-started"
     | "compare-succeeded"
@@ -37,6 +51,7 @@ export type RunEvent = {
   taskId?: string;
   compareId?: string;
   harnessId?: string;
+  skillIds?: string[];
   elapsedMs?: number;
   remainingMs?: number | null;
 };
@@ -55,6 +70,8 @@ export type RunStartInput = {
   synthesizerHarnessId?: string;
   synthesizerModel?: string;
   maxOutputChars?: number;
+  skills?: Skill[];
+  budget?: BudgetLimits;
 };
 
 export type RunView = {
@@ -81,6 +98,8 @@ export type RunView = {
   failedTaskDiagnosis?: TaskDiagnosis;
   eventCount: number;
   events: RunEvent[];
+  appliedSkills?: AppliedSkillInfo[];
+  budget: BudgetCheck;
 };
 
 export type RunViewOptions = {
@@ -111,6 +130,10 @@ export type RunManagerShutdownOptions = {
   deadlineMs?: number;
 };
 
+export type RunManagerOptions = {
+  maxRuns?: number;
+};
+
 type InternalRun = {
   id: string;
   status: RunStatus;
@@ -129,6 +152,8 @@ type InternalRun = {
   updatedAtMs: number;
   endedAtMs?: number;
   events: RunEvent[];
+  appliedSkills?: AppliedSkillInfo[];
+  budget: BudgetCheck;
 };
 
 type EtaSnapshot = {
@@ -140,14 +165,21 @@ type EtaSnapshot = {
 const DEFAULT_MAX_EVENTS = 100;
 const DEFAULT_MAX_ANSWER_CHARS = 80_000;
 const DEFAULT_SHUTDOWN_DEADLINE_MS = 5_000;
+const DEFAULT_MAX_RUNS = 100;
 const POLL_MS = 500;
 
 export class RunManager {
   private readonly runs = new Map<string, InternalRun>();
+  private readonly maxRuns: number;
   private shuttingDown = false;
   private shutdownPromise?: Promise<void>;
 
-  constructor(private readonly dependencies: RunManagerDependencies) {}
+  constructor(
+    private readonly dependencies: RunManagerDependencies,
+    options: RunManagerOptions = {},
+  ) {
+    this.maxRuns = Math.max(1, options.maxRuns ?? DEFAULT_MAX_RUNS);
+  }
 
   async start(input: RunStartInput): Promise<RunView> {
     if (this.shuttingDown) {
@@ -166,6 +198,24 @@ export class RunManager {
       throw new Error("No runnable harnesses were found.");
     }
 
+    if (input.skills && input.skills.length > 0) {
+      assertSkillsSupportHarnesses(input.skills, selectedHarnessIds);
+    }
+
+    const budget = checkBudgetLimits(
+      estimateRunBudget({
+        prompt: input.prompt,
+        selectedHarnessIds,
+        comparePlanned: shouldPlanCompare(compareMode, plan.compareSuggested, selectedHarnessIds.length),
+        maxOutputChars: input.maxOutputChars,
+      }),
+      input.budget,
+    );
+
+    if (budget.exceeded) {
+      throw new Error(`Budget limit exceeded: ${budget.issues.join(" ")}`);
+    }
+
     const now = Date.now();
     const run: InternalRun = {
       id: randomUUID(),
@@ -179,12 +229,28 @@ export class RunManager {
       createdAtMs: now,
       updatedAtMs: now,
       events: [],
+      appliedSkills: input.skills?.map(toAppliedSkillInfo),
+      budget,
     };
 
     this.runs.set(run.id, run);
+    this.pruneRuns(run.id);
     this.pushEvent(run, {
       type: "started",
       message: `Run started with ${selectedHarnessIds.length} selected harness(es).`,
+    });
+
+    if (run.appliedSkills && run.appliedSkills.length > 0) {
+      this.pushEvent(run, {
+        type: "skills-applied",
+        skillIds: run.appliedSkills.map((skill) => skill.id),
+        message: `Applied ${run.appliedSkills.length} skill(s).`,
+      });
+    }
+
+    this.pushEvent(run, {
+      type: "budget-checked",
+      message: `Estimated ${budget.estimate.estimatedTotalInputTokens} input token(s) across ${budget.estimate.selectedHarnessCount} child task(s).`,
     });
 
     for (const harnessId of selectedHarnessIds) {
@@ -253,6 +319,7 @@ export class RunManager {
         cwd: input.cwd,
         model: input.model,
         timeoutMs: input.timeoutMs,
+        skills: input.skills,
       }).task;
 
       run.taskIds.push(started.id);
@@ -460,6 +527,8 @@ export class RunManager {
       failedTaskDiagnosis: run.failedTaskDiagnosis,
       eventCount: run.events.length,
       events: options.includeEvents === false ? [] : tailItems(run.events, maxEvents),
+      appliedSkills: run.appliedSkills,
+      budget: run.budget,
     };
   }
 
@@ -548,6 +617,7 @@ export class RunManager {
     run.status = "cancelled";
     run.endedAtMs = Date.now();
     this.pushEvent(run, { type: "cancelled", message });
+    this.pruneRuns(run.id);
 
     for (const taskId of run.taskIds) {
       const task = this.dependencies.taskManager.get(taskId, {
@@ -572,6 +642,7 @@ export class RunManager {
       type: "succeeded",
       message: "Run completed.",
     });
+    this.pruneRuns(run.id);
   }
 
   private failRun(
@@ -587,6 +658,22 @@ export class RunManager {
       type: "failed",
       message,
     });
+    this.pruneRuns(run.id);
+  }
+
+  private pruneRuns(protectedRunId?: string): void {
+    const overflow = this.runs.size - this.maxRuns;
+    if (overflow <= 0) {
+      return;
+    }
+
+    const removable = [...this.runs.values()]
+      .filter((run) => run.id !== protectedRunId && isTerminalRun(run))
+      .sort((a, b) => a.createdAtMs - b.createdAtMs);
+
+    for (const run of removable.slice(0, overflow)) {
+      this.runs.delete(run.id);
+    }
   }
 
   private requireRun(id: string): InternalRun {
@@ -611,7 +698,7 @@ export class RunManager {
   }
 }
 
-function selectHarnessIds(
+export function selectHarnessIds(
   harnessId: string | undefined,
   mode: RunMode,
   plan: RoutePlan,
@@ -633,6 +720,26 @@ function selectHarnessIds(
   }
 
   return plan.selected ? [plan.selected] : [];
+}
+
+export function shouldPlanCompare(
+  compareMode: RunCompareMode,
+  compareSuggested: boolean,
+  selectedHarnessCount: number,
+): boolean {
+  if (selectedHarnessCount < 2) {
+    return false;
+  }
+
+  if (compareMode === true) {
+    return true;
+  }
+
+  if (compareMode === false) {
+    return false;
+  }
+
+  return compareSuggested;
 }
 
 function eventFromTask(task: TaskView): Omit<RunEvent, "at"> {

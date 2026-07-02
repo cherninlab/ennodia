@@ -1,6 +1,13 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import {
+  checkBudgetLimits,
+  estimateCompareBudget,
+  estimateRunBudget,
+  type BudgetCheck,
+  type BudgetLimits,
+} from "./budget";
+import {
   CompareManager,
   type CompareCandidateInput,
 } from "./compare";
@@ -10,8 +17,15 @@ import {
 } from "./harnesses";
 import { planRoute } from "./planner";
 import { RunManager } from "./runs";
+import { selectHarnessIds, shouldPlanCompare } from "./runs";
 import { TaskManager } from "./tasks";
 import { ENNODIA_VERSION } from "./version";
+import {
+  assertSkillsSupportHarnesses,
+  discoverSkillsWithWarnings,
+  installBundledSkills,
+  loadRunnableSkillsByIds,
+} from "./skills";
 
 const taskManager = new TaskManager();
 const compareManager = new CompareManager(taskManager, resolveRunnableHarness);
@@ -22,6 +36,61 @@ const runManager = new RunManager({
   findHarnessAdapter,
   planRoute,
 });
+
+const budgetSchema = z
+  .object({
+    maxEstimatedInputTokens: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe(
+        "Fail before starting if the estimated run input tokens exceed this value.",
+      ),
+    maxChildTasks: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe(
+        "Fail before starting if routing selects more child harness tasks than this value.",
+      ),
+    requireKnownSubscriptionLimits: z
+      .boolean()
+      .default(false)
+      .describe(
+        "Fail when selected harness subscription limits cannot be checked through supported local surfaces.",
+      ),
+  })
+  .describe("Optional preflight budget limits for an Ennodia operation.");
+
+function assertBudgetWithinLimits(budget: BudgetCheck): void {
+  if (budget.exceeded) {
+    throw new Error(`Budget limit exceeded: ${budget.issues.join(" ")}`);
+  }
+}
+
+function assertHarnessesRunnable(
+  selectedHarnessIds: string[],
+  harnesses: Awaited<ReturnType<typeof discoverHarnesses>>,
+): void {
+  for (const harnessId of selectedHarnessIds) {
+    const adapter = findHarnessAdapter(harnessId);
+    const discovery = harnesses.find((harness) => harness.id === harnessId);
+
+    if (!adapter || !discovery) {
+      throw new Error(`Unknown harness: ${harnessId}`);
+    }
+
+    if (!discovery.runnable) {
+      throw new Error(`Harness is not runnable: ${harnessId}`);
+    }
+  }
+}
+
+function responseCandidateChars(responses: CompareCandidateInput[]): number {
+  return responses.reduce((total, response) => total + response.text.length, 0);
+}
 
 export type EnnodiaShutdownOptions = {
   deadlineMs?: number;
@@ -52,6 +121,79 @@ export function createEnnodiaServer(): McpServer {
   );
 
   server.registerTool(
+    "ennodia_list_skills",
+    {
+      title: "List Ennodia skills",
+      description:
+        "Discover prompt-only skills from project, user, and built-in skill directories without returning full instruction text.",
+      inputSchema: {
+        cwd: z
+          .string()
+          .optional()
+          .describe("Optional working directory to locate project-specific skills."),
+      },
+    },
+    async ({ cwd }) => jsonResult(await discoverSkillsWithWarnings(cwd)),
+  );
+
+  server.registerTool(
+    "ennodia_install_skills",
+    {
+      title: "Install Ennodia skills",
+      description:
+        "Install bundled Ennodia Agent Skills into native harness skill directories. Defaults to dryRun so clients can inspect planned writes before applying them.",
+      inputSchema: {
+        skillIds: z
+          .array(z.string())
+          .optional()
+          .describe(
+            "Bundled skill IDs to install. Omit to install every bundled Ennodia skill.",
+          ),
+        harnessIds: z
+          .array(z.enum(["codex", "claude-code", "opencode", "antigravity"]))
+          .optional()
+          .describe(
+            "Native harness skill locations to install into. Omit to target Codex, Claude Code, OpenCode, and Antigravity.",
+          ),
+        scope: z
+          .enum(["project", "user"])
+          .default("project")
+          .describe("Install into project-local or user-global skill directories."),
+        cwd: z
+          .string()
+          .optional()
+          .describe("Project directory used when scope is project."),
+        overwrite: z
+          .boolean()
+          .default(false)
+          .describe("Replace an existing skill folder at the target path."),
+        dryRun: z
+          .boolean()
+          .default(true)
+          .describe("Preview planned writes without copying files. Set false to install."),
+      },
+    },
+    async ({ skillIds, harnessIds, scope, cwd, overwrite, dryRun }) => {
+      if (scope === "project" && !cwd) {
+        throw new Error(
+          "Project skill installation requires cwd so Ennodia does not write native skill folders into the MCP server process directory.",
+        );
+      }
+
+      return jsonResult(
+        await installBundledSkills({
+          skillIds,
+          harnessIds,
+          scope,
+          cwd,
+          overwrite,
+          dryRun,
+        }),
+      );
+    },
+  );
+
+  server.registerTool(
     "ennodia_plan",
     {
       title: "Plan an Ennodia route",
@@ -71,6 +213,76 @@ export function createEnnodiaServer(): McpServer {
     async ({ prompt, refresh }) => {
       const harnesses = await discoverHarnesses({ refresh });
       return jsonResult(planRoute(prompt, harnesses));
+    },
+  );
+
+  server.registerTool(
+    "ennodia_estimate_budget",
+    {
+      title: "Estimate Ennodia budget",
+      description:
+        "Estimate the input-token budget for a planned Ennodia run and report whether optional limits would be exceeded before starting child tasks.",
+      inputSchema: {
+        prompt: z
+          .string()
+          .min(1)
+          .describe("The user task to route and estimate."),
+        harnessId: z
+          .string()
+          .optional()
+          .describe(
+            "Force one harness by ID for the estimate, such as opencode or claude-code.",
+          ),
+        mode: z
+          .enum(["auto", "single", "parallel"])
+          .default("auto")
+          .describe(
+            "auto follows the planner; single estimates one selected harness; parallel estimates all candidate harnesses.",
+          ),
+        compare: z
+          .union([z.literal("auto"), z.boolean()])
+          .default("auto")
+          .describe(
+            "Whether Compare should be included in the estimate. auto follows the planner.",
+          ),
+        refresh: z
+          .boolean()
+          .default(false)
+          .describe("Re-scan harnesses before planning the estimate."),
+        maxOutputChars: z
+          .number()
+          .int()
+          .nonnegative()
+          .max(200_000)
+          .optional()
+          .describe(
+            "Maximum characters from each successful task output assumed for Compare input.",
+          ),
+        budget: budgetSchema.optional(),
+      },
+    },
+    async ({ prompt, harnessId, mode, compare, refresh, maxOutputChars, budget }) => {
+      const harnesses = await discoverHarnesses({ refresh });
+      const plan = planRoute(prompt, harnesses);
+      const selectedHarnessIds = selectHarnessIds(harnessId, mode, plan);
+      assertHarnessesRunnable(selectedHarnessIds, harnesses);
+      const compareMode = compare ?? "auto";
+      const estimate = estimateRunBudget({
+        prompt,
+        selectedHarnessIds,
+        comparePlanned: shouldPlanCompare(
+          compareMode,
+          plan.compareSuggested,
+          selectedHarnessIds.length,
+        ),
+        maxOutputChars,
+      });
+
+      return jsonResult({
+        plan,
+        selectedHarnessIds,
+        budget: checkBudgetLimits(estimate, budget as BudgetLimits | undefined),
+      });
     },
   );
 
@@ -118,9 +330,26 @@ export function createEnnodiaServer(): McpServer {
           .boolean()
           .default(false)
           .describe("Re-scan harnesses before planning and starting tasks."),
+        skillIds: z
+          .array(z.string())
+          .optional()
+          .describe(
+            "Optional list of skill IDs to apply to the prompt before starting the task.",
+          ),
+        budget: budgetSchema.optional(),
       },
     },
-    async ({ prompt, harnessId, mode, cwd, model, timeoutMs, refresh }) => {
+    async ({
+      prompt,
+      harnessId,
+      mode,
+      cwd,
+      model,
+      timeoutMs,
+      refresh,
+      skillIds,
+      budget,
+    }) => {
       const harnesses = await discoverHarnesses({ refresh });
       const plan = planRoute(prompt, harnesses);
       const selectedIds = harnessId
@@ -135,6 +364,20 @@ export function createEnnodiaServer(): McpServer {
         throw new Error("No runnable harnesses were found.");
       }
 
+      assertHarnessesRunnable(selectedIds, harnesses);
+      const budgetCheck = checkBudgetLimits(
+        estimateRunBudget({
+          prompt,
+          selectedHarnessIds: selectedIds,
+          comparePlanned: false,
+        }),
+        budget as BudgetLimits | undefined,
+      );
+      assertBudgetWithinLimits(budgetCheck);
+
+      const skills = skillIds ? await loadRunnableSkillsByIds(skillIds, cwd) : [];
+      assertSkillsSupportHarnesses(skills, selectedIds);
+
       const tasks = selectedIds.map((id) => {
         const adapter = findHarnessAdapter(id);
         const discovery = harnesses.find((harness) => harness.id === id);
@@ -148,10 +391,11 @@ export function createEnnodiaServer(): McpServer {
           cwd,
           model,
           timeoutMs,
+          skills,
         }).task;
       });
 
-      return jsonResult({ plan, tasks });
+      return jsonResult({ plan, tasks, budget: budgetCheck });
     },
   );
 
@@ -234,6 +478,13 @@ export function createEnnodiaServer(): McpServer {
           .describe(
             "Maximum characters from each successful task output to pass into Compare. Use 0 to suppress candidate text.",
           ),
+        skillIds: z
+          .array(z.string())
+          .optional()
+          .describe(
+            "Optional list of skill IDs to apply to the prompt before planning and running child tasks.",
+          ),
+        budget: budgetSchema.optional(),
       },
     },
     async ({
@@ -250,8 +501,11 @@ export function createEnnodiaServer(): McpServer {
       synthesizerHarnessId,
       synthesizerModel,
       maxOutputChars,
-    }) =>
-      jsonResult(
+      skillIds,
+      budget,
+    }) => {
+      const skills = skillIds ? await loadRunnableSkillsByIds(skillIds, cwd) : [];
+      return jsonResult(
         await runManager.start({
           prompt,
           harnessId,
@@ -266,8 +520,11 @@ export function createEnnodiaServer(): McpServer {
           synthesizerHarnessId,
           synthesizerModel,
           maxOutputChars,
+          skills,
+          budget: budget as BudgetLimits | undefined,
         }),
-      ),
+      );
+    },
   );
 
   server.registerTool(
@@ -488,6 +745,7 @@ export function createEnnodiaServer(): McpServer {
           .describe(
             "Maximum characters from each task output to include as a Compare candidate. Use 0 to suppress task output text.",
           ),
+        budget: budgetSchema.optional(),
       },
     },
     async ({
@@ -501,21 +759,43 @@ export function createEnnodiaServer(): McpServer {
       cwd,
       timeoutMs,
       maxOutputChars,
-    }) =>
-      jsonResult(
-        await compareManager.start({
+      budget,
+    }) => {
+      const judgeHarness = await resolveRunnableHarness(judgeHarnessId);
+      const synthesizerHarness = synthesizerHarnessId
+        ? await resolveRunnableHarness(synthesizerHarnessId)
+        : judgeHarness;
+      const budgetCheck = checkBudgetLimits(
+        estimateCompareBudget({
+          prompt,
+          taskCandidateCount: taskIds.length,
+          responseCandidateChars: responseCandidateChars(
+            responses as CompareCandidateInput[],
+          ),
+          judgeHarnessId: judgeHarness.adapter.id,
+          synthesizerHarnessId: synthesizerHarness.adapter.id,
+          maxOutputChars,
+        }),
+        budget as BudgetLimits | undefined,
+      );
+      assertBudgetWithinLimits(budgetCheck);
+
+      return jsonResult({
+        ...(await compareManager.start({
           prompt,
           taskIds,
           responses: responses as CompareCandidateInput[],
-          judgeHarnessId,
+          judgeHarnessId: judgeHarness.adapter.id,
           judgeModel,
-          synthesizerHarnessId,
+          synthesizerHarnessId: synthesizerHarness.adapter.id,
           synthesizerModel,
           cwd,
           timeoutMs,
           maxOutputChars,
-        }),
-      ),
+        })),
+        budget: budgetCheck,
+      });
+    },
   );
 
   server.registerTool(

@@ -1,6 +1,6 @@
 {
   "name": "ennodia",
-  "version": "0.1.0-rc.0",
+  "version": "0.1.0-rc.2",
   "description": "MCP server that lets one AI agent ask other agents for help",
   "license": "MIT",
   "type": "module",
@@ -35,6 +35,7 @@
     "bench/fixtures/**/*",
     "bench/results/.gitkeep",
     "src/cli.ts",
+    "src/budget.ts",
     "src/compare.ts",
     "src/diagnosis.ts",
     "src/harnesses.ts",
@@ -42,8 +43,10 @@
     "src/planner.ts",
     "src/runs.ts",
     "src/server.ts",
+    "src/skills.ts",
     "src/tasks.ts",
     "src/version.ts",
+    "skills/**/*",
     "docs/**/*.md",
     "docs/assets/**/*.svg"
   ],

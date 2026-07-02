@@ -68,6 +68,72 @@ describe("RunManager", () => {
     expect(result.events.map((event) => event.type)).toContain("compare-succeeded");
   });
 
+  it("includes run budget estimates and budget-checked events", async () => {
+    const fixture = createFixture([echoDiscovery("agent-a", "Agent A")]);
+
+    const started = await fixture.manager.start({
+      prompt: "hello budget",
+      harnessId: "agent-a",
+      compare: false,
+      timeoutMs: 5_000,
+      budget: {
+        maxEstimatedInputTokens: 1_000,
+        maxChildTasks: 1,
+      },
+    });
+    const result = await waitForRun(fixture.manager, started.id);
+
+    expect(result.status).toBe("succeeded");
+    expect(result.budget.exceeded).toBe(false);
+    expect(result.budget.estimate.selectedHarnessIds).toEqual(["agent-a"]);
+    expect(result.budget.estimate.estimatedTotalInputTokens).toBeGreaterThan(0);
+    expect(result.events.some((event) => event.type === "budget-checked")).toBe(true);
+  });
+
+  it("evicts old terminal runs after the configured history cap", async () => {
+    const fixture = createFixture([echoDiscovery("agent-a", "Agent A")], {
+      maxRuns: 1,
+    });
+
+    const first = await fixture.manager.start({
+      prompt: "first",
+      harnessId: "agent-a",
+      compare: false,
+      timeoutMs: 5_000,
+    });
+    await waitForRun(fixture.manager, first.id);
+
+    const second = await fixture.manager.start({
+      prompt: "second",
+      harnessId: "agent-a",
+      compare: false,
+      timeoutMs: 5_000,
+    });
+    await waitForRun(fixture.manager, second.id);
+
+    expect(fixture.manager.get(first.id)).toBeUndefined();
+    expect(fixture.manager.get(second.id)?.status).toBe("succeeded");
+  });
+
+  it("fails before starting tasks when budget limits are exceeded", async () => {
+    const fixture = createFixture([
+      echoDiscovery("agent-a", "Agent A"),
+      echoDiscovery("agent-b", "Agent B"),
+    ]);
+
+    await expect(fixture.manager.start({
+      prompt: "Compare several code approaches.",
+      mode: "parallel",
+      compare: true,
+      timeoutMs: 5_000,
+      budget: {
+        maxChildTasks: 1,
+      },
+    })).rejects.toThrow("Budget limit exceeded");
+
+    expect(fixture.taskManager.list()).toHaveLength(0);
+  });
+
   it("compares surviving outputs when one parallel task fails", async () => {
     const fixture = createFixture([
       echoDiscovery("agent-a", "Agent A"),
@@ -201,9 +267,85 @@ describe("RunManager", () => {
     expect(task.status).toBe("cancelled");
     expect(task.cancelRequested).toBe(true);
   });
+
+  it("propagates skills to run tracing and child tasks", async () => {
+    const fixture = createFixture([echoDiscovery("agent-a", "Agent A")]);
+    const skills = [
+      {
+        id: "test-skill-r",
+        name: "test-skill-r",
+        version: "1.0.0",
+        description: "Verify run behavior",
+        instructions: "Run guidelines instructions.",
+        hash: "abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd",
+        source: "project" as const,
+        path: "/tmp/test-skill-r.md",
+        harnessIds: ["agent-a"],
+        installations: [],
+        native: true,
+      },
+    ];
+
+    const started = await fixture.manager.start({
+      prompt: "run hello",
+      harnessId: "agent-a",
+      compare: false,
+      timeoutMs: 5_000,
+      skills,
+    });
+
+    const result = await waitForRun(fixture.manager, started.id);
+
+    expect(result.status).toBe("succeeded");
+    expect(result.appliedSkills).toBeDefined();
+    expect(result.appliedSkills).toHaveLength(1);
+    expect(result.appliedSkills?.[0].id).toBe("test-skill-r");
+    expect(result.appliedSkills?.[0].name).toBe("test-skill-r");
+    expect(result.appliedSkills?.[0].version).toBe("1.0.0");
+    expect(result.appliedSkills?.[0].hash).toBe("abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd");
+    expect(result.appliedSkills?.[0].source).toBe("project");
+    expect(result.appliedSkills?.[0].harnessIds).toContain("agent-a");
+    expect(result.appliedSkills?.[0].native).toBe(true);
+    expect(result.events.some((event) =>
+      event.type === "skills-applied" && event.skillIds?.includes("test-skill-r")
+    )).toBe(true);
+
+    expect(result.finalAnswer).toContain("Use the installed Agent Skills named: test-skill-r.");
+    expect(result.finalAnswer).not.toContain("Run guidelines instructions.");
+    expect(result.finalAnswer).toContain("run hello");
+  });
+
+  it("rejects requested skills that are not installed for the selected harness", async () => {
+    const fixture = createFixture([echoDiscovery("agent-a", "Agent A")]);
+    const skills = [
+      {
+        id: "other-skill",
+        name: "other-skill",
+        version: "1.0.0",
+        description: "Not installed for agent-a",
+        instructions: "Other harness only.",
+        hash: "abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd",
+        source: "project" as const,
+        path: "/tmp/other-skill.md",
+        harnessIds: ["agent-b"],
+        installations: [],
+        native: true,
+      },
+    ];
+
+    await expect(fixture.manager.start({
+      prompt: "run hello",
+      harnessId: "agent-a",
+      compare: false,
+      timeoutMs: 5_000,
+      skills,
+    })).rejects.toThrow("Skill is not installed for agent-a: other-skill");
+  });
 });
 
-function createFixture(discoveries: HarnessDiscovery[]): {
+function createFixture(discoveries: HarnessDiscovery[], options: {
+  maxRuns?: number;
+} = {}): {
   manager: RunManager;
   taskManager: TaskManager;
 } {
@@ -226,7 +368,7 @@ function createFixture(discoveries: HarnessDiscovery[]): {
     discoverHarnesses: async () => discoveries,
     findHarnessAdapter: (id) => adapters.get(id),
     planRoute,
-  });
+  }, options);
 
   return { manager, taskManager };
 }

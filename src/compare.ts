@@ -116,6 +116,10 @@ export type CompareManagerShutdownOptions = {
   deadlineMs?: number;
 };
 
+export type CompareManagerOptions = {
+  maxCompares?: number;
+};
+
 export type ResolvedHarness = {
   adapter: HarnessAdapter;
   discovery: HarnessDiscovery;
@@ -179,17 +183,22 @@ const DEFAULT_MAX_OUTPUT_CHARS = 80_000;
 const DEFAULT_MAX_CANDIDATE_CHARS = 6_000;
 const DEFAULT_MAX_EVENTS = 100;
 const DEFAULT_SHUTDOWN_DEADLINE_MS = 5_000;
+const DEFAULT_MAX_COMPARES = 100;
 const POLL_MS = 500;
 
 export class CompareManager {
   private readonly compares = new Map<string, InternalCompare>();
+  private readonly maxCompares: number;
   private shuttingDown = false;
   private shutdownPromise?: Promise<void>;
 
   constructor(
     private readonly taskManager: TaskManager,
     private readonly resolveHarness: ResolveHarness,
-  ) {}
+    options: CompareManagerOptions = {},
+  ) {
+    this.maxCompares = Math.max(1, options.maxCompares ?? DEFAULT_MAX_COMPARES);
+  }
 
   async start(input: CompareStartInput): Promise<CompareView> {
     if (this.shuttingDown) {
@@ -213,6 +222,7 @@ export class CompareManager {
     };
 
     this.compares.set(compare.id, compare);
+    this.pruneCompares(compare.id);
     this.pushEvent(compare, {
       type: "started",
       message: `Compare started with ${candidates.length} candidate(s).`,
@@ -405,6 +415,24 @@ export class CompareManager {
       }
     } finally {
       this.touch(compare);
+      this.pruneCompares(compare.id);
+    }
+  }
+
+  private pruneCompares(protectedCompareId?: string): void {
+    const overflow = this.compares.size - this.maxCompares;
+    if (overflow <= 0) {
+      return;
+    }
+
+    const removable = [...this.compares.values()]
+      .filter((compare) =>
+        compare.id !== protectedCompareId && isTerminalCompare(compare)
+      )
+      .sort((a, b) => a.createdAtMs - b.createdAtMs);
+
+    for (const compare of removable.slice(0, overflow)) {
+      this.compares.delete(compare.id);
     }
   }
 

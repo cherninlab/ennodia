@@ -1,21 +1,27 @@
 ---
 title: Documentation
-description: Start here for Ennodia setup, MCP tools, architecture, and releases.
+description: Start here for Ennodia install, examples, MCP tools, architecture, and releases.
 ---
 
-Ennodia is an MCP server that lets one AI agent ask other agents for help.
+Ennodia is a local MCP server that lets your primary AI agent ask the agent
+CLIs you already have installed for help, then inspect what happened and let
+a model compare the answers before you get one result.
 
-Start with [Getting started](./getting-started.md): requirements, MCP config,
-and the first checks.
+## Find the right page
 
-Once it is running, [MCP tools](./reference/mcp-tools.md) covers the public tool
-surface. [How Ennodia works](./in-depth/architecture.md) explains routing,
-visible task state, Compare, and synthesis.
-
-Use these pages first:
-
-- [Getting started](./getting-started.md)
-- [MCP tools](./reference/mcp-tools.md)
-- [How Ennodia works](./in-depth/architecture.md)
-- [Running better audits](./in-depth/auditing.md)
-- [Releasing Ennodia](./in-depth/releasing.md)
+- **I want an agent to install this for me.** Use
+  [Install Ennodia](./install/). It is written for the agent doing the setup,
+  with a copy-paste prompt for the end user.
+- **I am setting Ennodia up by hand, or developing on it.** Use
+  [Getting started](./getting-started/) for local checkout, manual MCP
+  config, and first checks.
+- **I am calling Ennodia's tools and need exact parameters.** Use
+  [MCP tools](./reference/mcp-tools/).
+- **I want to understand how a run actually works.** Use
+  [How Ennodia works](./in-depth/architecture/).
+- **I am deciding whether Ennodia fits my workflow.** Use
+  [Positioning and related work](./in-depth/positioning/) for how it compares
+  to model routers, chat comparison tools, and agent frameworks.
+- **I want better results out of Compare.** Use
+  [Running better audits](./in-depth/auditing/) for prompt rubrics that catch
+  more than consistency issues.

@@ -65,3 +65,27 @@ export {
   type TaskOutputPreview,
 } from "./diagnosis";
 export { ENNODIA_VERSION } from "./version";
+export {
+  discoverSkills,
+  discoverSkillsWithWarnings,
+  getSkillsDirectories,
+  loadSkillFromFile,
+  loadSkillsByIds,
+  loadRunnableSkillsByIds,
+  installBundledSkills,
+  augmentPrompt,
+  assertSkillsSupportHarnesses,
+  toAppliedSkillInfo,
+  toSkillSummary,
+  type Skill,
+  type AppliedSkillInfo,
+  type InstallBundledSkillsInput,
+  type InstallBundledSkillsResult,
+  type SkillInstallAction,
+  type SkillInstallTarget,
+  type SkillDiscovery,
+  type SkillInstallation,
+  type SkillScope,
+  type SkillSource,
+  type SkillSummary,
+} from "./skills";

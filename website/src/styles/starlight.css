@@ -203,9 +203,9 @@ starlight-theme-select {
 .sl-markdown-content pre:not(:where(.not-content *)) {
   border: 1px solid #e8e8e4;
   border-radius: 8px;
-  background: #101113;
+  background: #ffffff;
   box-shadow: none;
-  color: #f5f5f2;
+  color: #202124;
 }
 
 .sl-markdown-content pre code:not(:where(.not-content *)) {
@@ -215,8 +215,30 @@ starlight-theme-select {
   color: inherit;
 }
 
+.expressive-code {
+  --ec-codeBg: #ffffff !important;
+  --ec-codeFg: #202124 !important;
+  --ec-brdCol: #e8e8e4 !important;
+  --ec-frm-edBg: #f6f6f4 !important;
+  --ec-frm-edActTabBg: #ffffff !important;
+  --ec-frm-edActTabIndTopCol: #d7d7d2 !important;
+  --ec-frm-edTabBarBrdCol: #e8e8e4 !important;
+  --ec-tm-lineBg: transparent !important;
+  --ec-tm-lineBrdCol: transparent !important;
+}
+
+.expressive-code pre,
+.expressive-code code,
+.expressive-code .ec-line,
+.expressive-code span {
+  color: #202124 !important;
+}
+
 .expressive-code .copy button {
   opacity: 1 !important;
+  background: #ffffff !important;
+  border-color: #d7d7d2 !important;
+  color: #0b0b0b !important;
 }
 
 .expressive-code .copy button:focus-visible {
