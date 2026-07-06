@@ -1,4 +1,10 @@
 import { randomUUID } from "node:crypto";
+import {
+  checkBudgetLimits,
+  estimateRunBudget,
+  type BudgetCheck,
+  type BudgetLimits,
+} from "./budget";
 import type { CompareManager, CompareView } from "./compare";
 import { diagnoseTasks, type TaskDiagnosis } from "./diagnosis";
 import type {
@@ -6,8 +12,22 @@ import type {
   HarnessAdapter,
   HarnessDiscovery,
 } from "./harnesses";
+import {
+  noopHistorySink,
+  type HistorySink,
+  type RunHistoryListOptions,
+  type RunHistorySnapshot,
+} from "./history";
+import { errorMessage, preview, tailItems, truncate } from "./internal";
 import type { RoutePlan } from "./planner";
+import type { RouteCategory } from "./priority";
 import type { TaskManager, TaskView } from "./tasks";
+import {
+  assertSkillsSupportHarnesses,
+  toAppliedSkillInfo,
+  type Skill,
+  type AppliedSkillInfo,
+} from "./skills";
 
 export type RunMode = "auto" | "single" | "parallel";
 export type RunCompareMode = "auto" | boolean;
@@ -26,6 +46,8 @@ export type RunEvent = {
     | "task-succeeded"
     | "task-failed"
     | "task-cancelled"
+    | "skills-applied"
+    | "budget-checked"
     | "compare-skipped"
     | "compare-started"
     | "compare-succeeded"
@@ -37,12 +59,14 @@ export type RunEvent = {
   taskId?: string;
   compareId?: string;
   harnessId?: string;
+  skillIds?: string[];
   elapsedMs?: number;
   remainingMs?: number | null;
 };
 
 export type RunStartInput = {
   prompt: string;
+  category?: RouteCategory;
   harnessId?: string;
   mode?: RunMode;
   compare?: RunCompareMode;
@@ -55,6 +79,8 @@ export type RunStartInput = {
   synthesizerHarnessId?: string;
   synthesizerModel?: string;
   maxOutputChars?: number;
+  skills?: Skill[];
+  budget?: BudgetLimits;
 };
 
 export type RunView = {
@@ -81,6 +107,8 @@ export type RunView = {
   failedTaskDiagnosis?: TaskDiagnosis;
   eventCount: number;
   events: RunEvent[];
+  appliedSkills?: AppliedSkillInfo[];
+  budget: BudgetCheck;
 };
 
 export type RunViewOptions = {
@@ -97,6 +125,7 @@ export type FindHarnessAdapter = (id: string) => HarnessAdapter | undefined;
 export type PlanRoute = (
   prompt: string,
   harnesses: HarnessDiscovery[],
+  options?: { category?: RouteCategory },
 ) => RoutePlan;
 
 export type RunManagerDependencies = {
@@ -109,6 +138,11 @@ export type RunManagerDependencies = {
 
 export type RunManagerShutdownOptions = {
   deadlineMs?: number;
+};
+
+export type RunManagerOptions = {
+  maxRuns?: number;
+  historySink?: HistorySink;
 };
 
 type InternalRun = {
@@ -129,6 +163,10 @@ type InternalRun = {
   updatedAtMs: number;
   endedAtMs?: number;
   events: RunEvent[];
+  appliedSkills?: AppliedSkillInfo[];
+  budget: BudgetCheck;
+  settled?: Promise<void>;
+  historyRecorded?: Promise<void>;
 };
 
 type EtaSnapshot = {
@@ -140,14 +178,26 @@ type EtaSnapshot = {
 const DEFAULT_MAX_EVENTS = 100;
 const DEFAULT_MAX_ANSWER_CHARS = 80_000;
 const DEFAULT_SHUTDOWN_DEADLINE_MS = 5_000;
-const POLL_MS = 500;
+const DEFAULT_MAX_RUNS = 100;
+// History snapshots are receipts (final answers + Compare analysis), not
+// full transcripts; per-task output is capped well below live-view limits.
+const HISTORY_TASK_MAX_OUTPUT_CHARS = 20_000;
+const HISTORY_MAX_EVENTS = 50;
 
 export class RunManager {
   private readonly runs = new Map<string, InternalRun>();
+  private readonly maxRuns: number;
+  private readonly historySink: HistorySink;
   private shuttingDown = false;
   private shutdownPromise?: Promise<void>;
 
-  constructor(private readonly dependencies: RunManagerDependencies) {}
+  constructor(
+    private readonly dependencies: RunManagerDependencies,
+    options: RunManagerOptions = {},
+  ) {
+    this.maxRuns = Math.max(1, options.maxRuns ?? DEFAULT_MAX_RUNS);
+    this.historySink = options.historySink ?? noopHistorySink;
+  }
 
   async start(input: RunStartInput): Promise<RunView> {
     if (this.shuttingDown) {
@@ -157,13 +207,37 @@ export class RunManager {
     const harnesses = await this.dependencies.discoverHarnesses({
       refresh: input.refresh,
     });
-    const plan = this.dependencies.planRoute(input.prompt, harnesses);
+    const plan = this.dependencies.planRoute(input.prompt, harnesses, {
+      category: input.category,
+    });
     const mode = input.mode ?? "auto";
     const compareMode = input.compare ?? "auto";
     const selectedHarnessIds = selectHarnessIds(input.harnessId, mode, plan);
 
     if (selectedHarnessIds.length === 0) {
       throw new Error("No runnable harnesses were found.");
+    }
+
+    if (input.skills && input.skills.length > 0) {
+      assertSkillsSupportHarnesses(input.skills, selectedHarnessIds);
+    }
+
+    const budget = checkBudgetLimits(
+      estimateRunBudget({
+        prompt: input.prompt,
+        selectedHarnessIds,
+        comparePlanned: shouldPlanCompare(
+          compareMode,
+          plan.compareSuggested,
+          selectedHarnessIds.length,
+        ),
+        maxOutputChars: input.maxOutputChars,
+      }),
+      input.budget,
+    );
+
+    if (budget.exceeded) {
+      throw new Error(`Budget limit exceeded: ${budget.issues.join(" ")}`);
     }
 
     const now = Date.now();
@@ -179,12 +253,28 @@ export class RunManager {
       createdAtMs: now,
       updatedAtMs: now,
       events: [],
+      appliedSkills: input.skills?.map(toAppliedSkillInfo),
+      budget,
     };
 
     this.runs.set(run.id, run);
+    this.pruneRuns(run.id);
     this.pushEvent(run, {
       type: "started",
       message: `Run started with ${selectedHarnessIds.length} selected harness(es).`,
+    });
+
+    if (run.appliedSkills && run.appliedSkills.length > 0) {
+      this.pushEvent(run, {
+        type: "skills-applied",
+        skillIds: run.appliedSkills.map((skill) => skill.id),
+        message: `Applied ${run.appliedSkills.length} skill(s).`,
+      });
+    }
+
+    this.pushEvent(run, {
+      type: "budget-checked",
+      message: `Estimated ${budget.estimate.estimatedTotalInputTokens} input token(s) across ${budget.estimate.selectedHarnessCount} child task(s).`,
     });
 
     for (const harnessId of selectedHarnessIds) {
@@ -196,7 +286,7 @@ export class RunManager {
       return this.toView(run);
     }
 
-    void this.run(run, input);
+    run.settled = this.run(run, input);
     return this.toView(run);
   }
 
@@ -219,6 +309,33 @@ export class RunManager {
     }
 
     return this.toView(run);
+  }
+
+  async waitForTerminal(
+    id: string,
+    timeoutMs?: number,
+    options: RunViewOptions = {},
+  ): Promise<RunView | undefined> {
+    const run = this.runs.get(id);
+    if (!run) {
+      return undefined;
+    }
+
+    if (!isTerminalRun(run) && run.settled) {
+      await settleWithDeadline(run.settled, timeoutMs);
+    }
+
+    if (run.historyRecorded) {
+      await settleWithDeadline(run.historyRecorded, timeoutMs);
+    }
+
+    return this.toView(run, options);
+  }
+
+  listHistory(
+    options?: RunHistoryListOptions,
+  ): Promise<RunHistorySnapshot[]> | RunHistorySnapshot[] {
+    return this.historySink.listRuns(options);
   }
 
   async shutdown(options: RunManagerShutdownOptions = {}): Promise<void> {
@@ -253,6 +370,7 @@ export class RunManager {
         cwd: input.cwd,
         model: input.model,
         timeoutMs: input.timeoutMs,
+        skills: input.skills,
       }).task;
 
       run.taskIds.push(started.id);
@@ -389,24 +507,25 @@ export class RunManager {
     run: InternalRun,
     compareId: string,
   ): Promise<CompareView> {
-    while (true) {
-      const compare = this.dependencies.compareManager.get(compareId, {
+    const compare = await this.dependencies.compareManager.waitForTerminal(
+      compareId,
+      undefined,
+      {
         includeCandidates: false,
         includeEvents: true,
         maxEvents: 25,
-      });
+      },
+    );
 
-      if (!compare) {
-        throw new Error(`Run child compare disappeared: ${compareId}`);
-      }
-
-      if (isTerminalCompare(compare) || run.status === "cancelled") {
-        return compare;
-      }
-
-      await sleep(POLL_MS);
-      this.touch(run);
+    if (!compare) {
+      throw new Error(`Run child compare disappeared: ${compareId}`);
     }
+
+    if (isRunStatus(run, "cancelled")) {
+      return compare;
+    }
+
+    return compare;
   }
 
   private shouldCompare(run: InternalRun, comparableTaskCount: number): boolean {
@@ -460,6 +579,8 @@ export class RunManager {
       failedTaskDiagnosis: run.failedTaskDiagnosis,
       eventCount: run.events.length,
       events: options.includeEvents === false ? [] : tailItems(run.events, maxEvents),
+      appliedSkills: run.appliedSkills,
+      budget: run.budget,
     };
   }
 
@@ -548,6 +669,8 @@ export class RunManager {
     run.status = "cancelled";
     run.endedAtMs = Date.now();
     this.pushEvent(run, { type: "cancelled", message });
+    this.recordHistory(run);
+    this.pruneRuns(run.id);
 
     for (const taskId of run.taskIds) {
       const task = this.dependencies.taskManager.get(taskId, {
@@ -572,6 +695,8 @@ export class RunManager {
       type: "succeeded",
       message: "Run completed.",
     });
+    this.recordHistory(run);
+    this.pruneRuns(run.id);
   }
 
   private failRun(
@@ -587,6 +712,58 @@ export class RunManager {
       type: "failed",
       message,
     });
+    this.recordHistory(run);
+    this.pruneRuns(run.id);
+  }
+
+  private recordHistory(run: InternalRun): void {
+    const tasks = run.taskIds
+      .map((taskId) =>
+        this.dependencies.taskManager.get(taskId, {
+          includeOutput: true,
+          includeEvents: true,
+          maxOutputChars: HISTORY_TASK_MAX_OUTPUT_CHARS,
+          maxEvents: HISTORY_MAX_EVENTS,
+        })
+      )
+      .filter(isTaskView);
+    const compare = run.compareId
+      ? this.dependencies.compareManager.get(run.compareId, {
+          includeCandidates: true,
+          includeEvents: true,
+          maxEvents: HISTORY_MAX_EVENTS,
+        })
+      : undefined;
+
+    run.historyRecorded = Promise.resolve(
+      this.historySink.recordRun({
+        version: 1,
+        kind: "run",
+        recordedAt: new Date().toISOString(),
+        run: this.toView(run, {
+          includeEvents: true,
+          maxAnswerChars: DEFAULT_MAX_ANSWER_CHARS,
+          maxEvents: DEFAULT_MAX_EVENTS,
+        }),
+        tasks,
+        compare,
+      }),
+    ).catch(() => undefined);
+  }
+
+  private pruneRuns(protectedRunId?: string): void {
+    const overflow = this.runs.size - this.maxRuns;
+    if (overflow <= 0) {
+      return;
+    }
+
+    const removable = [...this.runs.values()]
+      .filter((run) => run.id !== protectedRunId && isTerminalRun(run))
+      .sort((a, b) => a.createdAtMs - b.createdAtMs);
+
+    for (const run of removable.slice(0, overflow)) {
+      this.runs.delete(run.id);
+    }
   }
 
   private requireRun(id: string): InternalRun {
@@ -611,7 +788,7 @@ export class RunManager {
   }
 }
 
-function selectHarnessIds(
+export function selectHarnessIds(
   harnessId: string | undefined,
   mode: RunMode,
   plan: RoutePlan,
@@ -633,6 +810,26 @@ function selectHarnessIds(
   }
 
   return plan.selected ? [plan.selected] : [];
+}
+
+export function shouldPlanCompare(
+  compareMode: RunCompareMode,
+  compareSuggested: boolean,
+  selectedHarnessCount: number,
+): boolean {
+  if (selectedHarnessCount < 2) {
+    return false;
+  }
+
+  if (compareMode === true) {
+    return true;
+  }
+
+  if (compareMode === false) {
+    return false;
+  }
+
+  return compareSuggested;
 }
 
 function eventFromTask(task: TaskView): Omit<RunEvent, "at"> {
@@ -719,14 +916,6 @@ function compareTaskIds(compare: CompareView | undefined): string[] {
   );
 }
 
-function isTerminalCompare(compare: CompareView): boolean {
-  return (
-    compare.status === "succeeded" ||
-    compare.status === "failed" ||
-    compare.status === "cancelled"
-  );
-}
-
 function isTerminalRun(run: InternalRun): boolean {
   return (
     run.status === "succeeded" ||
@@ -739,39 +928,20 @@ function isRunStatus(run: InternalRun, status: RunStatus): boolean {
   return run.status === status;
 }
 
-function truncate(text: string, maxChars: number): string {
-  if (maxChars <= 0) {
-    return "";
+async function settleWithDeadline(
+  settled: Promise<void>,
+  timeoutMs?: number,
+): Promise<void> {
+  if (timeoutMs === undefined) {
+    await settled;
+    return;
   }
 
-  if (text.length <= maxChars) {
-    return text;
-  }
-
-  if (maxChars <= 3) {
-    return ".".repeat(maxChars);
-  }
-
-  return `${text.slice(0, maxChars - 3)}...`;
-}
-
-function tailItems<T>(items: T[], maxItems: number): T[] {
-  if (maxItems <= 0) {
-    return [];
-  }
-
-  return items.slice(-maxItems);
-}
-
-function preview(text: string): string {
-  const clean = text.replace(/\s+/g, " ").trim();
-  return clean.length <= 160 ? clean : `${clean.slice(0, 157)}...`;
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+  await new Promise<void>((resolve) => {
+    const timer = setTimeout(resolve, timeoutMs);
+    void settled.finally(() => {
+      clearTimeout(timer);
+      resolve();
+    });
+  });
 }

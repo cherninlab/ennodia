@@ -95,38 +95,256 @@ a:focus-visible {
 
 .hero {
   display: grid;
-  min-height: min(620px, 70svh);
+  min-height: min(720px, 88svh);
   place-items: center;
-  padding: 72px 20px 58px;
+  padding: 56px 20px 52px;
   text-align: center;
 }
 
 .hero-inner {
   width: min(720px, 100%);
+  max-width: 100%;
+  min-width: 0;
 }
 
 .hero h1 {
+  display: grid;
+  justify-items: center;
+  gap: 62px;
   margin: 0;
-  line-height: 0;
+  line-height: 1.04;
 }
 
 .hero-logo {
   display: block;
-  width: min(320px, 72vw);
-  height: auto;
+  width: auto;
+  height: 24px;
   margin: 0 auto;
+}
+
+.hero-title-text {
+  display: block;
+  max-width: 720px;
+  font-size: 3.625rem;
+  font-weight: 650;
+  letter-spacing: 0;
+  line-height: 1.04;
 }
 
 .hero-subtitle {
   max-width: 660px;
-  margin: 26px auto 0;
-  color: #565861;
-  font-size: 1.25rem;
+  margin: 18px auto 0;
+  color: #2f3035;
+  font-size: 1.4rem;
   line-height: 1.45;
+}
+
+.hero-terminal {
+  width: min(515px, 100%);
+  margin: 32px auto 0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 16px;
+  color: #dbdbd6;
+  background: #101012;
+  box-shadow: 0 22px 70px rgba(16, 16, 18, 0.16);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  text-align: left;
+  corner-shape: squircle;
+}
+
+.terminal-command {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #f3f3ef;
+  white-space: nowrap;
+}
+
+.terminal-muted {
+  color: #85858a;
+}
+
+.terminal-typed {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.terminal-cursor {
+  width: 8px;
+  height: 1.2em;
+  background: #f3f3ef;
+  animation: terminal-cursor 1s steps(1, end) infinite;
+}
+
+.terminal-line {
+  margin-top: 12px;
+  opacity: 0;
+  transform: translateY(4px);
+  animation: terminal-fade 320ms var(--ease) forwards;
+}
+
+.terminal-rows {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.terminal-row {
+  display: grid;
+  grid-template-columns: 22px minmax(86px, max-content) minmax(96px, 1fr) max-content;
+  gap: 10px;
+  align-items: center;
+  margin-top: 0;
+}
+
+.terminal-row img {
+  display: block;
+  width: 19px;
+  height: 19px;
+  object-fit: contain;
+}
+
+.terminal-bar {
+  position: relative;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #252528;
+}
+
+.terminal-bar span {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--bar-color);
+  animation: terminal-fill 920ms var(--ease) forwards;
+}
+
+.terminal-status {
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.terminal-good {
+  color: #84d8b4;
+}
+
+.terminal-warn {
+  color: #f0bf60;
+}
+
+.terminal-final {
+  margin-top: 14px;
+  color: #f3f3ef;
+  font-weight: 700;
+}
+
+.terminal-delay-1 {
+  animation-delay: 280ms;
+}
+
+.terminal-delay-2 {
+  animation-delay: 560ms;
+}
+
+.terminal-delay-3 {
+  animation-delay: 720ms;
+}
+
+.terminal-delay-4 {
+  animation-delay: 880ms;
+}
+
+.terminal-delay-5 {
+  animation-delay: 1280ms;
+}
+
+.terminal-delay-6 {
+  animation-delay: 1500ms;
+}
+
+.terminal-delay-7 {
+  animation-delay: 1720ms;
+}
+
+.terminal-delay-8 {
+  animation-delay: 1940ms;
+}
+
+.terminal-delay-2 .terminal-bar span {
+  animation-delay: 660ms;
+}
+
+.terminal-delay-3 .terminal-bar span {
+  animation-delay: 820ms;
+}
+
+.terminal-delay-4 .terminal-bar span {
+  animation-delay: 980ms;
+}
+
+.hero-prompt {
+  width: min(515px, 100%);
+  max-width: 100%;
+  min-width: 0;
+  margin: 28px auto 0;
+  text-align: left;
+}
+
+.hero-prompt pre {
+  background: var(--surface);
+  color: var(--text);
+}
+
+.hero-prompt .copy-button {
+  border-color: var(--line-strong);
+  color: var(--text);
+  background: rgba(246, 246, 244, 0.9);
+}
+
+.hero-prompt .copy-button::after {
+  background: var(--surface);
+}
+
+.hero-prompt .copy-status {
+  color: var(--muted);
+}
+
+.hero-links {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 18px;
+  color: var(--muted);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.hero-links a {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  transition: color 150ms var(--ease);
+}
+
+.github-link img {
+  display: block;
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  opacity: 0.84;
 }
 
 .hero-actions {
   display: flex;
+  max-width: 100%;
   justify-content: center;
   gap: 24px;
   margin-top: 28px;
@@ -185,6 +403,29 @@ a:focus-visible {
 
   .button-plain:hover {
     color: var(--blue);
+  }
+
+  .hero-links a:hover {
+    color: var(--blue);
+  }
+}
+
+@keyframes terminal-fade {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes terminal-fill {
+  to {
+    width: var(--bar-width);
+  }
+}
+
+@keyframes terminal-cursor {
+  50% {
+    opacity: 0;
   }
 }
 
@@ -271,6 +512,42 @@ p:last-child {
   font-size: 1.0625rem;
 }
 
+.example-list {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--line);
+}
+
+.example-list li {
+  border-bottom: 1px solid var(--line);
+  padding: 24px 0;
+}
+
+.example-list h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.interface-logo {
+  display: block;
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
+.example-list p {
+  max-width: 620px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 1rem;
+  line-height: 1.62;
+}
+
 .install-layout {
   display: grid;
   grid-template-columns: minmax(0, 0.86fr) minmax(0, 1fr);
@@ -285,8 +562,8 @@ p:last-child {
   min-width: 0;
 }
 
-.install-layout > div,
-.install-snippets > div {
+.install-layout>div,
+.install-snippets>div {
   min-width: 0;
   max-width: 100%;
 }
@@ -521,7 +798,7 @@ code {
   text-align: center;
 }
 
-.adapter-list img {
+.adapter-logo {
   display: block;
   width: 36px;
   height: 36px;
@@ -532,6 +809,10 @@ code {
   display: block;
   font-size: 1rem;
   font-weight: 650;
+}
+
+.adapter-list-upcoming {
+  opacity: 0.6;
 }
 
 .compare-flow {
@@ -688,13 +969,27 @@ code {
 
 @media (max-width: 860px) {
   .hero {
-    min-height: 560px;
-    padding-top: 64px;
+    min-height: auto;
+    padding-top: 56px;
+    padding-bottom: 48px;
+  }
+
+  .hero-title-text {
+    max-width: 620px;
+    font-size: 3rem;
   }
 
   .hero-subtitle {
     max-width: 560px;
     font-size: 1.125rem;
+  }
+
+  .hero-terminal {
+    margin-top: 28px;
+  }
+
+  .hero-prompt {
+    margin-top: 24px;
   }
 
   .section {
@@ -727,6 +1022,7 @@ code {
 }
 
 @media (max-width: 640px) {
+
   .section,
   .footer-inner {
     width: min(100% - 32px, 1040px);
@@ -734,21 +1030,70 @@ code {
 
   .hero {
     min-height: auto;
-    padding: 64px 16px 48px;
+    padding: 48px 16px 42px;
+  }
+
+  .hero h1 {
+    gap: 42px;
   }
 
   .hero-logo {
-    width: min(70vw, 260px);
+    height: 22px;
+  }
+
+  .hero-title-text {
+    font-size: 4rem;
   }
 
   .hero-subtitle {
-    margin-top: 22px;
-    font-size: 1.0625rem;
+    margin-top: 16px;
+    font-size: 1.4rem;
+  }
+
+  .hero-terminal {
+    margin-top: 48px;
+    border-radius: 12px;
+    padding: 14px;
+    font-size: 0.75rem;
+  }
+
+  .terminal-command {
+    gap: 7px;
+  }
+
+  .terminal-row {
+    grid-template-columns: 18px minmax(72px, max-content) minmax(42px, 1fr) minmax(60px, max-content);
+    gap: 7px;
+  }
+
+  .terminal-row img {
+    width: 17px;
+    height: 17px;
+  }
+
+  .terminal-bar {
+    height: 5px;
+  }
+
+  .terminal-status {
+    font-size: 0.6875rem;
+  }
+
+  .hero-prompt pre {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    padding: 16px 50px 16px 16px;
+    font-size: 0.75rem;
+    line-height: 1.55;
   }
 
   .hero-actions {
     gap: 14px;
     margin-top: 24px;
+  }
+
+  .hero-links {
+    margin-top: 16px;
   }
 
   .button {
@@ -779,13 +1124,113 @@ code {
     padding-bottom: 4px;
   }
 
-  .adapter-list {
-    grid-template-columns: 1fr;
-  }
-
   .footer-inner {
     align-items: flex-start;
     flex-direction: column;
+  }
+}
+
+@media (max-width: 380px) {
+  .hero-title-text {
+    font-size: 2.25rem;
+  }
+
+  .hero-terminal {
+    padding: 12px;
+    font-size: 0.71875rem;
+  }
+
+  .terminal-row {
+    grid-template-columns: 17px minmax(68px, max-content) minmax(30px, 1fr) minmax(56px, max-content);
+    gap: 6px;
+  }
+
+  .terminal-status {
+    font-size: 0.65625rem;
+  }
+}
+
+@media (max-width: 640px) and (max-height: 700px) {
+  .hero {
+    padding-top: 32px;
+    padding-bottom: 34px;
+  }
+
+  .hero-logo {
+    height: 20px;
+  }
+
+  .hero h1 {
+    gap: 16px;
+  }
+
+  .hero-title-text {
+    font-size: 2.25rem;
+    line-height: 1.02;
+  }
+
+  .hero-subtitle {
+    margin-top: 12px;
+    font-size: 0.984375rem;
+    line-height: 1.35;
+  }
+
+  .hero-terminal {
+    padding: 12px;
+    font-size: 0.6875rem;
+    line-height: 1.32;
+  }
+
+  .terminal-line {
+    margin-top: 8px;
+  }
+
+  .terminal-rows {
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .terminal-row {
+    grid-template-columns: 16px minmax(64px, max-content) minmax(28px, 1fr) minmax(52px, max-content);
+    gap: 5px;
+  }
+
+  .terminal-row img {
+    width: 15px;
+    height: 15px;
+  }
+
+  .terminal-status {
+    font-size: 0.625rem;
+  }
+
+  .terminal-final {
+    margin-top: 8px;
+  }
+
+  .hero-prompt {
+    margin-top: 20px;
+  }
+
+  .hero-prompt .snippet-label {
+    font-size: 0.75rem;
+  }
+
+  .hero-prompt pre {
+    padding: 14px 48px 14px 14px;
+    font-size: 0.75rem;
+    line-height: 1.5;
+  }
+
+  .hero-prompt .copy-button {
+    top: 8px;
+    right: 8px;
+    width: 30px;
+    height: 30px;
+  }
+
+  .hero-prompt .copy-status {
+    top: 44px;
   }
 }
 
@@ -797,6 +1242,8 @@ code {
   *,
   *::before,
   *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
     transition-duration: 1ms !important;
   }

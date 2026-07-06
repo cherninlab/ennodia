@@ -8,52 +8,79 @@
 </picture>
 </a>
 
-<p><strong>MCP server that lets one AI agent ask other agents for help</strong></p>
+<p><strong>MCP server for multi-agent review with Compare and traceable receipts</strong></p>
 
 <p>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-informational"></a>
   <img alt="CI" src="https://github.com/cherninlab/ennodia/actions/workflows/ci.yml/badge.svg" />
 </p>
 
+<p align="center">
+  <img alt="Ennodia terminal comparing three completed AI reviews" src="docs/assets/terminal.png" width="600">
+</p>
+
 </div>
 
-Ennodia is a local MCP server that lets one AI agent ask other agents for help while a task is still in progress. It routes the request, runs selected command line tools, tracks status and output, and can compare several answers before returning one result.
+No single model or agent should be the only reviewer for work that matters.
+Ennodia lets your primary agent ask the installed agent CLIs you already have,
+track every child task, and use model-led Compare to surface agreements,
+disagreements, blind spots, and one synthesized answer with receipts.
 
-It is built for workflows where no single model or agent should be trusted as the only reviewer.
+The subscription-pool idea is secondary: if you already pay for Codex, Claude
+Code, Antigravity, OpenCode, and other local agent tools, Ennodia gives your
+main agent one MCP doorway to use them as an independent review panel. The
+experimental IO package exposes a small local HTTP subset for apps, but the
+supported first-class surface is MCP.
 
 ## Install
 
-Run Ennodia as a stdio MCP server from the npm prerelease channel:
+Send this to your primary agent and let it handle setup:
+
+```text
+try-ennodia.cherninlab.com
+```
+Or run it directly as a stdio MCP server from npm:
 
 ```sh
-npx -y ennodia@next
+npx -y ennodia
 ```
 
-Requires Bun `1.3.14` or newer. `npx` downloads Ennodia; Bun runs it. Prefer
-Bun directly? Use `bunx ennodia@next`.
+Requires Bun `1.3.14` or newer — `npx` downloads Ennodia, Bun runs it. Prefer
+Bun directly? Use `bunx ennodia`. For manual setup, local development,
+or a full walkthrough, see
+[Quickstart](https://ennodia.cherninlab.com/docs/getting-started/).
 
-For local development from a checkout:
-
-```sh
-git clone https://github.com/cherninlab/ennodia
-cd ennodia
-bun install
-bun run verify
-```
-
-## What Ennodia Does
+## What Ennodia does
 
 - Discovers available local AI tools
-- Plans which tool should handle a request
+- Plans a route with a caller-provided category or keyword fallback
+- Estimates preflight input tokens and enforces local caps on that estimate
 - Starts and monitors child tasks
 - Shows status, timing, logs, and failures
 - Cancels tasks and runs explicitly
 - Compares multiple completed outputs
 - Synthesizes one answer from the comparison
 
-## Supported Harnesses
+The main entrypoint is `ennodia_run`: it plans, executes, optionally
+compares, and returns a run ID to poll with `ennodia_get_run`. See
+[MCP tools](https://ennodia.cherninlab.com/docs/reference/mcp-tools/) for the
+full tool and parameter reference.
 
-Current adapters:
+Ennodia is for deliberation-class work: a run usually takes minutes, and Compare
+adds two serial model passes after the child agents finish.
+
+## Ennodia IO
+
+The separate `@cherninlab/ennodia-io` workspace package exposes a local HTTP and TypeScript interface for apps that want BYOK-style settings over installed local agents:
+
+```sh
+npx -y @cherninlab/ennodia-io
+```
+
+See [Ennodia IO](https://ennodia.cherninlab.com/docs/reference/ennodia-io/) for
+supported fields, auth behavior, CORS posture, and current limits.
+
+## Supported harnesses
 
 - Codex CLI
 - Claude Code
@@ -64,30 +91,25 @@ Current adapters:
 - Hermes Agent
 - Antigravity
 
-Adapters stay thin. Shared routing, tracing, task state, recovery, and Compare
-logic live in the core modules.
+Adapters stay thin — shared routing, tracing, task state, recovery, and
+Compare logic live in core modules.
 
-## MCP Tools
-
-Common entrypoints:
-
-- `ennodia_list_harnesses` - show detected tools
-- `ennodia_plan` - preview routing for a prompt
-- `ennodia_start` - start direct child tasks without run-level synthesis
-- `ennodia_run` - plan, execute, optionally Compare, and return a run ID
-- `ennodia_get_run` - inspect run state, events, ETA, and final answer
-- `ennodia_cancel_run` - cancel a running orchestration
-- `ennodia_start_compare` - compare completed task outputs or supplied responses
-
-Lower-level task tools are available for polling and cancellation.
+Evaluated-but-not-shipped candidates include Gemini CLI, GitHub Copilot CLI,
+Amp, Aider, Goose, Qwen Code, and Cursor CLI. They will be added only when a
+supported non-interactive prompt-in/text-out surface can be verified without
+permission-bypass flags or provider-private APIs.
 
 ## Documentation
 
-- [Getting started](docs/getting-started.md)
-- [How Ennodia works](docs/in-depth/architecture.md)
-- [MCP tools](docs/reference/mcp-tools.md)
-- [Running better audits](docs/in-depth/auditing.md)
-- [Releasing Ennodia](docs/in-depth/releasing.md)
+- [Installation for Agents](https://ennodia.cherninlab.com/docs/install/) — the agent-driven setup path
+- [Quickstart](https://ennodia.cherninlab.com/docs/getting-started/) — manual setup and local development
+- [MCP Tools](https://ennodia.cherninlab.com/docs/reference/mcp-tools/) — full tool parameter reference
+- [How Ennodia Works](https://ennodia.cherninlab.com/docs/concepts/how-ennodia-works/) — the orchestration pipeline
+- [Second Opinions](https://ennodia.cherninlab.com/docs/concepts/second-opinions/) — replicate, decompose, and red-team patterns
+- [Data Governance](https://ennodia.cherninlab.com/docs/concepts/data-governance/) — local storage and data movement boundaries
+- [Comparisons](https://ennodia.cherninlab.com/docs/comparisons/) — how Ennodia compares to adjacent tools
+- [Benchmarks](https://ennodia.cherninlab.com/docs/reference/benchmarks/) — deterministic bug-recall results
+- [Running Better Audits](https://ennodia.cherninlab.com/docs/guides/running-better-audits/) — prompt rubrics for Compare
 
 ## Benchmarks
 
@@ -100,6 +122,10 @@ bun run bench:bug-recall
 
 Live harness runs are available through `bun run bench:bug-recall:live` and are
 kept out of `bun run verify`.
+
+The current dated fixture snapshot is published in
+[Benchmarks](https://ennodia.cherninlab.com/docs/reference/benchmarks/): 4
+cases, with `ennodia-parallel-compare` at 100% recall and 100% precision.
 
 ## Contributing
 

@@ -15,9 +15,12 @@ website/src/content/docs/docs/
 bench/results/*
 !bench/results/.gitkeep
 .wrangler/
+.kiro/
+.opencode/
 
 # OS files
 .DS_Store
 
 # Temporary files
-tmp/
+.tmp/
+repomix-output.*

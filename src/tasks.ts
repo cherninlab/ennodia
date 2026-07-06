@@ -6,15 +6,19 @@ import type {
   HarnessDiscovery,
   HarnessRunInput,
 } from "./harnesses";
+import { preview, tailItems } from "./internal";
+import {
+  augmentPrompt,
+  toAppliedSkillInfo,
+  type AppliedSkillInfo,
+} from "./skills";
 
 export type TaskStatus = "running" | "succeeded" | "failed" | "cancelled";
 
 export type TaskEvent = {
   at: string;
-  type: "started" | "stdout" | "stderr" | "tick" | "exit" | "cancel" | "error";
+  type: "started" | "stdout" | "stderr" | "exit" | "cancel" | "error";
   message?: string;
-  elapsedMs?: number;
-  remainingMs?: number | null;
 };
 
 export type TaskView = {
@@ -44,6 +48,7 @@ export type TaskView = {
   stdout: string;
   stderr: string;
   events: TaskEvent[];
+  appliedSkills?: AppliedSkillInfo[];
 };
 
 export type TaskViewOptions = {
@@ -52,6 +57,17 @@ export type TaskViewOptions = {
   maxOutputChars?: number;
   maxEvents?: number;
 };
+
+type TaskProcess = Bun.Subprocess<"ignore" | "pipe", "pipe", "pipe">;
+export type TaskSpawnInput = {
+  cmd: string[];
+  cwd: string;
+  env: Record<string, string | undefined>;
+  stdin: "ignore" | "pipe";
+  stdout: "pipe";
+  stderr: "pipe";
+};
+export type TaskSpawn = (input: TaskSpawnInput) => TaskProcess;
 
 type InternalTask = Omit<
   TaskView,
@@ -70,11 +86,10 @@ type InternalTask = Omit<
   updatedAtMs: number;
   endedAtMs?: number;
   lastOutputAtMs?: number;
-  process?: Bun.Subprocess<"ignore" | "pipe", "pipe", "pipe">;
+  process?: TaskProcess;
   streamsDone?: Promise<void>;
   settled?: Promise<void>;
   streamReaders: Set<ReadableStreamDefaultReader<Uint8Array>>;
-  tick?: Timer;
   timeout?: Timer;
 };
 
@@ -84,6 +99,8 @@ export type StartTaskResult = {
 
 export type TaskManagerOptions = {
   drainTimeoutMs?: number;
+  maxTasks?: number;
+  spawn?: TaskSpawn;
 };
 
 export type TaskManagerShutdownOptions = {
@@ -93,6 +110,7 @@ export type TaskManagerShutdownOptions = {
 const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000;
 const DEFAULT_DRAIN_TIMEOUT_MS = 1_000;
 const DEFAULT_SHUTDOWN_DEADLINE_MS = 5_000;
+const DEFAULT_MAX_TASKS = 200;
 const MAX_CAPTURE_CHARS = 200_000;
 const MAX_EVENT_MESSAGE_CHARS = 4_000;
 const MAX_EVENTS = 300;
@@ -100,11 +118,15 @@ const MAX_EVENTS = 300;
 export class TaskManager {
   private readonly tasks = new Map<string, InternalTask>();
   private readonly drainTimeoutMs: number;
+  private readonly maxTasks: number;
+  private readonly spawn: TaskSpawn;
   private shuttingDown = false;
   private shutdownPromise?: Promise<void>;
 
   constructor(options: TaskManagerOptions = {}) {
     this.drainTimeoutMs = options.drainTimeoutMs ?? DEFAULT_DRAIN_TIMEOUT_MS;
+    this.maxTasks = Math.max(1, options.maxTasks ?? DEFAULT_MAX_TASKS);
+    this.spawn = options.spawn ?? ((input) => Bun.spawn(input));
   }
 
   start(
@@ -121,7 +143,13 @@ export class TaskManager {
     }
 
     const timeoutMs = input.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-    const commandSpec = adapter.buildCommand(discovery.commandPath, input);
+    const augmentedPrompt = input.skills && input.skills.length > 0
+      ? augmentPrompt(input.prompt, input.skills, adapter.id)
+      : input.prompt;
+    const commandSpec = adapter.buildCommand(discovery.commandPath, {
+      ...input,
+      prompt: augmentedPrompt,
+    });
     const cwd = commandSpec.cwd ?? process.cwd();
 
     if (!existsSync(cwd)) {
@@ -137,7 +165,7 @@ export class TaskManager {
       cwd,
       command: [
         basename(commandSpec.command),
-        ...commandSpec.args.map((arg) => arg === input.prompt ? "<prompt>" : arg),
+        ...commandSpec.args.map((arg) => arg === augmentedPrompt ? "<prompt>" : arg),
         ...(commandSpec.stdin === undefined ? [] : ["<stdin-prompt>"]),
       ],
       promptPreview: preview(input.prompt),
@@ -151,12 +179,14 @@ export class TaskManager {
       stderr: "",
       events: [],
       streamReaders: new Set(),
+      appliedSkills: input.skills?.map(toAppliedSkillInfo),
     };
 
     this.tasks.set(task.id, task);
+    this.pruneTasks(task.id);
     this.pushEvent(task, { type: "started", message: "Task started." });
 
-    const child = Bun.spawn({
+    const child = this.spawn({
       cmd: [commandSpec.command, ...commandSpec.args],
       cwd,
       env: { ...process.env, ...commandSpec.env },
@@ -168,30 +198,10 @@ export class TaskManager {
     task.process = child;
     task.pid = child.pid;
 
-    if (commandSpec.stdin !== undefined) {
-      const childStdin = child.stdin;
-      if (!childStdin) {
-        throw new Error("Child stdin pipe was not available.");
-      }
-
-      childStdin.write(commandSpec.stdin);
-      childStdin.end();
-    }
-
     task.streamsDone = Promise.all([
       this.pipeStreamSafely(task, "stdout", child.stdout),
       this.pipeStreamSafely(task, "stderr", child.stderr),
     ]).then(() => undefined);
-
-    task.tick = setInterval(() => {
-      this.touch(task);
-      const view = this.toView(task);
-      this.pushEvent(task, {
-        type: "tick",
-        elapsedMs: view.elapsedMs,
-        remainingMs: view.remainingMs,
-      });
-    }, 1_000);
 
     task.timeout = setTimeout(() => {
       if (task.cancelRequested) {
@@ -209,6 +219,24 @@ export class TaskManager {
 
     task.settled = this.watchExit(task, child);
     void task.settled;
+
+    if (commandSpec.stdin !== undefined) {
+      try {
+        const childStdin = child.stdin;
+        if (!childStdin) {
+          throw new Error("Child stdin pipe was not available.");
+        }
+
+        childStdin.write(commandSpec.stdin);
+        childStdin.end();
+      } catch (error) {
+        this.pushEvent(task, {
+          type: "error",
+          message: error instanceof Error ? error.message : String(error),
+        });
+        child.kill();
+      }
+    }
 
     return { task: this.toView(task) };
   }
@@ -302,7 +330,7 @@ export class TaskManager {
 
   private async watchExit(
     task: InternalTask,
-    child: Bun.Subprocess<"ignore" | "pipe", "pipe", "pipe">,
+    child: TaskProcess,
   ): Promise<void> {
     try {
       const exitCode = await child.exited;
@@ -340,6 +368,22 @@ export class TaskManager {
     } finally {
       this.clearTimers(task);
       this.touch(task);
+      this.pruneTasks(task.id);
+    }
+  }
+
+  private pruneTasks(protectedTaskId?: string): void {
+    const overflow = this.tasks.size - this.maxTasks;
+    if (overflow <= 0) {
+      return;
+    }
+
+    const removable = [...this.tasks.values()]
+      .filter((task) => task.id !== protectedTaskId && task.status !== "running")
+      .sort((a, b) => a.createdAtMs - b.createdAtMs);
+
+    for (const task of removable.slice(0, overflow)) {
+      this.tasks.delete(task.id);
     }
   }
 
@@ -524,6 +568,7 @@ export class TaskManager {
       stdout: includeOutput ? tail(task.stdout, maxOutputChars) : "",
       stderr: includeOutput ? tail(task.stderr, maxOutputChars) : "",
       events: includeEvents ? tailItems(task.events, maxEvents) : [],
+      appliedSkills: task.appliedSkills,
     };
   }
 
@@ -547,11 +592,6 @@ export class TaskManager {
   }
 
   private clearTimers(task: InternalTask): void {
-    if (task.tick) {
-      clearInterval(task.tick);
-      task.tick = undefined;
-    }
-
     if (task.timeout) {
       clearTimeout(task.timeout);
       task.timeout = undefined;
@@ -580,23 +620,10 @@ function tail(text: string, maxChars: number): string {
   return text.slice(text.length - maxChars);
 }
 
-function preview(text: string): string {
-  const clean = text.replace(/\s+/g, " ").trim();
-  return clean.length <= 160 ? clean : `${clean.slice(0, 157)}...`;
-}
-
 function trimEventMessage(message: string): string {
   if (message.length <= MAX_EVENT_MESSAGE_CHARS) {
     return message;
   }
 
   return `${message.slice(0, MAX_EVENT_MESSAGE_CHARS)}...`;
-}
-
-function tailItems<T>(items: T[], maxItems: number): T[] {
-  if (maxItems <= 0) {
-    return [];
-  }
-
-  return items.slice(-maxItems);
 }

@@ -27,31 +27,77 @@ const plan = await client.callTool({
     prompt: "Review this TypeScript repo and compare tradeoffs.",
   },
 });
+const budget = await client.callTool({
+  name: "ennodia_estimate_budget",
+  arguments: {
+    prompt: "Review this TypeScript repo and compare tradeoffs.",
+    mode: "parallel",
+    compare: true,
+    budget: {
+      maxChildTasks: 10,
+    },
+  },
+});
+const skills = await client.callTool({
+  name: "ennodia_list_skills",
+  arguments: {},
+});
+const skillInstall = await client.callTool({
+  name: "ennodia_install_skills",
+  arguments: {
+    dryRun: true,
+    harnessIds: ["codex"],
+    cwd: process.cwd(),
+  },
+});
 
 await client.close();
+
+const skillList = parseTextResult(skills);
+const skillInstallPlan = parseTextResult(skillInstall);
 
 const toolNames = tools.tools.map((tool) => tool.name);
 const harnessList = parseTextResult(harnesses);
 const routePlan = parseTextResult(plan);
+const budgetPlan = parseTextResult(budget);
 
 assertToolSchemaDescriptions(tools.tools);
 assertIncludes(toolNames, "ennodia_list_harnesses");
 assertIncludes(toolNames, "ennodia_plan");
+assertIncludes(toolNames, "ennodia_estimate_budget");
+assertIncludes(toolNames, "ennodia_estimate_compositional_budget");
 assertIncludes(toolNames, "ennodia_start");
+assertIncludes(toolNames, "ennodia_start_compositional");
 assertIncludes(toolNames, "ennodia_run");
 assertIncludes(toolNames, "ennodia_list_runs");
+assertIncludes(toolNames, "ennodia_history");
 assertIncludes(toolNames, "ennodia_get_run");
 assertIncludes(toolNames, "ennodia_cancel_run");
 assertIncludes(toolNames, "ennodia_get_task");
+assertIncludes(toolNames, "ennodia_get_compositional_status");
 assertIncludes(toolNames, "ennodia_start_compare");
 assertIncludes(toolNames, "ennodia_get_compare");
+assertIncludes(toolNames, "ennodia_list_skills");
+assertIncludes(toolNames, "ennodia_install_skills");
 
 if (!Array.isArray(harnessList)) {
   throw new Error("Harness list response was not an array.");
 }
 
+if (!isSkillDiscovery(skillList)) {
+  throw new Error("Skills list response did not include the expected discovery shape.");
+}
+
+if (!isSkillInstallPlan(skillInstallPlan)) {
+  throw new Error("Skills install response did not include the expected plan shape.");
+}
+
 if (!isRoutePlanSummary(routePlan)) {
   throw new Error("Plan response did not include the expected route shape.");
+}
+
+if (!isBudgetPlan(budgetPlan)) {
+  throw new Error("Budget response did not include the expected estimate shape.");
 }
 
 console.log(
@@ -63,9 +109,18 @@ console.log(
         runnable: harness.runnable,
         version: harness.version,
       })),
+      skills: skillList.skills.map((skill) => ({
+        id: skill.id,
+        name: skill.name,
+        version: skill.version,
+        source: skill.source,
+        native: skill.native,
+      })),
+      skillInstallActions: skillInstallPlan.actions.length,
       selected: routePlan.selected ?? null,
       parallelSuggested: routePlan.parallelSuggested,
       compareSuggested: routePlan.compareSuggested,
+      budgetEstimate: budgetPlan.budget.estimate.estimatedTotalInputTokens,
     },
     null,
     2,
@@ -89,6 +144,35 @@ type RoutePlanSummary = {
   selected?: string;
   parallelSuggested: boolean;
   compareSuggested: boolean;
+};
+
+type SkillDiscoverySummary = {
+  skills: SkillSummary[];
+  warnings: string[];
+  searchedDirectories: string[];
+};
+
+type SkillSummary = {
+  id: string;
+  name: string;
+  version: string;
+  source: string;
+  native: boolean;
+};
+
+type SkillInstallPlan = {
+  dryRun: boolean;
+  actions: unknown[];
+};
+
+type BudgetPlan = {
+  budget: {
+    estimate: {
+      estimatedTotalInputTokens: number;
+    };
+    exceeded: boolean;
+    issues: string[];
+  };
 };
 
 type JsonSchemaObject = {
@@ -192,6 +276,37 @@ function isRoutePlanSummary(value: unknown): value is RoutePlanSummary {
     typeof (value as { parallelSuggested?: unknown }).parallelSuggested ===
       "boolean" &&
     typeof (value as { compareSuggested?: unknown }).compareSuggested === "boolean"
+  );
+}
+
+function isSkillDiscovery(value: unknown): value is SkillDiscoverySummary {
+  return (
+    isRecord(value) &&
+    Array.isArray(value.skills) &&
+    Array.isArray(value.warnings) &&
+    Array.isArray(value.searchedDirectories)
+  );
+}
+
+function isSkillInstallPlan(value: unknown): value is SkillInstallPlan {
+  return (
+    isRecord(value) &&
+    typeof value.dryRun === "boolean" &&
+    Array.isArray(value.actions)
+  );
+}
+
+function isBudgetPlan(value: unknown): value is BudgetPlan {
+  if (!isRecord(value) || !isRecord(value.budget)) {
+    return false;
+  }
+
+  const budget = value.budget;
+  return (
+    isRecord(budget.estimate) &&
+    typeof budget.estimate.estimatedTotalInputTokens === "number" &&
+    typeof budget.exceeded === "boolean" &&
+    Array.isArray(budget.issues)
   );
 }
 

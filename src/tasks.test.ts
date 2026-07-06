@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import type { HarnessAdapter, HarnessDiscovery } from "./harnesses";
-import { TaskManager } from "./tasks";
+import { TaskManager, type TaskSpawn } from "./tasks";
 
 describe("TaskManager", () => {
   it("captures stdout, stderr, exit status, and task events", async () => {
@@ -37,6 +37,68 @@ describe("TaskManager", () => {
     expect(result.command).not.toContain("from stdin");
   });
 
+  it("settles and kills the child process when a stdin write fails", async () => {
+    let killed = false;
+    let resolveExited: (exitCode: number) => void = () => undefined;
+    const exited = new Promise<number>((resolve) => {
+      resolveExited = resolve;
+    });
+    const emptyStream = () =>
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.close();
+        },
+      });
+    const manager = new TaskManager({
+      spawn: () =>
+        ({
+          pid: 123,
+          stdin: {
+            write: () => {
+              throw new Error("stdin write failed");
+            },
+            end: () => undefined,
+          },
+          stdout: emptyStream(),
+          stderr: emptyStream(),
+          exited,
+          kill: () => {
+            killed = true;
+            resolveExited(1);
+            return true;
+          },
+        }) as unknown as ReturnType<TaskSpawn>,
+    });
+
+    const { task } = manager.start(stdinEchoAdapter, shellDiscovery, {
+      prompt: "from stdin",
+      timeoutMs: 5_000,
+    });
+    const result = await manager.waitForTerminal(task.id, 1_000);
+
+    expect(killed).toBe(true);
+    expect(result?.status).toBe("failed");
+    expect(result?.events.some((event) =>
+      event.type === "error" && event.message === "stdin write failed"
+    )).toBe(true);
+  });
+
+  it("does not store periodic ticks as task events", async () => {
+    const manager = new TaskManager();
+    const { task } = manager.start(cancellableAdapter, bunDiscovery, {
+      prompt: "",
+      timeoutMs: 5_000,
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 1_100));
+    const running = manager.get(task.id);
+    manager.cancel(task.id);
+    await waitForTask(manager, task.id);
+
+    expect(running?.status).toBe("running");
+    expect(running?.events.map((event) => event.type)).toEqual(["started"]);
+  });
+
   it("returns lightweight task list views by default", async () => {
     const manager = new TaskManager();
     const { task } = manager.start(echoAdapter, echoDiscovery, {
@@ -53,6 +115,25 @@ describe("TaskManager", () => {
     expect(listed.events).toEqual([]);
     expect(listed.stdoutChars).toBeGreaterThan(0);
     expect(listed.eventCount).toBeGreaterThan(0);
+  });
+
+  it("evicts old terminal tasks after the configured history cap", async () => {
+    const manager = new TaskManager({ maxTasks: 1 });
+
+    const first = manager.start(echoAdapter, echoDiscovery, {
+      prompt: "first",
+      timeoutMs: 5_000,
+    }).task;
+    await waitForTask(manager, first.id);
+
+    const second = manager.start(echoAdapter, echoDiscovery, {
+      prompt: "second",
+      timeoutMs: 5_000,
+    }).task;
+    await waitForTask(manager, second.id);
+
+    expect(manager.get(first.id)).toBeUndefined();
+    expect(manager.get(second.id)?.status).toBe("succeeded");
   });
 
   it("can return bounded output and events", async () => {
@@ -176,6 +257,48 @@ describe("TaskManager", () => {
       event.message?.includes("force-killing task"),
     )).toBe(true);
   }, 10_000);
+
+  it("augments prompts with skills and exposes them in the trace", async () => {
+    const manager = new TaskManager();
+    const skills = [
+      {
+        id: "test-skill-1",
+        name: "test-skill-1",
+        version: "1.0.0",
+        description: "Test description",
+        instructions: "Always add tests.",
+        hash: "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+        source: "project" as const,
+        path: "/tmp/test-skill-1.md",
+        harnessIds: ["echo-agent"],
+        installations: [],
+        native: true,
+      },
+    ];
+
+    const { task } = manager.start(echoAdapter, echoDiscovery, {
+      prompt: "hello",
+      timeoutMs: 5_000,
+      skills,
+    });
+
+    const result = await waitForTask(manager, task.id);
+
+    expect(result.status).toBe("succeeded");
+    expect(result.promptPreview).toBe("hello");
+    expect(result.appliedSkills).toBeDefined();
+    expect(result.appliedSkills).toHaveLength(1);
+    expect(result.appliedSkills?.[0].id).toBe("test-skill-1");
+    expect(result.appliedSkills?.[0].name).toBe("test-skill-1");
+    expect(result.appliedSkills?.[0].version).toBe("1.0.0");
+    expect(result.appliedSkills?.[0].hash).toBe("1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef");
+    expect(result.appliedSkills?.[0].source).toBe("project");
+    expect(result.appliedSkills?.[0].harnessIds).toContain("echo-agent");
+    expect(result.appliedSkills?.[0].native).toBe(true);
+    expect(result.stdout).toContain("Use the installed Agent Skills named: test-skill-1.");
+    expect(result.stdout).not.toContain("Always add tests.");
+    expect(result.stdout).toContain("hello");
+  });
 });
 
 const echoAdapter: HarnessAdapter = {

@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { HarnessAdapter, HarnessDiscovery } from "./harnesses";
+import { preview, tailItems, truncate } from "./internal";
 import type { TaskView, TaskViewOptions } from "./tasks";
 import { TaskManager } from "./tasks";
 
@@ -116,6 +117,10 @@ export type CompareManagerShutdownOptions = {
   deadlineMs?: number;
 };
 
+export type CompareManagerOptions = {
+  maxCompares?: number;
+};
+
 export type ResolvedHarness = {
   adapter: HarnessAdapter;
   discovery: HarnessDiscovery;
@@ -136,6 +141,7 @@ type InternalCompare = {
   analysis?: CompareAnalysis;
   synthesis?: CompareSynthesis;
   events: CompareEvent[];
+  settled?: Promise<void>;
 };
 
 export const CompareAnalysisSchema: z.ZodType<CompareAnalysis> = z.object({
@@ -174,22 +180,26 @@ export const CompareAnalysisSchema: z.ZodType<CompareAnalysis> = z.object({
   confidence: z.enum(["low", "medium", "high"]).default("medium"),
 });
 
-const MAX_PROMPT_CANDIDATE_CHARS = 24_000;
+export const MAX_PROMPT_CANDIDATE_CHARS = 24_000;
 const DEFAULT_MAX_OUTPUT_CHARS = 80_000;
 const DEFAULT_MAX_CANDIDATE_CHARS = 6_000;
 const DEFAULT_MAX_EVENTS = 100;
 const DEFAULT_SHUTDOWN_DEADLINE_MS = 5_000;
-const POLL_MS = 500;
+const DEFAULT_MAX_COMPARES = 100;
 
 export class CompareManager {
   private readonly compares = new Map<string, InternalCompare>();
+  private readonly maxCompares: number;
   private shuttingDown = false;
   private shutdownPromise?: Promise<void>;
 
   constructor(
     private readonly taskManager: TaskManager,
     private readonly resolveHarness: ResolveHarness,
-  ) {}
+    options: CompareManagerOptions = {},
+  ) {
+    this.maxCompares = Math.max(1, options.maxCompares ?? DEFAULT_MAX_COMPARES);
+  }
 
   async start(input: CompareStartInput): Promise<CompareView> {
     if (this.shuttingDown) {
@@ -213,12 +223,14 @@ export class CompareManager {
     };
 
     this.compares.set(compare.id, compare);
+    this.pruneCompares(compare.id);
     this.pushEvent(compare, {
       type: "started",
       message: `Compare started with ${candidates.length} candidate(s).`,
     });
 
-    void this.run(compare, input);
+    compare.settled = this.run(compare, input);
+    void compare.settled;
 
     return this.toView(compare);
   }
@@ -250,6 +262,23 @@ export class CompareManager {
     return this.toView(compare);
   }
 
+  async waitForTerminal(
+    id: string,
+    timeoutMs?: number,
+    options: CompareViewOptions = {},
+  ): Promise<CompareView | undefined> {
+    const compare = this.compares.get(id);
+    if (!compare) {
+      return undefined;
+    }
+
+    if (!isTerminalCompare(compare) && compare.settled) {
+      await settleWithDeadline(compare.settled, timeoutMs);
+    }
+
+    return this.toView(compare, options);
+  }
+
   async shutdown(options: CompareManagerShutdownOptions = {}): Promise<void> {
     this.shuttingDown = true;
     this.shutdownPromise ??= this.performShutdown(
@@ -260,6 +289,7 @@ export class CompareManager {
 
   private async performShutdown(deadlineMs: number): Promise<void> {
     const taskIds = new Set<string>();
+    const comparesToWait: Promise<void>[] = [];
 
     for (const compare of this.compares.values()) {
       if (isTerminalCompare(compare)) {
@@ -271,6 +301,9 @@ export class CompareManager {
       }
 
       this.cancelCompare(compare, "Compare cancelled by shutdown.");
+      if (compare.settled) {
+        comparesToWait.push(settleWithDeadline(compare.settled, deadlineMs));
+      }
     }
 
     for (const taskId of taskIds) {
@@ -278,9 +311,12 @@ export class CompareManager {
     }
 
     await Promise.allSettled(
-      [...taskIds].map((taskId) =>
-        this.taskManager.waitForTerminal(taskId, deadlineMs)
-      ),
+      [
+        ...[...taskIds].map((taskId) =>
+          this.taskManager.waitForTerminal(taskId, deadlineMs)
+        ),
+        ...comparesToWait,
+      ],
     );
   }
 
@@ -405,6 +441,24 @@ export class CompareManager {
       }
     } finally {
       this.touch(compare);
+      this.pruneCompares(compare.id);
+    }
+  }
+
+  private pruneCompares(protectedCompareId?: string): void {
+    const overflow = this.compares.size - this.maxCompares;
+    if (overflow <= 0) {
+      return;
+    }
+
+    const removable = [...this.compares.values()]
+      .filter((compare) =>
+        compare.id !== protectedCompareId && isTerminalCompare(compare)
+      )
+      .sort((a, b) => a.createdAtMs - b.createdAtMs);
+
+    for (const compare of removable.slice(0, overflow)) {
+      this.compares.delete(compare.id);
     }
   }
 
@@ -462,28 +516,20 @@ export class CompareManager {
     taskId: string,
     compare: InternalCompare,
   ): Promise<TaskView> {
-    while (true) {
-      const task = this.taskManager.get(taskId, {
-        includeOutput: true,
-        includeEvents: false,
-      });
-
-      if (!task) {
-        throw new Error(`Compare child task disappeared: ${taskId}`);
-      }
-
-      if (compare.status === "cancelled") {
-        return task;
-      }
-
-      if (task.status !== "running") {
-        // TaskManager guarantees terminal status only after output drains or times out visibly.
-        return task;
-      }
-
-      await sleep(POLL_MS);
-      this.touch(compare);
+    const task = await this.taskManager.waitForTerminal(taskId);
+    if (!task) {
+      throw new Error(`Compare child task disappeared: ${taskId}`);
     }
+
+    if (compare.status === "cancelled") {
+      return task;
+    }
+
+    // TaskManager guarantees terminal status only after output drains or times out visibly.
+    return this.taskManager.get(taskId, {
+      includeOutput: true,
+      includeEvents: false,
+    }) ?? task;
   }
 
   private toView(
@@ -740,41 +786,8 @@ function truncateCandidate(
   };
 }
 
-function truncate(text: string, maxChars: number): string {
-  if (maxChars <= 0) {
-    return "";
-  }
-
-  if (text.length <= maxChars) {
-    return text;
-  }
-
-  if (maxChars <= 3) {
-    return ".".repeat(maxChars);
-  }
-
-  return `${text.slice(0, maxChars - 3)}...`;
-}
-
-function tailItems<T>(items: T[], maxItems: number): T[] {
-  if (maxItems <= 0) {
-    return [];
-  }
-
-  return items.slice(-maxItems);
-}
-
-function preview(text: string): string {
-  const clean = text.replace(/\s+/g, " ").trim();
-  return clean.length <= 160 ? clean : `${clean.slice(0, 157)}...`;
-}
-
 function escapeAttribute(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function isCompareStatus(
@@ -782,6 +795,24 @@ function isCompareStatus(
   status: CompareStatus,
 ): boolean {
   return compare.status === status;
+}
+
+async function settleWithDeadline(
+  settled: Promise<void>,
+  timeoutMs?: number,
+): Promise<void> {
+  if (timeoutMs === undefined) {
+    await settled;
+    return;
+  }
+
+  await new Promise<void>((resolve) => {
+    const timer = setTimeout(resolve, timeoutMs);
+    void settled.finally(() => {
+      clearTimeout(timer);
+      resolve();
+    });
+  });
 }
 
 function isTerminalCompare(compare: InternalCompare): boolean {

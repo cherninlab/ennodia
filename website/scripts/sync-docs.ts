@@ -70,6 +70,13 @@ function ensureFrontmatter(content: string, filePath: string): string {
   return `---\ntitle: "${title}"\n---\n\n${content}`;
 }
 
+function rewriteMarkdownLinksForWebsite(content: string): string {
+  return content.replace(
+    /\]\(((?:\.{1,2}\/|\/)[^)\s#?]+)\.md(#[^)]+)?\)/g,
+    (_match, href: string, hash = "") => `](${href}/${hash})`,
+  );
+}
+
 await rm(targetRoot, { recursive: true, force: true });
 await mkdir(targetRoot, { recursive: true });
 
@@ -83,7 +90,10 @@ for (const sourceFile of sourceFiles) {
 
   if (markdownExtensions.has(path.extname(sourceFile))) {
     const content = normalizeFrontmatterStart(await readFile(sourceFile, "utf8"));
-    await writeFile(targetFile, ensureFrontmatter(content, sourceFile));
+    await writeFile(
+      targetFile,
+      rewriteMarkdownLinksForWebsite(ensureFrontmatter(content, sourceFile)),
+    );
   } else {
     await copyFile(sourceFile, targetFile);
   }

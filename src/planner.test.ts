@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import type { HarnessDiscovery } from "./harnesses";
-import { planRoute } from "./planner";
+import { planRoute, renderPlanMermaid } from "./planner";
 
 const harnesses: HarnessDiscovery[] = [
   harness("claude-code"),
@@ -44,7 +44,7 @@ describe("planRoute", () => {
 
     expect(plan.parallelSuggested).toBe(true);
     expect(plan.compareSuggested).toBe(true);
-    expect(plan.mermaid).toContain('compare["Compare outputs"]');
+    expect(renderPlanMermaid(plan)).toContain('compare["Compare outputs"]');
   });
 
   it("filters out unavailable harnesses", () => {
@@ -55,6 +55,22 @@ describe("planRoute", () => {
 
     expect(plan.candidates).toEqual(["claude-code"]);
     expect(plan.selected).toBe("claude-code");
+  });
+
+  it("uses caller-provided category before keyword classification", () => {
+    const plan = planRoute("Help me write landing page copy.", harnesses, {
+      category: "general",
+    });
+
+    expect(plan.category).toBe("general");
+    expect(plan.reasons).toContain("Caller-provided category.");
+    expect(plan.selected).toBe("claude-code");
+  });
+
+  it("does not route copywriting or generic review prompts as browser/code", () => {
+    expect(planRoute("Help me write landing page copy.", harnesses).category)
+      .toBe("general");
+    expect(planRoute("Review this poem.", harnesses).category).toBe("general");
   });
 });
 

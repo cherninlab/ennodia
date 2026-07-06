@@ -1,36 +1,54 @@
 import type { HarnessDiscovery } from "./harnesses";
+import {
+  CATEGORY_HARNESS_PRIORITIES,
+  type RouteCategory,
+} from "./priority";
 
 export type RoutePlan = {
-  category: "code" | "research" | "browser" | "image" | "general";
+  category: RouteCategory;
   reasons: string[];
   candidates: string[];
   selected?: string;
   parallelSuggested: boolean;
   compareSuggested: boolean;
-  mermaid: string;
+};
+
+export type PlanRouteOptions = {
+  category?: RouteCategory;
 };
 
 export function planRoute(
   prompt: string,
   harnesses: HarnessDiscovery[],
+  options: PlanRouteOptions = {},
 ): RoutePlan {
   const lower = prompt.toLowerCase();
   const runnable = harnesses.filter((harness) => harness.runnable);
   const runnableIds = new Set(runnable.map((harness) => harness.id));
   const reasons: string[] = [];
 
-  let category: RoutePlan["category"] = "general";
-  const browserSignals = /\b(browser|website|site|landing|frontend|ui|page|viewport|mobile|desktop|click|screenshot|rendered)\b/.test(
-    lower,
-  );
+  let category: RouteCategory = "general";
+  const strongBrowserSignals =
+    /\b(browser|click|screenshot|viewport|rendered|mobile|desktop)\b/.test(
+      lower,
+    );
+  const uiSurfaceSignals =
+    /\b(website|site|landing page|frontend|ui|page)\b/.test(lower);
+  const uiReviewSignals = /\b(audit|inspect|review|test|open)\b/.test(lower);
+  const copywritingSignals =
+    /\b(copy|headline|tagline|rewrite|write|draft|body text)\b/.test(lower);
+  const browserSignals = strongBrowserSignals ||
+    (uiSurfaceSignals && uiReviewSignals && !copywritingSignals);
   const imageSignals = /\b(image|visual|design|mockup)\b/.test(lower);
   const explicitCodeSignals = /\b(code|bug|diff|repo|typescript|javascript|python|test)\b/.test(
     lower,
   );
-  const codeSignals = explicitCodeSignals ||
-    (/\breview\b/.test(lower) && !browserSignals && !imageSignals);
+  const codeSignals = explicitCodeSignals;
 
-  if (browserSignals) {
+  if (options.category) {
+    category = options.category;
+    reasons.push("Caller-provided category.");
+  } else if (browserSignals) {
     category = "browser";
     reasons.push("The prompt mentions a website, UI, or rendered page.");
   } else if (imageSignals) {
@@ -46,62 +64,10 @@ export function planRoute(
     reasons.push("No specialist category was obvious, so Ennodia chose a general route.");
   }
 
-  const preferredByCategory: Record<RoutePlan["category"], string[]> = {
-    code: [
-      "codex",
-      "claude-code",
-      "opencode",
-      "kilo",
-      "kiro",
-      "cline",
-      "hermes-agent",
-      "antigravity",
-    ],
-    research: [
-      "claude-code",
-      "codex",
-      "opencode",
-      "kilo",
-      "kiro",
-      "cline",
-      "hermes-agent",
-    ],
-    browser: [
-      "antigravity",
-      "opencode",
-      "kilo",
-      "kiro",
-      "cline",
-      "hermes-agent",
-      "claude-code",
-      "codex",
-    ],
-    image: [
-      "antigravity",
-      "claude-code",
-      "opencode",
-      "kilo",
-      "kiro",
-      "cline",
-      "hermes-agent",
-      "codex",
-    ],
-    general: [
-      "claude-code",
-      "codex",
-      "opencode",
-      "kilo",
-      "kiro",
-      "cline",
-      "hermes-agent",
-      "antigravity",
-    ],
-  };
-
   const candidates = [
-    ...preferredByCategory[category].filter((id) => runnableIds.has(id)),
+    ...CATEGORY_HARNESS_PRIORITIES[category].filter((id) => runnableIds.has(id)),
     ...runnable.map((harness) => harness.id).filter(
-      (id) => !preferredByCategory[category].includes(id),
+      (id) => !CATEGORY_HARNESS_PRIORITIES[category].includes(id),
     ),
   ];
 
@@ -118,15 +84,10 @@ export function planRoute(
     selected: candidates[0],
     parallelSuggested,
     compareSuggested,
-    mermaid: renderPlanMermaid(candidates, parallelSuggested, compareSuggested),
   };
 }
 
-function renderPlanMermaid(
-  candidates: string[],
-  parallelSuggested: boolean,
-  compareSuggested: boolean,
-): string {
+export function renderPlanMermaid(plan: RoutePlan): string {
   const lines = [
     "flowchart TD",
     '    request["Request"]',
@@ -136,7 +97,9 @@ function renderPlanMermaid(
     "    classify --> plan",
   ];
 
-  const selected = parallelSuggested ? candidates : candidates.slice(0, 1);
+  const selected = plan.parallelSuggested
+    ? plan.candidates
+    : plan.candidates.slice(0, 1);
 
   for (const id of selected) {
     const nodeId = id.replace(/[^a-zA-Z0-9]/g, "_");
@@ -144,7 +107,7 @@ function renderPlanMermaid(
     lines.push(`    plan --> ${nodeId}`);
   }
 
-  if (compareSuggested && selected.length > 1) {
+  if (plan.compareSuggested && selected.length > 1) {
     lines.push('    compare["Compare outputs"]');
     for (const id of selected) {
       const nodeId = id.replace(/[^a-zA-Z0-9]/g, "_");

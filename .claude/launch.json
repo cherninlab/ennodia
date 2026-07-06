@@ -1,0 +1,15 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "hero-lab",
+      "runtimeExecutable": "bun",
+      "runtimeArgs": [
+        "run",
+        "--cwd=/Users/theochernin/Projects/ennodia/.tmp/hero-lab",
+        "dev"
+      ],
+      "port": 5199
+    }
+  ]
+}

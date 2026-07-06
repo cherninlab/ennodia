@@ -1,0 +1,44 @@
+@font-face {
+  font-family: "Ennodia Agent Logos";
+  src: url("./ennodia-agents.woff2") format("woff2"), url("./ennodia-agents.woff") format("woff");
+  font-display: block;
+  font-style: normal;
+  font-weight: 400;
+}
+
+.agent-logo {
+  font-family: "Ennodia Agent Logos";
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  color: currentColor;
+  direction: ltr;
+  font-feature-settings: normal;
+  font-size: 1em;
+  font-style: normal;
+  font-variant: normal;
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: 1;
+  text-rendering: geometricPrecision;
+  text-transform: none;
+  vertical-align: -0.12em;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-font-smoothing: antialiased;
+}
+
+.agent-logo::before {
+  display: block;
+}
+
+.agent-logo--antigravity::before { content: "\e001"; }
+.agent-logo--claude-code::before { content: "\e002"; }
+.agent-logo--cline::before { content: "\e003"; }
+.agent-logo--codex::before { content: "\e004"; }
+.agent-logo--hermes-agent::before { content: "\e005"; }
+.agent-logo--kilo-code::before { content: "\e006"; }
+.agent-logo--kiro::before { content: "\e007"; }
+.agent-logo--opencode::before { content: "\e008"; }
+.agent-logo--mcp::before { content: "\e009"; }
+.agent-logo--langgraph::before { content: "\e00a"; }
+.agent-logo--openrouter::before { content: "\e00b"; }

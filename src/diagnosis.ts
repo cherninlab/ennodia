@@ -1,4 +1,5 @@
 import type { TaskView } from "./tasks";
+import { truncate } from "./internal";
 
 export type TaskOutputPreview = {
   harnessId: string;
@@ -144,14 +145,6 @@ function formatDuration(ms: number): string {
   }
 
   return `${Math.round(ms / 1_000)}s`;
-}
-
-function truncate(text: string, maxChars: number): string {
-  if (text.length <= maxChars) {
-    return text;
-  }
-
-  return `${text.slice(0, maxChars - 3)}...`;
 }
 
 function isTaskOutputPreview(

@@ -1,0 +1,21 @@
+---
+const target = "/docs/install/";
+const canonical = new URL(
+  target,
+  Astro.site ?? "https://ennodia.cherninlab.com",
+).toString();
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="refresh" content={`0; url=${target}`} />
+    <link rel="canonical" href={canonical} />
+    <title>Install Ennodia</title>
+  </head>
+  <body>
+    <p><a href={target}>Install Ennodia</a></p>
+  </body>
+</html>
