@@ -5,7 +5,12 @@
     "moduleResolution": "Bundler",
     "strict": true,
     "skipLibCheck": true,
-    "types": ["bun"]
+    "ignoreDeprecations": "6.0",
+    "types": ["bun"],
+    "baseUrl": ".",
+    "paths": {
+      "ennodia": ["./src/index.ts"]
+    }
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts", "packages/ennodia-io/src/**/*.ts"]
 }

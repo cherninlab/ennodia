@@ -103,6 +103,8 @@ a:focus-visible {
 
 .hero-inner {
   width: min(720px, 100%);
+  max-width: 100%;
+  min-width: 0;
 }
 
 .hero h1 {
@@ -125,8 +127,36 @@ a:focus-visible {
   line-height: 1.45;
 }
 
+.hero-prompt {
+  width: min(680px, 100%);
+  max-width: 100%;
+  min-width: 0;
+  margin: 28px auto 0;
+  text-align: left;
+}
+
+.hero-prompt pre {
+  background: var(--surface);
+  color: var(--text);
+}
+
+.hero-prompt .copy-button {
+  border-color: var(--line-strong);
+  color: var(--text);
+  background: rgba(246, 246, 244, 0.9);
+}
+
+.hero-prompt .copy-button::after {
+  background: var(--surface);
+}
+
+.hero-prompt .copy-status {
+  color: var(--muted);
+}
+
 .hero-actions {
   display: flex;
+  max-width: 100%;
   justify-content: center;
   gap: 24px;
   margin-top: 28px;
@@ -269,6 +299,42 @@ p:last-child {
   border-bottom: 1px solid var(--line);
   color: var(--text);
   font-size: 1.0625rem;
+}
+
+.example-list {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--line);
+}
+
+.example-list li {
+  border-bottom: 1px solid var(--line);
+  padding: 24px 0;
+}
+
+.example-list h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.interface-logo {
+  display: block;
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
+.example-list p {
+  max-width: 620px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 1rem;
+  line-height: 1.62;
 }
 
 .install-layout {
@@ -521,7 +587,7 @@ code {
   text-align: center;
 }
 
-.adapter-list img {
+.adapter-logo {
   display: block;
   width: 36px;
   height: 36px;
@@ -697,6 +763,10 @@ code {
     font-size: 1.125rem;
   }
 
+  .hero-prompt {
+    margin-top: 24px;
+  }
+
   .section {
     grid-template-columns: 1fr;
     gap: 18px;
@@ -744,6 +814,13 @@ code {
   .hero-subtitle {
     margin-top: 22px;
     font-size: 1.0625rem;
+  }
+
+  .hero-prompt pre {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    padding-right: 52px;
+    font-size: 0.8125rem;
   }
 
   .hero-actions {

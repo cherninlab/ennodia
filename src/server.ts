@@ -1,33 +1,48 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { compositionalSliceSchema } from "./compositional";
 import {
-  CompareManager,
-  type CompareCandidateInput,
-} from "./compare";
-import {
-  discoverHarnesses,
-  findHarnessAdapter,
-} from "./harnesses";
-import { planRoute } from "./planner";
-import { RunManager } from "./runs";
-import { TaskManager } from "./tasks";
+  createDefaultEnnodiaCore,
+  type EnnodiaCore,
+  type EnnodiaCoreShutdownOptions,
+} from "./core";
+import { renderPlanMermaid } from "./planner";
+import { formatHarnessPriorityList } from "./priority";
 import { ENNODIA_VERSION } from "./version";
 
-const taskManager = new TaskManager();
-const compareManager = new CompareManager(taskManager, resolveRunnableHarness);
-const runManager = new RunManager({
-  taskManager,
-  compareManager,
-  discoverHarnesses,
-  findHarnessAdapter,
-  planRoute,
-});
+const defaultCore = createDefaultEnnodiaCore();
+const comparePriorityText = formatHarnessPriorityList();
 
-export type EnnodiaShutdownOptions = {
-  deadlineMs?: number;
-};
+const categorySchema = z
+  .enum(["code", "research", "browser", "image", "general"])
+  .describe(
+    "Optional caller-provided route category. Pass this when you know the task category; Ennodia then skips keyword classification.",
+  );
 
-export function createEnnodiaServer(): McpServer {
+const budgetSchema = z
+  .object({
+    maxEstimatedInputTokens: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe(
+        "Fail before starting if the estimated run input tokens exceed this value.",
+      ),
+    maxChildTasks: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe(
+        "Fail before starting if routing selects more child harness tasks than this value.",
+      ),
+  })
+  .describe("Optional preflight budget limits for an Ennodia operation.");
+
+export type EnnodiaShutdownOptions = EnnodiaCoreShutdownOptions;
+
+export function createEnnodiaServer(core: EnnodiaCore = defaultCore): McpServer {
   const server = new McpServer({
     name: "ennodia",
     version: ENNODIA_VERSION,
@@ -48,7 +63,63 @@ export function createEnnodiaServer(): McpServer {
           ),
       },
     },
-    async ({ refresh }) => jsonResult(await discoverHarnesses({ refresh })),
+    async ({ refresh }) => jsonResult(await core.listHarnesses({ refresh })),
+  );
+
+  server.registerTool(
+    "ennodia_list_skills",
+    {
+      title: "List Ennodia skills",
+      description:
+        "Discover prompt-only skills from project, user, and built-in skill directories without returning full instruction text.",
+      inputSchema: {
+        cwd: z
+          .string()
+          .optional()
+          .describe("Optional working directory to locate project-specific skills."),
+      },
+    },
+    async ({ cwd }) => jsonResult(await core.listSkills(cwd)),
+  );
+
+  server.registerTool(
+    "ennodia_install_skills",
+    {
+      title: "Install Ennodia skills",
+      description:
+        "Install bundled Ennodia Agent Skills into native harness skill directories. Defaults to dryRun so clients can inspect planned writes before applying them.",
+      inputSchema: {
+        skillIds: z
+          .array(z.string())
+          .optional()
+          .describe(
+            "Bundled skill IDs to install. Omit to install every bundled Ennodia skill.",
+          ),
+        harnessIds: z
+          .array(z.enum(["codex", "claude-code", "opencode", "antigravity"]))
+          .optional()
+          .describe(
+            "Native harness skill locations to install into. Omit to target Codex, Claude Code, OpenCode, and Antigravity.",
+          ),
+        scope: z
+          .enum(["project", "user"])
+          .default("project")
+          .describe("Install into project-local or user-global skill directories."),
+        cwd: z
+          .string()
+          .optional()
+          .describe("Project directory used when scope is project."),
+        overwrite: z
+          .boolean()
+          .default(false)
+          .describe("Replace an existing skill folder at the target path."),
+        dryRun: z
+          .boolean()
+          .default(true)
+          .describe("Preview planned writes without copying files. Set false to install."),
+      },
+    },
+    async (input) => jsonResult(await core.installSkills(input)),
   );
 
   server.registerTool(
@@ -62,16 +133,129 @@ export function createEnnodiaServer(): McpServer {
           .string()
           .min(1)
           .describe("The task to classify and route."),
+        category: categorySchema.optional(),
         refresh: z
           .boolean()
           .default(false)
           .describe("Re-scan harnesses before planning."),
+        includeMermaid: z
+          .boolean()
+          .default(true)
+          .describe("Include the presentational Mermaid route diagram."),
       },
     },
-    async ({ prompt, refresh }) => {
-      const harnesses = await discoverHarnesses({ refresh });
-      return jsonResult(planRoute(prompt, harnesses));
+    async ({ prompt, category, refresh, includeMermaid }) => {
+      const plan = await core.plan(prompt, { category, refresh });
+      return jsonResult(includeMermaid
+        ? { ...plan, mermaid: renderPlanMermaid(plan) }
+        : plan);
     },
+  );
+
+  server.registerTool(
+    "ennodia_estimate_budget",
+    {
+      title: "Estimate Ennodia budget",
+      description:
+        "Estimate the input-token budget for a planned Ennodia run and report whether optional limits would be exceeded before starting child tasks.",
+      inputSchema: {
+        prompt: z
+          .string()
+          .min(1)
+          .describe("The user task to route and estimate."),
+        category: categorySchema.optional(),
+        harnessId: z
+          .string()
+          .optional()
+          .describe(
+            "Force one harness by ID for the estimate, such as opencode or claude-code.",
+          ),
+        mode: z
+          .enum(["auto", "single", "parallel"])
+          .default("auto")
+          .describe(
+            "auto follows the planner; single estimates one selected harness; parallel estimates all candidate harnesses.",
+          ),
+        compare: z
+          .union([z.literal("auto"), z.boolean()])
+          .default("auto")
+          .describe(
+            "Whether Compare should be included in the estimate. auto follows the planner.",
+          ),
+        refresh: z
+          .boolean()
+          .default(false)
+          .describe("Re-scan harnesses before planning the estimate."),
+        maxOutputChars: z
+          .number()
+          .int()
+          .nonnegative()
+          .max(200_000)
+          .optional()
+          .describe(
+            "Maximum characters from each successful task output assumed for Compare input.",
+          ),
+        budget: budgetSchema.optional(),
+      },
+    },
+    async (input) => jsonResult(await core.estimateRun(input)),
+  );
+
+  server.registerTool(
+    "ennodia_estimate_compositional_budget",
+    {
+      title: "Estimate compositional Ennodia budget",
+      description:
+        "Resolve focused compositional slices to harnesses and estimate child-task and Compare budget without starting child processes.",
+      inputSchema: {
+        prompt: z
+          .string()
+          .min(1)
+          .describe(
+            "Overall question or synthesis goal that every slice belongs to.",
+          ),
+        slices: z
+          .array(compositionalSliceSchema)
+          .min(1)
+          .max(50)
+          .describe(
+            "Focused work slices. Each slice resolves to at most one child task.",
+          ),
+        cwd: z
+          .string()
+          .optional()
+          .describe(
+            "Optional working directory used to validate requested native skills.",
+          ),
+        refresh: z
+          .boolean()
+          .default(false)
+          .describe("Re-scan harnesses before resolving slice routes."),
+        skillIds: z
+          .array(z.string())
+          .optional()
+          .describe(
+            "Optional list of installed native skill IDs to validate against every selected slice harness.",
+          ),
+        includeCompareEstimate: z
+          .boolean()
+          .default(true)
+          .describe(
+            "Include a later Compare pass in the returned preflight budget estimate.",
+          ),
+        maxOutputChars: z
+          .number()
+          .int()
+          .nonnegative()
+          .max(200_000)
+          .optional()
+          .describe(
+            "Maximum characters per successful slice output assumed for a later Compare estimate.",
+          ),
+        budget: budgetSchema.optional(),
+      },
+    },
+    async (input) => jsonResult(await core.estimateCompositional(input)),
   );
 
   server.registerTool(
@@ -85,6 +269,7 @@ export function createEnnodiaServer(): McpServer {
           .string()
           .min(1)
           .describe("The task to send to the selected local harness or harnesses."),
+        category: categorySchema.optional(),
         harnessId: z
           .string()
           .optional()
@@ -118,40 +303,89 @@ export function createEnnodiaServer(): McpServer {
           .boolean()
           .default(false)
           .describe("Re-scan harnesses before planning and starting tasks."),
+        skillIds: z
+          .array(z.string())
+          .optional()
+          .describe(
+            "Optional list of skill IDs to apply to the prompt before starting the task.",
+          ),
+        budget: budgetSchema.optional(),
       },
     },
-    async ({ prompt, harnessId, mode, cwd, model, timeoutMs, refresh }) => {
-      const harnesses = await discoverHarnesses({ refresh });
-      const plan = planRoute(prompt, harnesses);
-      const selectedIds = harnessId
-        ? [harnessId]
-        : mode === "parallel"
-          ? plan.candidates
-          : plan.selected
-            ? [plan.selected]
-            : [];
+    async (input) => jsonResult(await core.startTasks(input)),
+  );
 
-      if (selectedIds.length === 0) {
-        throw new Error("No runnable harnesses were found.");
-      }
+  server.registerTool(
+    "ennodia_start_compositional",
+    {
+      title: "Start compositional Ennodia tasks",
+      description:
+        "Start one focused child task per slice for compositional reviews. Poll the returned task IDs, then pass useful completed task IDs to ennodia_start_compare for synthesis.",
+      inputSchema: {
+        prompt: z
+          .string()
+          .min(1)
+          .describe(
+            "Overall question or synthesis goal that every slice belongs to.",
+          ),
+        slices: z
+          .array(compositionalSliceSchema)
+          .min(1)
+          .max(50)
+          .describe(
+            "Focused work slices. Each slice starts at most one child task.",
+          ),
+        cwd: z
+          .string()
+          .optional()
+          .describe("Working directory for child harness commands."),
+        timeoutMs: z
+          .number()
+          .int()
+          .positive()
+          .max(60 * 60 * 1000)
+          .optional()
+          .describe(
+            "Per-slice task timeout in milliseconds. Defaults to the task manager timeout and is capped at one hour.",
+          ),
+        refresh: z
+          .boolean()
+          .default(false)
+          .describe("Re-scan harnesses before resolving slice routes."),
+        skillIds: z
+          .array(z.string())
+          .optional()
+          .describe(
+            "Optional list of installed native skill IDs to ask every selected slice harness to use.",
+          ),
+        includeCompareEstimate: z
+          .boolean()
+          .default(true)
+          .describe(
+            "Include a later Compare pass in the returned preflight budget estimate.",
+          ),
+        maxOutputChars: z
+          .number()
+          .int()
+          .nonnegative()
+          .max(200_000)
+          .optional()
+          .describe(
+            "Maximum characters per successful slice output assumed for a later Compare estimate.",
+          ),
+        budget: budgetSchema.optional(),
+      },
+    },
+    async (input) => {
+      const result = await core.startCompositional(input);
 
-      const tasks = selectedIds.map((id) => {
-        const adapter = findHarnessAdapter(id);
-        const discovery = harnesses.find((harness) => harness.id === id);
-
-        if (!adapter || !discovery) {
-          throw new Error(`Unknown harness: ${id}`);
-        }
-
-        return taskManager.start(adapter, discovery, {
-          prompt,
-          cwd,
-          model,
-          timeoutMs,
-        }).task;
+      return jsonResult({
+        ...result,
+        compareNext: {
+          tool: "ennodia_start_compare",
+          ...result.compareNext,
+        },
       });
-
-      return jsonResult({ plan, tasks });
     },
   );
 
@@ -160,12 +394,13 @@ export function createEnnodiaServer(): McpServer {
     {
       title: "Run Ennodia",
       description:
-        "Start a high-level Ennodia orchestration. Use this as the default entrypoint: it plans routing, starts one or more local harness tasks, optionally compares successful outputs, and returns a run ID to inspect with ennodia_get_run.",
+        "Start a high-level Ennodia orchestration. Use this as the default entrypoint: it plans routing, starts one or more local harness tasks, optionally compares successful outputs, and returns a run ID. Runs usually take minutes; poll ennodia_get_run with sensible spacing and trust remainingMs/etaConfidence instead of aborting early.",
       inputSchema: {
         prompt: z
           .string()
           .min(1)
           .describe("The user task to route to local AI harnesses."),
+        category: categorySchema.optional(),
         harnessId: z
           .string()
           .optional()
@@ -209,7 +444,7 @@ export function createEnnodiaServer(): McpServer {
           .string()
           .optional()
           .describe(
-            "Harness to use as the Compare judge. Omit to use the default priority: claude-code, codex, antigravity, opencode, kilo, kiro, cline, then hermes-agent.",
+            `Harness to use as the Compare judge. Omit to use the default priority: ${comparePriorityText}.`,
           ),
         judgeModel: z
           .string()
@@ -234,40 +469,16 @@ export function createEnnodiaServer(): McpServer {
           .describe(
             "Maximum characters from each successful task output to pass into Compare. Use 0 to suppress candidate text.",
           ),
+        skillIds: z
+          .array(z.string())
+          .optional()
+          .describe(
+            "Optional list of skill IDs to apply to the prompt before planning and running child tasks.",
+          ),
+        budget: budgetSchema.optional(),
       },
     },
-    async ({
-      prompt,
-      harnessId,
-      mode,
-      compare,
-      cwd,
-      model,
-      timeoutMs,
-      refresh,
-      judgeHarnessId,
-      judgeModel,
-      synthesizerHarnessId,
-      synthesizerModel,
-      maxOutputChars,
-    }) =>
-      jsonResult(
-        await runManager.start({
-          prompt,
-          harnessId,
-          mode,
-          compare,
-          cwd,
-          model,
-          timeoutMs,
-          refresh,
-          judgeHarnessId,
-          judgeModel,
-          synthesizerHarnessId,
-          synthesizerModel,
-          maxOutputChars,
-        }),
-      ),
+    async (input) => jsonResult(await core.startRun(input)),
   );
 
   server.registerTool(
@@ -298,14 +509,26 @@ export function createEnnodiaServer(): McpServer {
           ),
       },
     },
-    async ({ includeEvents, maxEvents, maxAnswerChars }) =>
-      jsonResult(
-        runManager.listViews({
-          includeEvents,
-          maxEvents,
-          maxAnswerChars,
-        }),
-      ),
+    async (options) => jsonResult(core.listRuns(options)),
+  );
+
+  server.registerTool(
+    "ennodia_history",
+    {
+      title: "List durable Ennodia run history",
+      description:
+        "Read terminal run receipts persisted under the local Ennodia history directory. Use after a restart to inspect previous final answers and Compare disagreement analysis.",
+      inputSchema: {
+        limit: z
+          .number()
+          .int()
+          .positive()
+          .max(500)
+          .default(20)
+          .describe("Maximum persisted run snapshots to return, newest first."),
+      },
+    },
+    async ({ limit }) => jsonResult(await core.listRunHistory({ limit })),
   );
 
   server.registerTool(
@@ -338,12 +561,8 @@ export function createEnnodiaServer(): McpServer {
           ),
       },
     },
-    async ({ runId, includeEvents, maxEvents, maxAnswerChars }) => {
-      const run = runManager.get(runId, {
-        includeEvents,
-        maxEvents,
-        maxAnswerChars,
-      });
+    async ({ runId, ...options }) => {
+      const run = core.getRun(runId, options);
       if (!run) {
         throw new Error(`Unknown run: ${runId}`);
       }
@@ -361,7 +580,7 @@ export function createEnnodiaServer(): McpServer {
         runId: z.string().min(1).describe("Run ID returned by ennodia_run."),
       },
     },
-    async ({ runId }) => jsonResult(runManager.cancel(runId)),
+    async ({ runId }) => jsonResult(core.cancelRun(runId)),
   );
 
   server.registerTool(
@@ -396,15 +615,64 @@ export function createEnnodiaServer(): McpServer {
           .describe("Maximum task events to include per task when includeEvents is true."),
       },
     },
-    async ({ includeOutput, includeEvents, maxOutputChars, maxEvents }) =>
-      jsonResult(
-        taskManager.listViews({
-          includeOutput,
-          includeEvents,
-          maxOutputChars,
-          maxEvents,
-        }),
-      ),
+    async (options) => jsonResult(core.listTasks(options)),
+  );
+
+  server.registerTool(
+    "ennodia_get_compositional_status",
+    {
+      title: "Get compositional Ennodia status",
+      description:
+        "Inspect a batch of compositional shard tasks, group running and terminal states, and return Compare-ready successful task IDs.",
+      inputSchema: {
+        taskIds: z
+          .array(z.string().min(1).describe("Task ID returned by a compositional start."))
+          .min(1)
+          .max(100)
+          .describe("Shard task IDs to inspect."),
+        prompt: z
+          .string()
+          .optional()
+          .describe(
+            "Optional synthesis prompt to include in the returned compareNext object.",
+          ),
+        minSuccessfulTasksForCompare: z
+          .number()
+          .int()
+          .positive()
+          .max(100)
+          .default(2)
+          .describe(
+            "Minimum successful non-empty task outputs required before compareReady is true.",
+          ),
+        includeOutput: z
+          .boolean()
+          .default(false)
+          .describe("Include bounded stdout and stderr previews for each known task."),
+        maxOutputChars: z
+          .number()
+          .int()
+          .nonnegative()
+          .max(200_000)
+          .default(2_000)
+          .describe(
+            "Maximum stdout and stderr characters to include per task when includeOutput is true.",
+          ),
+      },
+    },
+    async (input) => {
+      const status = core.getCompositionalStatus(input);
+
+      return jsonResult({
+        ...status,
+        compareNext: status.compareNext
+          ? {
+            tool: "ennodia_start_compare",
+            ...status.compareNext,
+          }
+          : undefined,
+      });
+    },
   );
 
   server.registerTool(
@@ -450,7 +718,7 @@ export function createEnnodiaServer(): McpServer {
           .string()
           .optional()
           .describe(
-            "Harness to use as the Compare judge. Omit to use the default priority: claude-code, codex, antigravity, opencode, kilo, kiro, cline, then hermes-agent.",
+            `Harness to use as the Compare judge. Omit to use the default priority: ${comparePriorityText}.`,
           ),
         judgeModel: z
           .string()
@@ -488,34 +756,10 @@ export function createEnnodiaServer(): McpServer {
           .describe(
             "Maximum characters from each task output to include as a Compare candidate. Use 0 to suppress task output text.",
           ),
+        budget: budgetSchema.optional(),
       },
     },
-    async ({
-      prompt,
-      taskIds,
-      responses,
-      judgeHarnessId,
-      judgeModel,
-      synthesizerHarnessId,
-      synthesizerModel,
-      cwd,
-      timeoutMs,
-      maxOutputChars,
-    }) =>
-      jsonResult(
-        await compareManager.start({
-          prompt,
-          taskIds,
-          responses: responses as CompareCandidateInput[],
-          judgeHarnessId,
-          judgeModel,
-          synthesizerHarnessId,
-          synthesizerModel,
-          cwd,
-          timeoutMs,
-          maxOutputChars,
-        }),
-      ),
+    async (input) => jsonResult(await core.startCompare(input)),
   );
 
   server.registerTool(
@@ -552,15 +796,7 @@ export function createEnnodiaServer(): McpServer {
           ),
       },
     },
-    async ({ includeCandidates, includeEvents, maxCandidateChars, maxEvents }) =>
-      jsonResult(
-        compareManager.listViews({
-          includeCandidates,
-          includeEvents,
-          maxCandidateChars,
-          maxEvents,
-        }),
-      ),
+    async (options) => jsonResult(core.listCompares(options)),
   );
 
   server.registerTool(
@@ -600,19 +836,8 @@ export function createEnnodiaServer(): McpServer {
           .describe("Maximum Compare events to include. Use 0 to omit events."),
       },
     },
-    async ({
-      compareId,
-      includeCandidates,
-      includeEvents,
-      maxCandidateChars,
-      maxEvents,
-    }) => {
-      const compare = compareManager.get(compareId, {
-        includeCandidates,
-        includeEvents,
-        maxCandidateChars,
-        maxEvents,
-      });
+    async ({ compareId, ...options }) => {
+      const compare = core.getCompare(compareId, options);
       if (!compare) {
         throw new Error(`Unknown compare: ${compareId}`);
       }
@@ -633,7 +858,7 @@ export function createEnnodiaServer(): McpServer {
           .describe("Compare ID returned by ennodia_start_compare or ennodia_run."),
       },
     },
-    async ({ compareId }) => jsonResult(compareManager.cancel(compareId)),
+    async ({ compareId }) => jsonResult(core.cancelCompare(compareId)),
   );
 
   server.registerTool(
@@ -672,13 +897,8 @@ export function createEnnodiaServer(): McpServer {
           .describe("Maximum task events to include. Use 0 to omit events."),
       },
     },
-    async ({ taskId, includeOutput, includeEvents, maxOutputChars, maxEvents }) => {
-      const task = taskManager.get(taskId, {
-        includeOutput,
-        includeEvents,
-        maxOutputChars,
-        maxEvents,
-      });
+    async ({ taskId, ...options }) => {
+      const task = core.getTask(taskId, options);
       if (!task) {
         throw new Error(`Unknown task: ${taskId}`);
       }
@@ -699,7 +919,7 @@ export function createEnnodiaServer(): McpServer {
           .describe("Task ID returned by ennodia_start, ennodia_run, or Compare."),
       },
     },
-    async ({ taskId }) => jsonResult(taskManager.cancel(taskId)),
+    async ({ taskId }) => jsonResult(core.cancelTask(taskId)),
   );
 
   return server;
@@ -708,40 +928,7 @@ export function createEnnodiaServer(): McpServer {
 export async function shutdownEnnodia(
   options: EnnodiaShutdownOptions = {},
 ): Promise<void> {
-  await runManager.shutdown(options);
-  await compareManager.shutdown(options);
-  await taskManager.shutdown(options);
-}
-
-async function resolveRunnableHarness(harnessId?: string) {
-  const harnesses = await discoverHarnesses();
-  const preferredIds = harnessId
-    ? [harnessId]
-    : [
-      "claude-code",
-      "codex",
-      "antigravity",
-      "opencode",
-      "kilo",
-      "kiro",
-      "cline",
-      "hermes-agent",
-    ];
-
-  for (const id of preferredIds) {
-    const adapter = findHarnessAdapter(id);
-    const discovery = harnesses.find((harness) => harness.id === id);
-
-    if (adapter?.buildCommand && discovery?.runnable) {
-      return { adapter, discovery };
-    }
-  }
-
-  throw new Error(
-    harnessId
-      ? `Harness is not runnable: ${harnessId}`
-      : "No runnable harness was found for Compare.",
-  );
+  await defaultCore.shutdown(options);
 }
 
 function jsonResult(value: unknown) {

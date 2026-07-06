@@ -4,6 +4,63 @@ export {
   type EnnodiaShutdownOptions,
 } from "./server";
 export {
+  EnnodiaCore,
+  createDefaultEnnodiaCore,
+  type CompareStart,
+  type CompareStartWithBudgetInput,
+  type CompositionalEstimate,
+  type CompositionalEstimateInput,
+  type CompositionalStart,
+  type CompositionalStartInput,
+  type CompositionalStatusInput,
+  type CompositionalTaskStart,
+  type EnnodiaCoreOptions,
+  type EnnodiaCoreShutdownOptions,
+  type RunEstimate,
+  type RunEstimateInput,
+  type RunStartWithSkillIdsInput,
+  type TaskBatchStart,
+  type TaskBatchStartInput,
+} from "./core";
+export {
+  DEFAULT_HISTORY_MAX_RUNS,
+  defaultHistoryDir,
+  FileHistorySink,
+  HISTORY_DIR_ENV_VAR,
+  HISTORY_ENV_VAR,
+  noopHistorySink,
+  type FileHistorySinkOptions,
+  type HistorySink,
+  type RunHistoryListOptions,
+  type RunHistorySnapshot,
+} from "./history";
+export {
+  assertBudgetWithinLimits,
+  checkBudgetLimits,
+  estimateCompareBudget,
+  estimateRunBudget,
+  estimateTaskBatchBudget,
+  type BudgetCheck,
+  type BudgetEstimate,
+  type BudgetLimits,
+  type BudgetSubscriptionLimitCheck,
+} from "./budget";
+export {
+  assertUniqueSliceIds,
+  compositionalSliceSchema,
+  compositionalSliceSummaries,
+  estimateCompositionalBudget,
+  resolveCompositionalSlices,
+  summarizeCompositionalTasks,
+  uniqueTaskIds,
+  type CompositionalCompareNext,
+  type CompositionalSliceInput,
+  type CompositionalSliceSummary,
+  type CompositionalStatusView,
+  type CompositionalTaskSnapshot,
+  type ResolvedCompositionalSlice,
+} from "./compositional";
+export {
   discoverHarnesses,
   findHarnessAdapter,
   harnessAdapters,
@@ -14,7 +71,14 @@ export {
   type HarnessKind,
   type HarnessRunInput,
 } from "./harnesses";
-export { planRoute, type RoutePlan } from "./planner";
+export { planRoute, renderPlanMermaid, type RoutePlan } from "./planner";
+export {
+  allPriorityHarnessIds,
+  CATEGORY_HARNESS_PRIORITIES,
+  DEFAULT_COMPARE_HARNESS_PRIORITY,
+  formatHarnessPriorityList,
+  type RouteCategory,
+} from "./priority";
 export {
   RunManager,
   type RunCompareMode,
@@ -55,6 +119,8 @@ export {
   type TaskEvent,
   type TaskManagerOptions,
   type TaskManagerShutdownOptions,
+  type TaskSpawn,
+  type TaskSpawnInput,
   type TaskStatus,
   type TaskView,
   type TaskViewOptions,
@@ -65,3 +131,27 @@ export {
   type TaskOutputPreview,
 } from "./diagnosis";
 export { ENNODIA_VERSION } from "./version";
+export {
+  discoverSkills,
+  discoverSkillsWithWarnings,
+  getSkillsDirectories,
+  loadSkillFromFile,
+  loadSkillsByIds,
+  loadRunnableSkillsByIds,
+  installBundledSkills,
+  augmentPrompt,
+  assertSkillsSupportHarnesses,
+  toAppliedSkillInfo,
+  toSkillSummary,
+  type Skill,
+  type AppliedSkillInfo,
+  type InstallBundledSkillsInput,
+  type InstallBundledSkillsResult,
+  type SkillInstallAction,
+  type SkillInstallTarget,
+  type SkillDiscovery,
+  type SkillInstallation,
+  type SkillScope,
+  type SkillSource,
+  type SkillSummary,
+} from "./skills";

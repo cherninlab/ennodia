@@ -105,6 +105,35 @@ describe("CompareManager", () => {
     expect(judgeTask?.status).toBe("cancelled");
     expect(judgeTask?.cancelRequested).toBe(true);
   });
+
+  it("evicts old terminal compares after the configured history cap", async () => {
+    const taskManager = new TaskManager();
+    const manager = new CompareManager(
+      taskManager,
+      async () => ({
+        adapter: compareAdapter,
+        discovery: compareDiscovery,
+      }),
+      { maxCompares: 1 },
+    );
+
+    const first = await manager.start({
+      prompt: "First compare.",
+      responses: [{ id: "agent-a", text: "Use visible task monitoring." }],
+      timeoutMs: 5_000,
+    });
+    await waitForCompare(manager, first.id);
+
+    const second = await manager.start({
+      prompt: "Second compare.",
+      responses: [{ id: "agent-b", text: "Keep calls observable." }],
+      timeoutMs: 5_000,
+    });
+    await waitForCompare(manager, second.id);
+
+    expect(manager.get(first.id)).toBeUndefined();
+    expect(manager.get(second.id)?.status).toBe("succeeded");
+  });
 });
 
 describe("Compare prompts and parsing", () => {

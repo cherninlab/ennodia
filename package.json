@@ -1,7 +1,8 @@
 {
   "name": "ennodia",
-  "version": "0.1.0-rc.0",
-  "description": "MCP server that lets one AI agent ask other agents for help",
+  "version": "0.1.0",
+  "mcpName": "io.github.cherninlab/ennodia",
+  "description": "MCP server for multi-agent review with Compare and traceable receipts",
   "license": "MIT",
   "type": "module",
   "packageManager": "bun@1.3.14",
@@ -35,17 +36,25 @@
     "bench/fixtures/**/*",
     "bench/results/.gitkeep",
     "src/cli.ts",
+    "src/budget.ts",
     "src/compare.ts",
+    "src/compositional.ts",
+    "src/core.ts",
     "src/diagnosis.ts",
     "src/harnesses.ts",
+    "src/history.ts",
     "src/index.ts",
+    "src/internal.ts",
     "src/planner.ts",
+    "src/priority.ts",
     "src/runs.ts",
     "src/server.ts",
+    "src/skills.ts",
     "src/tasks.ts",
     "src/version.ts",
+    "skills/**/*",
     "docs/**/*.md",
-    "docs/assets/**/*.svg"
+    "docs/assets/**/*"
   ],
   "publishConfig": {
     "access": "public"
@@ -54,7 +63,8 @@
     ".": "./src/index.ts"
   },
   "workspaces": [
-    "website"
+    "website",
+    "packages/ennodia-io"
   ],
   "bin": {
     "ennodia": "bin/ennodia"
@@ -65,9 +75,12 @@
     "check": "tsc --noEmit",
     "lint": "oxlint",
     "test": "bun test",
+    "version:sync": "bun run src/dev/sync-version.ts",
     "discover": "bun run src/dev/discover.ts",
     "smoke": "bun run src/dev/smoke.ts",
+    "agent-font:build": "bun run src/dev/build-agent-font.ts",
     "mcp:smoke": "bun run src/dev/mcp-smoke.ts",
+    "io:smoke": "bun run --cwd packages/ennodia-io smoke",
     "task:smoke": "bun run src/dev/task-smoke.ts",
     "bench:bug-recall": "bun run bench/bug-recall/run.ts",
     "bench:bug-recall:live": "bun run bench/bug-recall/run.ts --live",
@@ -75,11 +88,12 @@
     "publish:dry-run": "npm publish --dry-run --tag next",
     "jsr:check": "npx jsr publish --dry-run --allow-dirty",
     "package:smoke": "bun run src/dev/package-smoke.ts",
-    "release:check": "bun run verify && bun run pack:check && bun run publish:dry-run && bun run jsr:check && bun run package:smoke",
+    "io:release:check": "bun run --cwd packages/ennodia-io check && bun run --cwd packages/ennodia-io test && bun run --cwd packages/ennodia-io pack:check && bun run --cwd packages/ennodia-io publish:dry-run",
+    "release:check": "bun run version:sync && bun run verify && bun run pack:check && bun run publish:dry-run && bun run jsr:check && bun run package:smoke && bun run io:release:check",
     "website:dev": "bun run --cwd website dev",
     "website:build": "bun run --cwd website build",
     "website:deploy": "bun run --cwd website deploy",
-    "verify": "bun run check && bun run lint && bun run test && bun run website:build && bun run task:smoke && bun run mcp:smoke"
+    "verify": "bun run check && bun run lint && bun run test && bun run website:build && bun run task:smoke && bun run mcp:smoke && bun run io:smoke"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
@@ -87,6 +101,7 @@
   },
   "devDependencies": {
     "@types/bun": "^1.3.14",
+    "fantasticon": "4.1.0",
     "oxlint": "^1.70.0",
     "typescript": "^6.0.3"
   }

@@ -1,15 +1,35 @@
 ---
-title: Running better audits
+title: Running Better Audits
 description: How to ask Ennodia for audits that catch user-facing product problems, not only consistency issues.
 ---
 
-Ennodia can ask several agents for review, but the quality of the result still
-depends on the audit rubric. A vague request such as "audit the website" often
-turns into a consistency pass: broken links, mismatched docs, release metadata,
-type errors, and copy drift. That is useful, but it does not prove the page is
-clear to a first-time visitor.
+Ennodia can ask several agents for review, but the result still depends on the
+audit rubric. A vague request such as "audit the website" often turns into a
+consistency pass: broken links, mismatched docs, release metadata, type errors,
+and copy drift. That is useful, but it does not prove the page is clear to a
+first-time visitor.
 
-## Pick the audit mode
+## Quick Recipe
+
+Use a source-grounded audit when the answer depends on docs, standards, package
+behavior, or another product's public surface:
+
+```json
+{
+  "tool": "ennodia_run",
+  "arguments": {
+    "prompt": "Audit these docs against the linked primary sources. Separate facts from judgment and recommend exact edits.",
+    "mode": "parallel",
+    "compare": true,
+    "skillIds": ["source-grounded-audit"]
+  }
+}
+```
+
+Install the skill first if the harness has not seen it yet. See
+[Using Agent Skills](/docs/guides/agent-skills/).
+
+## Pick the Audit Mode
 
 Name the failure mode you want reviewers to catch.
 
@@ -24,7 +44,11 @@ Name the failure mode you want reviewers to catch.
 Use separate passes when the stakes are different. A page can pass consistency
 and still fail conversion.
 
-## Landing page rubric
+For a large review, split the work into focused slices instead of sending the
+entire prompt to every reviewer. See
+[Compositional Audits](/docs/concepts/compositional-audits/).
+
+## Landing Page Rubric
 
 For landing pages, ask each reviewer to answer these questions:
 
@@ -38,7 +62,7 @@ For landing pages, ask each reviewer to answer these questions:
 For Ennodia itself, prefer `mode: "parallel"` and `compare: true` for this kind
 of review. A single source-only answer is not enough for product-facing pages.
 
-## Include rendered evidence
+## Include Rendered Evidence
 
 Source-only review misses visual problems. Before asking Ennodia to judge a
 website, include desktop and mobile screenshots or ask a harness with browser
@@ -53,7 +77,23 @@ short text description. Then check the child outputs for access errors. If a
 harness cannot read the files, stage them somewhere it can access and rerun; do
 not treat that failure as a normal design review.
 
-## Good prompt shape
+## Ground Standards in Sources
+
+When the audit depends on an external standard, registry convention, or product
+behavior, include the sources in the prompt and ask reviewers to separate facts
+from judgment. Otherwise a model council can confidently optimize the wrong
+model of the world.
+
+Agent Skills are the cautionary example: they are not an Ennodia-private prompt
+format. They are portable `SKILL.md` folders discovered by tools such as Codex,
+Claude Code, OpenCode, and Antigravity in native locations. A useful audit for
+skills must start from those product docs before recommending an Ennodia API.
+
+The bundled `source-grounded-audit` skill exists for this case. Install it into
+the harnesses you use for standards-sensitive audits, then ask Ennodia to use
+that skill when the answer depends on external docs.
+
+## Good Prompt Shape
 
 ```text
 Audit this landing page as a first-time visitor, not as a code consistency

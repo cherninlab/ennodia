@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { harnessAdapters } from "./harnesses";
+import { allPriorityHarnessIds } from "./priority";
 
 describe("harness adapters", () => {
   it("runs Kilo Code without auto-approval flags", () => {
@@ -119,5 +120,13 @@ describe("harness adapters", () => {
     expect(command?.args).toContain("/tmp/ennodia-fixture");
     expect(command?.args).not.toContain("do not put this prompt in argv");
     expect(command?.stdin).toBe("do not put this prompt in argv");
+  });
+
+  it("keeps every priority-list harness backed by a real adapter", () => {
+    const adapterIds = new Set(harnessAdapters.map((adapter) => adapter.id));
+
+    for (const priorityId of allPriorityHarnessIds()) {
+      expect(adapterIds.has(priorityId)).toBe(true);
+    }
   });
 });

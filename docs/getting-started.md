@@ -1,29 +1,34 @@
 ---
-title: Getting started
-description: Install Ennodia, connect it to an MCP client, and run the first checks.
+title: Quickstart
+description: Set up Ennodia by hand, run the first checks, and know where to go next.
 ---
 
-Ennodia runs locally as a stdio MCP server. The MCP client starts Ennodia, then
-calls tools such as `ennodia_list_harnesses`, `ennodia_plan`, and `ennodia_run`.
+This page is for humans setting up Ennodia by hand. If you would rather have an
+agent install and configure Ennodia for you, use
+[Installation for Agents](/docs/install/) instead.
 
 ## Requirements
 
 - Bun `1.3.14` or newer
-- At least one supported AI command line tool if you want real agent execution
 - An MCP client that can launch a stdio server
+- At least one supported AI command-line tool, if you want real agent
+  execution; see [Supported Harnesses](/docs/reference/supported-harnesses/)
 
-The current adapters detect:
+## Install from npm
 
-- Codex CLI
-- Claude Code
-- OpenCode
-- Kilo Code
-- Kiro CLI
-- Cline CLI
-- Hermes Agent
-- Antigravity
+Install the stable release from npm:
 
-## Local checkout
+```sh
+npx -y ennodia
+```
+
+Requires Bun `1.3.14` or newer. `npx` downloads Ennodia; Bun runs it. Prefer
+Bun directly? Use `bunx ennodia`.
+
+The JSR package `@cherninlab/ennodia` exposes TypeScript modules for import.
+Use the npm package for the stdio MCP executable.
+
+## Local Checkout
 
 Use a checkout when you are changing Ennodia itself:
 
@@ -34,36 +39,20 @@ bun install
 bun run verify
 ```
 
-## Install from npm
-
-The public prerelease channel uses npm's `next` dist-tag:
-
-```sh
-npx -y ennodia@next
-```
-
-Requires Bun `1.3.14` or newer. `npx` downloads Ennodia; Bun runs it. Prefer
-Bun directly? Use `bunx ennodia@next`.
-
-The JSR package `@cherninlab/ennodia` exposes TypeScript modules for import.
-Use the npm package for the stdio MCP executable.
-
-## MCP client config
-
-Use the npm package for normal MCP client setup:
+## MCP Client Config
 
 ```json
 {
   "mcpServers": {
     "ennodia": {
       "command": "npx",
-      "args": ["-y", "ennodia@next"]
+      "args": ["-y", "ennodia"]
     }
   }
 }
 ```
 
-For local development from a checkout:
+For a local checkout, point at the source file instead:
 
 ```json
 {
@@ -78,7 +67,7 @@ For local development from a checkout:
 
 Replace `/absolute/path/to/ennodia` with your local repo path.
 
-## First checks
+## First Checks
 
 From the repo:
 
@@ -88,19 +77,27 @@ bun run mcp:smoke
 bun run verify
 ```
 
-From an MCP client, start with:
+From an MCP client, call these tools in order: `ennodia_list_harnesses`,
+`ennodia_estimate_budget`, `ennodia_plan`, `ennodia_run`, then
+`ennodia_get_run`. `ennodia_run` is the main end-to-end entrypoint — it plans
+the route, starts the selected task or tasks, optionally compares successful
+outputs, and returns a run ID. Poll `ennodia_get_run` with that ID until the
+run reaches `succeeded`, `failed`, or `cancelled`.
 
-1. `ennodia_list_harnesses`
-2. `ennodia_plan`
-3. `ennodia_run`
-4. `ennodia_get_run`
+Expect real runs to take minutes. Compare adds a judge pass and a synthesizer
+pass after child agents finish.
 
-`ennodia_run` is the main end-to-end entrypoint. It plans the route, starts the
-selected task or tasks, optionally compares successful outputs, and returns a
-run ID. Poll `ennodia_get_run` with that ID until the run reaches `succeeded`,
-`failed`, or `cancelled`.
+## Next Pages
 
-## Expected behavior
+- [Budgets and Limits](/docs/guides/budgets-and-limits/) explains
+  `ennodia_estimate_budget` and run limits.
+- [Using Agent Skills](/docs/guides/agent-skills/) explains `skillIds` and
+  native `SKILL.md` installation.
+- [Supported Harnesses](/docs/reference/supported-harnesses/) lists adapter IDs
+  and setup notes.
+- [MCP Tools](/docs/reference/mcp-tools/) is the full parameter reference.
+
+## Expected Behavior
 
 An Ennodia run is meant to be visible. You should be able to inspect:
 
@@ -108,7 +105,7 @@ An Ennodia run is meant to be visible. You should be able to inspect:
 - child task IDs
 - task status
 - stdout and stderr previews
-- elapsed time and timeout budget
+- elapsed time and per-task timeout
 - Compare state, if Compare was used
 - final answer or explicit failure reason
 
