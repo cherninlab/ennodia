@@ -7,6 +7,7 @@ const sourceRoot = path.join(repoRoot, "docs");
 const targetRoot = path.join(websiteRoot, "src", "content", "docs", "docs");
 
 const markdownExtensions = new Set([".md", ".mdx"]);
+const junkFiles = new Set([".DS_Store", "Thumbs.db"]);
 
 async function collectFiles(directory: string): Promise<string[]> {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -18,7 +19,7 @@ async function collectFiles(directory: string): Promise<string[]> {
         return collectFiles(fullPath);
       }
 
-      if (entry.isFile()) {
+      if (entry.isFile() && !junkFiles.has(entry.name)) {
         return [fullPath];
       }
 
