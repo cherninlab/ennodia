@@ -1,2 +1,23 @@
-#!/usr/bin/env bun
-import "../src/cli.ts";
+#!/usr/bin/env node
+import { spawnSync } from "node:child_process";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const cliPath = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "src", "cli.ts");
+
+const bunCheck = spawnSync("bun", ["--version"], { stdio: "ignore" });
+
+if (bunCheck.error) {
+  process.stderr.write(
+    "Ennodia requires Bun (1.3.14 or newer) to run, but it wasn't found on your PATH.\n" +
+      "Install Bun from https://bun.sh, then try again:\n" +
+      "  curl -fsSL https://bun.sh/install | bash\n",
+  );
+  process.exit(1);
+}
+
+const result = spawnSync("bun", ["run", cliPath, ...process.argv.slice(2)], {
+  stdio: "inherit",
+});
+
+process.exit(result.status ?? 1);
