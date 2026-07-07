@@ -6,13 +6,13 @@
     "url": "https://github.com/cherninlab/ennodia",
     "source": "github"
   },
-  "version": "0.1.0",
+  "version": "0.1.1",
   "websiteUrl": "https://ennodia.cherninlab.com",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "ennodia",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "transport": {
         "type": "stdio"
       }

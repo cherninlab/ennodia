@@ -1,6 +1,6 @@
 {
   "name": "ennodia",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "mcpName": "io.github.cherninlab/ennodia",
   "description": "MCP server for multi-agent review with Compare and traceable receipts",
   "license": "MIT",

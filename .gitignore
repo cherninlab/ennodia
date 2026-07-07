@@ -24,3 +24,4 @@ bench/results/*
 # Temporary files
 .tmp/
 repomix-output.*
+*.mcpb

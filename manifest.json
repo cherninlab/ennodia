@@ -1,0 +1,1794 @@
+{
+  "manifest_version": "0.2",
+  "name": "ennodia",
+  "version": "0.1.1",
+  "description": "MCP server for multi-agent review with Compare and traceable receipts",
+  "author": {
+    "name": "Cherninlab"
+  },
+  "server": {
+    "type": "node",
+    "entry_point": "server/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": [
+        "${__dirname}/server/index.js"
+      ],
+      "env": {}
+    }
+  },
+  "license": "MIT",
+  "tools": [
+    {
+      "name": "ennodia_list_harnesses",
+      "description": "Discover supported local AI harnesses and report availability, runnable state, command path, version, capabilities, and adapter notes. Use first when setup or routing fails.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "refresh": {
+            "default": false,
+            "description": "Re-scan available harnesses instead of returning the short-lived discovery cache.",
+            "type": "boolean"
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "text"
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "content"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "ennodia_list_skills",
+      "description": "Discover prompt-only skills from project, user, and built-in skill directories without returning full instruction text.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "description": "Optional working directory to locate project-specific skills.",
+            "type": "string"
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "text"
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "content"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "ennodia_install_skills",
+      "description": "Install bundled Ennodia Agent Skills into native harness skill directories. Defaults to dryRun so clients can inspect planned writes before applying them.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "skillIds": {
+            "description": "Bundled skill IDs to install. Omit to install every bundled Ennodia skill.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "harnessIds": {
+            "description": "Native harness skill locations to install into. Omit to target Codex, Claude Code, OpenCode, and Antigravity.",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "codex",
+                "claude-code",
+                "opencode",
+                "antigravity"
+              ]
+            }
+          },
+          "scope": {
+            "default": "project",
+            "description": "Install into project-local or user-global skill directories.",
+            "type": "string",
+            "enum": [
+              "project",
+              "user"
+            ]
+          },
+          "cwd": {
+            "description": "Project directory used when scope is project.",
+            "type": "string"
+          },
+          "overwrite": {
+            "default": false,
+            "description": "Replace an existing skill folder at the target path.",
+            "type": "boolean"
+          },
+          "dryRun": {
+            "default": true,
+            "description": "Preview planned writes without copying files. Set false to install.",
+            "type": "boolean"
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "text"
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "content"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false
+      }
+    },
+    {
+      "name": "ennodia_plan",
+      "description": "Classify a prompt and preview the route Ennodia would take without starting any child process. Use before ennodia_run when you want to inspect routing.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The task to classify and route."
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "code",
+              "research",
+              "browser",
+              "image",
+              "general"
+            ],
+            "description": "Optional caller-provided route category. Pass this when you know the task category; Ennodia then skips keyword classification."
+          },
+          "refresh": {
+            "default": false,
+            "description": "Re-scan harnesses before planning.",
+            "type": "boolean"
+          },
+          "includeMermaid": {
+            "default": true,
+            "description": "Include the presentational Mermaid route diagram.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "prompt"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "text"
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "content"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false
+      }
+    },
+    {
+      "name": "ennodia_estimate_budget",
+      "description": "Estimate the input-token budget for a planned Ennodia run and report whether optional limits would be exceeded before starting child tasks.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The user task to route and estimate."
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "code",
+              "research",
+              "browser",
+              "image",
+              "general"
+            ],
+            "description": "Optional caller-provided route category. Pass this when you know the task category; Ennodia then skips keyword classification."
+          },
+          "harnessId": {
+            "description": "Force one harness by ID for the estimate, such as opencode or claude-code.",
+            "type": "string"
+          },
+          "mode": {
+            "default": "auto",
+            "description": "auto follows the planner; single estimates one selected harness; parallel estimates all candidate harnesses.",
+            "type": "string",
+            "enum": [
+              "auto",
+              "single",
+              "parallel"
+            ]
+          },
+          "compare": {
+            "default": "auto",
+            "description": "Whether Compare should be included in the estimate. auto follows the planner.",
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "auto"
+              },
+              {
+                "type": "boolean"
+              }
+            ]
+          },
+          "refresh": {
+            "default": false,
+            "description": "Re-scan harnesses before planning the estimate.",
+            "type": "boolean"
+          },
+          "maxOutputChars": {
+            "description": "Maximum characters from each successful task output assumed for Compare input.",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 200000
+          },
+          "budget": {
+            "type": "object",
+            "properties": {
+              "maxEstimatedInputTokens": {
+                "description": "Fail before starting if the estimated run input tokens exceed this value.",
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "maxChildTasks": {
+                "description": "Fail before starting if routing selects more child harness tasks than this value.",
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "description": "Optional preflight budget limits for an Ennodia operation."
+          }
+        },
+        "required": [
+          "prompt"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "text"
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "content"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "ennodia_estimate_compositional_budget",
+      "description": "Resolve focused compositional slices to harnesses and estimate child-task and Compare budget without starting child processes.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Overall question or synthesis goal that every slice belongs to."
+          },
+          "slices": {
+            "minItems": 1,
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "description": "Optional stable slice ID returned with the started task. Must be unique when supplied.",
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 80
+                },
+                "title": {
+                  "description": "Optional short human-readable label for this slice.",
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160
+                },
+                "prompt": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Focused task prompt for this slice."
+                },
+                "category": {
+                  "description": "Optional caller-provided route category for this slice. When supplied, Ennodia skips keyword classification.",
+                  "type": "string",
+                  "enum": [
+                    "code",
+                    "research",
+                    "browser",
+                    "image",
+                    "general"
+                  ]
+                },
+                "harnessId": {
+                  "description": "Optional harness ID for this slice. Omit to let Ennodia plan this slice independently.",
+                  "type": "string"
+                },
+                "model": {
+                  "description": "Optional model override for this slice, passed only to harnesses that support model selection.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "prompt"
+              ],
+              "description": "One focused unit of compositional work."
+            },
+            "description": "Focused work slices. Each slice resolves to at most one child task."
+          },
+          "cwd": {
+            "description": "Optional working directory used to validate requested native skills.",
+            "type": "string"
+          },
+          "refresh": {
+            "default": false,
+            "description": "Re-scan harnesses before resolving slice routes.",
+            "type": "boolean"
+          },
+          "skillIds": {
+            "description": "Optional list of installed native skill IDs to validate against every selected slice harness.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "includeCompareEstimate": {
+            "default": true,
+            "description": "Include a later Compare pass in the returned preflight budget estimate.",
+            "type": "boolean"
+          },
+          "maxOutputChars": {
+            "description": "Maximum characters per successful slice output assumed for a later Compare estimate.",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 200000
+          },
+          "budget": {
+            "type": "object",
+            "properties": {
+              "maxEstimatedInputTokens": {
+                "description": "Fail before starting if the estimated run input tokens exceed this value.",
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "maxChildTasks": {
+                "description": "Fail before starting if routing selects more child harness tasks than this value.",
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "description": "Optional preflight budget limits for an Ennodia operation."
+          }
+        },
+        "required": [
+          "prompt",
+          "slices"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "text"
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "content"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "ennodia_start",
+      "description": "Start raw child harness tasks without run-level Compare or final synthesis. Use for debugging, direct harness calls, or manual Compare workflows; prefer ennodia_run for normal end-to-end use.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The task to send to the selected local harness or harnesses."
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "code",
+              "research",
+              "browser",
+              "image",
+              "general"
+            ],
+            "description": "Optional caller-provided route category. Pass this when you know the task category; Ennodia then skips keyword classification."
+          },
+          "harnessId": {
+            "description": "Force one harness by ID, such as codex or claude-code. Omit to let Ennodia pick from the plan.",
+            "type": "string"
+          },
+          "mode": {
+            "default": "single",
+            "description": "single starts the selected or top-ranked harness; parallel starts every planned candidate.",
+            "type": "string",
+            "enum": [
+              "single",
+              "parallel"
+            ]
+          },
+          "cwd": {
+            "description": "Working directory for child harness commands.",
+            "type": "string"
+          },
+          "model": {
+            "description": "Optional model override passed through to harnesses that support it.",
+            "type": "string"
+          },
+          "timeoutMs": {
+            "description": "Per-task timeout in milliseconds. Defaults to the task manager timeout and is capped at one hour.",
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 3600000
+          },
+          "refresh": {
+            "default": false,
+            "description": "Re-scan harnesses before planning and starting tasks.",
+            "type": "boolean"
+          },
+          "skillIds": {
+            "description": "Optional list of skill IDs to apply to the prompt before starting the task.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "budget": {
+            "type": "object",
+            "properties": {
+              "maxEstimatedInputTokens": {
+                "description": "Fail before starting if the estimated run input tokens exceed this value.",
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "maxChildTasks": {
+                "description": "Fail before starting if routing selects more child harness tasks than this value.",
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "description": "Optional preflight budget limits for an Ennodia operation."
+          }
+        },
+        "required": [
+          "prompt"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "text"
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "content"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false
+      }
+    },
+    {
+      "name": "ennodia_start_compositional",
+      "description": "Start one focused child task per slice for compositional reviews. Poll the returned task IDs, then pass useful completed task IDs to ennodia_start_compare for synthesis.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Overall question or synthesis goal that every slice belongs to."
+          },
+          "slices": {
+            "minItems": 1,
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "description": "Optional stable slice ID returned with the started task. Must be unique when supplied.",
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 80
+                },
+                "title": {
+                  "description": "Optional short human-readable label for this slice.",
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160
+                },
+                "prompt": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Focused task prompt for this slice."
+                },
+                "category": {
+                  "description": "Optional caller-provided route category for this slice. When supplied, Ennodia skips keyword classification.",
+                  "type": "string",
+                  "enum": [
+                    "code",
+                    "research",
+                    "browser",
+                    "image",
+                    "general"
+                  ]
+                },
+                "harnessId": {
+                  "description": "Optional harness ID for this slice. Omit to let Ennodia plan this slice independently.",
+                  "type": "string"
+                },
+                "model": {
+                  "description": "Optional model override for this slice, passed only to harnesses that support model selection.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "prompt"
+              ],
+              "description": "One focused unit of compositional work."
+            },
+            "description": "Focused work slices. Each slice starts at most one child task."
+          },
+          "cwd": {
+            "description": "Working directory for child harness commands.",
+            "type": "string"
+          },
+          "timeoutMs": {
+            "description": "Per-slice task timeout in milliseconds. Defaults to the task manager timeout and is capped at one hour.",
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 3600000
+          },
+          "refresh": {
+            "default": false,
+            "description": "Re-scan harnesses before resolving slice routes.",
+            "type": "boolean"
+          },
+          "skillIds": {
+            "description": "Optional list of installed native skill IDs to ask every selected slice harness to use.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "includeCompareEstimate": {
+            "default": true,
+            "description": "Include a later Compare pass in the returned preflight budget estimate.",
+            "type": "boolean"
+          },
+          "maxOutputChars": {
+            "description": "Maximum characters per successful slice output assumed for a later Compare estimate.",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 200000
+          },
+          "budget": {
+            "type": "object",
+            "properties": {
+              "maxEstimatedInputTokens": {
+                "description": "Fail before starting if the estimated run input tokens exceed this value.",
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "maxChildTasks": {
+                "description": "Fail before starting if routing selects more child harness tasks than this value.",
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "description": "Optional preflight budget limits for an Ennodia operation."
+          }
+        },
+        "required": [
+          "prompt",
+          "slices"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "text"
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "content"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false
+      }
+    },
+    {
+      "name": "ennodia_run",
+      "description": "Start a high-level Ennodia orchestration. Use this as the default entrypoint: it plans routing, starts one or more local harness tasks, optionally compares successful outputs, and returns a run ID. Runs usually take minutes; poll ennodia_get_run with sensible spacing and trust remainingMs/etaConfidence instead of aborting early.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The user task to route to local AI harnesses."
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "code",
+              "research",
+              "browser",
+              "image",
+              "general"
+            ],
+            "description": "Optional caller-provided route category. Pass this when you know the task category; Ennodia then skips keyword classification."
+          },
+          "harnessId": {
+            "description": "Force one harness by ID, such as codex or claude-code. Omit to let Ennodia plan.",
+            "type": "string"
+          },
+          "mode": {
+            "default": "auto",
+            "description": "auto follows the planner; single runs one selected harness; parallel runs all candidate harnesses.",
+            "type": "string",
+            "enum": [
+              "auto",
+              "single",
+              "parallel"
+            ]
+          },
+          "compare": {
+            "default": "auto",
+            "description": "Whether to run Compare after tasks finish. auto compares when the planner sees value and at least two tasks produce output.",
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "auto"
+              },
+              {
+                "type": "boolean"
+              }
+            ]
+          },
+          "cwd": {
+            "description": "Working directory for child harness commands.",
+            "type": "string"
+          },
+          "model": {
+            "description": "Optional model override passed to the selected task harnesses.",
+            "type": "string"
+          },
+          "timeoutMs": {
+            "description": "Per-task timeout in milliseconds. Defaults to the task manager timeout and is capped at one hour.",
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 3600000
+          },
+          "refresh": {
+            "default": false,
+            "description": "Re-scan harnesses before planning the run.",
+            "type": "boolean"
+          },
+          "judgeHarnessId": {
+            "description": "Harness to use as the Compare judge. Omit to use the default priority: claude-code, codex, antigravity, opencode, kilo, kiro, cline, then hermes-agent.",
+            "type": "string"
+          },
+          "judgeModel": {
+            "description": "Optional model override for the Compare judge.",
+            "type": "string"
+          },
+          "synthesizerHarnessId": {
+            "description": "Harness that writes the final synthesized answer. Defaults to the judge harness selection.",
+            "type": "string"
+          },
+          "synthesizerModel": {
+            "description": "Optional model override for the Compare synthesizer.",
+            "type": "string"
+          },
+          "maxOutputChars": {
+            "description": "Maximum characters from each successful task output to pass into Compare. Use 0 to suppress candidate text.",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 200000
+          },
+          "skillIds": {
+            "description": "Optional list of skill IDs to apply to the prompt before planning and running child tasks.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "budget": {
+            "type": "object",
+            "properties": {
+              "maxEstimatedInputTokens": {
+                "description": "Fail before starting if the estimated run input tokens exceed this value.",
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "maxChildTasks": {
+                "description": "Fail before starting if routing selects more child harness tasks than this value.",
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "description": "Optional preflight budget limits for an Ennodia operation."
+          }
+        },
+        "required": [
+          "prompt"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "text"
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "content"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false
+      }
+    },
+    {
+      "name": "ennodia_list_runs",
+      "description": "List high-level Ennodia runs started by this MCP server process.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "includeEvents": {
+            "default": false,
+            "description": "Include bounded run event history for each listed run.",
+            "type": "boolean"
+          },
+          "maxEvents": {
+            "default": 25,
+            "description": "Maximum run events to include per run when includeEvents is true.",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 300
+          },
+          "maxAnswerChars": {
+            "default": 2000,
+            "description": "Maximum final-answer characters to include per run. Use 0 to omit answer text.",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 200000
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "text"
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "content"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "ennodia_history",
+      "description": "Read terminal run receipts persisted under the local Ennodia history directory. Use after a restart to inspect previous final answers and Compare disagreement analysis.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "limit": {
+            "default": 20,
+            "description": "Maximum persisted run snapshots to return, newest first.",
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 500
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "text"
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "content"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "ennodia_get_run",
+      "description": "Inspect run status, selected harnesses, child task IDs, Compare ID, final answer, events, and ETA.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Run ID returned by ennodia_run."
+          },
+          "includeEvents": {
+            "default": true,
+            "description": "Include bounded run event history.",
+            "type": "boolean"
+          },
+          "maxEvents": {
+            "default": 100,
+            "description": "Maximum run events to include. Use 0 to omit events.",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 300
+          },
+          "maxAnswerChars": {
+            "default": 80000,
+            "description": "Maximum final-answer characters to include. Use 0 to omit answer text.",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 200000
+          }
+        },
+        "required": [
+          "runId"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "text"
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "content"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "ennodia_cancel_run",
+      "description": "Cancel a high-level run and any active child task or Compare.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Run ID returned by ennodia_run."
+          }
+        },
+        "required": [
+          "runId"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "text"
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "content"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false
+      }
+    },
+    {
+      "name": "ennodia_list_tasks",
+      "description": "List tasks started by this Ennodia MCP server process.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "includeOutput": {
+            "default": false,
+            "description": "Include bounded stdout and stderr previews for each task.",
+            "type": "boolean"
+          },
+          "includeEvents": {
+            "default": false,
+            "description": "Include bounded task event history for each task.",
+            "type": "boolean"
+          },
+          "maxOutputChars": {
+            "default": 4000,
+            "description": "Maximum stdout and stderr characters to include per task. Use 0 to omit output text.",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 200000
+          },
+          "maxEvents": {
+            "default": 25,
+            "description": "Maximum task events to include per task when includeEvents is true.",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 300
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "text"
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "content"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "ennodia_get_compositional_status",
+      "description": "Inspect a batch of compositional shard tasks, group running and terminal states, and return Compare-ready successful task IDs.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "taskIds": {
+            "minItems": 1,
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Task ID returned by a compositional start."
+            },
+            "description": "Shard task IDs to inspect."
+          },
+          "prompt": {
+            "description": "Optional synthesis prompt to include in the returned compareNext object.",
+            "type": "string"
+          },
+          "minSuccessfulTasksForCompare": {
+            "default": 2,
+            "description": "Minimum successful non-empty task outputs required before compareReady is true.",
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 100
+          },
+          "includeOutput": {
+            "default": false,
+            "description": "Include bounded stdout and stderr previews for each known task.",
+            "type": "boolean"
+          },
+          "maxOutputChars": {
+            "default": 2000,
+            "description": "Maximum stdout and stderr characters to include per task when includeOutput is true.",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 200000
+          }
+        },
+        "required": [
+          "taskIds"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "text"
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "content"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "ennodia_start_compare",
+      "description": "Compare completed Ennodia task outputs or caller-supplied responses. Runs a judge pass, then a synthesizer pass, and returns a Compare ID to inspect with ennodia_get_compare.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Original user task or question the candidate responses answer."
+          },
+          "taskIds": {
+            "default": [],
+            "description": "IDs of completed tasks from this server session to include as candidates.",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Completed Ennodia task ID."
+            }
+          },
+          "responses": {
+            "default": [],
+            "description": "Freeform text responses to compare directly when you do not have task IDs.",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Stable candidate ID used in judge analysis."
+                },
+                "label": {
+                  "description": "Human-readable candidate label.",
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string",
+                  "description": "Candidate response text to compare."
+                },
+                "metadata": {
+                  "description": "Optional structured metadata to retain with the candidate.",
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {}
+                }
+              },
+              "required": [
+                "id",
+                "text"
+              ]
+            }
+          },
+          "judgeHarnessId": {
+            "description": "Harness to use as the Compare judge. Omit to use the default priority: claude-code, codex, antigravity, opencode, kilo, kiro, cline, then hermes-agent.",
+            "type": "string"
+          },
+          "judgeModel": {
+            "description": "Optional model override for the Compare judge.",
+            "type": "string"
+          },
+          "synthesizerHarnessId": {
+            "description": "Harness that writes the final synthesized answer. Defaults to the judge harness selection.",
+            "type": "string"
+          },
+          "synthesizerModel": {
+            "description": "Optional model override for the Compare synthesizer.",
+            "type": "string"
+          },
+          "cwd": {
+            "description": "Working directory for judge and synthesizer child tasks.",
+            "type": "string"
+          },
+          "timeoutMs": {
+            "description": "Per-child timeout for judge and synthesizer tasks in milliseconds, capped at one hour.",
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 3600000
+          },
+          "maxOutputChars": {
+            "description": "Maximum characters from each task output to include as a Compare candidate. Use 0 to suppress task output text.",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 200000
+          },
+          "budget": {
+            "type": "object",
+            "properties": {
+              "maxEstimatedInputTokens": {
+                "description": "Fail before starting if the estimated run input tokens exceed this value.",
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "maxChildTasks": {
+                "description": "Fail before starting if routing selects more child harness tasks than this value.",
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "description": "Optional preflight budget limits for an Ennodia operation."
+          }
+        },
+        "required": [
+          "prompt"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "text"
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "content"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false
+      }
+    },
+    {
+      "name": "ennodia_list_compares",
+      "description": "List Compare runs started by this Ennodia MCP server process.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "includeCandidates": {
+            "default": false,
+            "description": "Include bounded candidate response previews for each Compare.",
+            "type": "boolean"
+          },
+          "includeEvents": {
+            "default": false,
+            "description": "Include bounded Compare event history.",
+            "type": "boolean"
+          },
+          "maxCandidateChars": {
+            "default": 2000,
+            "description": "Maximum characters to include per candidate. Use 0 to omit candidate text.",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 200000
+          },
+          "maxEvents": {
+            "default": 25,
+            "description": "Maximum Compare events to include when includeEvents is true.",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 300
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "text"
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "content"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "ennodia_get_compare",
+      "description": "Inspect Compare status, candidate inputs, judge analysis, final synthesis, child task IDs, and ETA.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "compareId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Compare ID returned by ennodia_start_compare or ennodia_run."
+          },
+          "includeCandidates": {
+            "default": true,
+            "description": "Include bounded candidate response previews.",
+            "type": "boolean"
+          },
+          "includeEvents": {
+            "default": true,
+            "description": "Include bounded Compare event history.",
+            "type": "boolean"
+          },
+          "maxCandidateChars": {
+            "default": 8000,
+            "description": "Maximum characters to include per candidate. Use 0 to omit candidate text.",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 200000
+          },
+          "maxEvents": {
+            "default": 100,
+            "description": "Maximum Compare events to include. Use 0 to omit events.",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 300
+          }
+        },
+        "required": [
+          "compareId"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "text"
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "content"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "ennodia_cancel_compare",
+      "description": "Cancel a running Compare and its active child task.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "compareId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Compare ID returned by ennodia_start_compare or ennodia_run."
+          }
+        },
+        "required": [
+          "compareId"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "text"
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "content"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false
+      }
+    },
+    {
+      "name": "ennodia_get_task",
+      "description": "Inspect task status, captured output, events, and ETA.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Task ID returned by ennodia_start, ennodia_run, or Compare."
+          },
+          "includeOutput": {
+            "default": true,
+            "description": "Include bounded stdout and stderr previews.",
+            "type": "boolean"
+          },
+          "includeEvents": {
+            "default": true,
+            "description": "Include bounded task event history.",
+            "type": "boolean"
+          },
+          "maxOutputChars": {
+            "default": 20000,
+            "description": "Maximum stdout and stderr characters to include. Use 0 to omit output text.",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 200000
+          },
+          "maxEvents": {
+            "default": 100,
+            "description": "Maximum task events to include. Use 0 to omit events.",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 300
+          }
+        },
+        "required": [
+          "taskId"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "text"
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "content"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "ennodia_cancel_task",
+      "description": "Cancel a running task by task ID.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Task ID returned by ennodia_start, ennodia_run, or Compare."
+          }
+        },
+        "required": [
+          "taskId"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "text"
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "content"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false
+      }
+    }
+  ]
+}

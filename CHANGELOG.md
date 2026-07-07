@@ -2,6 +2,11 @@
 
 All notable changes to Ennodia will be documented in this file.
 
+## [0.1.1] - 2026-07-07
+
+### Changed
+- Simplified copy-paste agent installation prompt on landing page and README to `try-ennodia.cherninlab.com`.
+
 ## [0.1.0] - 2026-07-06
 
 ### Added

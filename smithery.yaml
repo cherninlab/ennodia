@@ -1,0 +1,13 @@
+startCommand:
+  type: stdio
+  commandFunction: |-
+    (config) => ({
+      command: 'npx',
+      args: ['-y', 'ennodia'],
+      env: {}
+    })
+
+configSchema:
+  type: object
+  description: "No configuration needed."
+  properties: {}

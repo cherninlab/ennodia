@@ -1,6 +1,6 @@
 {
   "name": "@cherninlab/ennodia-io",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Experimental OpenAI-compatible local HTTP surface for Ennodia",
   "license": "MIT",
   "type": "module",
@@ -55,7 +55,7 @@
     "zod": "^4.4.3"
   },
   "peerDependencies": {
-    "ennodia": "0.1.0"
+    "ennodia": "0.1.1"
   },
   "peerDependenciesMeta": {
     "ennodia": {
