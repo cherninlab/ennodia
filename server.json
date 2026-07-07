@@ -1,7 +1,7 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.cherninlab/ennodia",
-  "description": "MCP server for multi-agent review: ask installed local agent CLIs for second opinions and compare the answers",
+  "description": "MCP server for multi-agent review with Compare and traceable receipts",
   "repository": {
     "url": "https://github.com/cherninlab/ennodia",
     "source": "github"
