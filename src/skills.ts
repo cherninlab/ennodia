@@ -721,16 +721,95 @@ function splitFrontmatter(content: string): {
 
   const metadata: Record<string, string> = {};
   const frontmatter = normalized.slice(4, end).trim();
-  for (const line of frontmatter.split("\n")) {
-    const match = /^([A-Za-z][A-Za-z0-9_-]*):\s*(.*)$/.exec(line.trim());
+  const lines = frontmatter.split("\n");
+
+  for (let i = 0; i < lines.length; i++) {
+    const match = /^([A-Za-z][A-Za-z0-9_-]*):\s*(.*)$/.exec(lines[i].trim());
     if (!match) {
       continue;
     }
 
-    metadata[match[1]] = unquote(match[2].trim());
+    const key = match[1];
+    const rest = match[2].trim();
+    const blockScalar = /^([|>])([+-]?)$/.exec(rest);
+
+    if (blockScalar) {
+      const style = blockScalar[1] as "|" | ">";
+      const chomp = blockScalar[2];
+      const consumed = readYamlBlockScalar(lines, i + 1);
+      metadata[key] = foldYamlBlockScalar(consumed.value, style, chomp);
+      i = consumed.nextIndex - 1;
+      continue;
+    }
+
+    metadata[key] = unquote(rest);
   }
 
   return { metadata, body: normalized.slice(end + 5) };
+}
+
+function readYamlBlockScalar(
+  lines: string[],
+  startIndex: number,
+): { value: string[]; nextIndex: number } {
+  const value: string[] = [];
+  let indent: number | null = null;
+  let i = startIndex;
+
+  for (; i < lines.length; i++) {
+    const rawLine = lines[i];
+    if (rawLine.trim() === "") {
+      value.push("");
+      continue;
+    }
+
+    const lineIndent = rawLine.match(/^ */)?.[0].length ?? 0;
+    if (indent === null) {
+      if (lineIndent === 0) {
+        break;
+      }
+      indent = lineIndent;
+    } else if (lineIndent < indent) {
+      break;
+    }
+
+    value.push(rawLine.slice(indent ?? 0));
+  }
+
+  return { value, nextIndex: i };
+}
+
+function foldYamlBlockScalar(
+  lines: string[],
+  style: "|" | ">",
+  chomp: string,
+): string {
+  const trimmed = [...lines];
+  while (trimmed.length && trimmed[trimmed.length - 1] === "" && chomp !== "+") {
+    trimmed.pop();
+  }
+
+  if (style === "|") {
+    return trimmed.join("\n");
+  }
+
+  const paragraphs: string[] = [];
+  let current: string[] = [];
+  for (const line of trimmed) {
+    if (line === "") {
+      if (current.length) {
+        paragraphs.push(current.join(" "));
+        current = [];
+      }
+      continue;
+    }
+    current.push(line);
+  }
+  if (current.length) {
+    paragraphs.push(current.join(" "));
+  }
+
+  return paragraphs.join("\n").trim();
 }
 
 function stringField(
