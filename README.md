@@ -13,6 +13,7 @@
 <p>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-informational"></a>
   <img alt="CI" src="https://github.com/cherninlab/ennodia/actions/workflows/ci.yml/badge.svg" />
+  <a href="https://smithery.ai/servers/cherninlab/ennodia"><img alt="Smithery: Ennodia" src="https://img.shields.io/badge/Smithery-Ennodia-FF5601"></a>
 </p>
 
 <p align="center">
@@ -44,6 +45,11 @@ Or run it directly as a stdio MCP server from npm:
 ```sh
 npx -y ennodia
 ```
+
+Prefer a registry or client installer? Use the
+[Ennodia Smithery listing](https://smithery.ai/servers/cherninlab/ennodia).
+It uses the same stdio command from `smithery.yaml` (`npx -y ennodia`) and
+does not need Ennodia-specific configuration.
 
 Requires Bun `1.3.14` or newer — `npx` downloads Ennodia, Bun runs it. Prefer
 Bun directly? Use `bunx ennodia`. For manual setup, local development,
