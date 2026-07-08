@@ -71,6 +71,7 @@ export type RunStartInput = {
   mode?: RunMode;
   compare?: RunCompareMode;
   cwd?: string;
+  isolateCwd?: boolean;
   model?: string;
   timeoutMs?: number;
   refresh?: boolean;
@@ -94,6 +95,11 @@ export type RunView = {
   endedAt?: string;
   elapsedMs: number;
   plan: RoutePlan;
+  /** True when harnessId was explicitly forced, meaning plan.selected /
+   * plan.candidates reflect what the auto-router would have chosen and were
+   * NOT what actually ran. Check selectedHarnessIds for the harness(es) that
+   * actually executed. */
+  harnessOverridden: boolean;
   selectedHarnessIds: string[];
   taskIds: string[];
   compareId?: string;
@@ -108,6 +114,11 @@ export type RunView = {
   eventCount: number;
   events: RunEvent[];
   appliedSkills?: AppliedSkillInfo[];
+  /** Skills discoverable in cwd's native skill directories but not part of
+   * this run's appliedSkills. A harness may self-select these on its own
+   * initiative even though this run didn't request them. Populated by
+   * EnnodiaCore.startRun; empty when cwd was not provided. */
+  unrequestedSkillsPresent?: string[];
   budget: BudgetCheck;
 };
 
@@ -152,6 +163,7 @@ type InternalRun = {
   compareMode: RunCompareMode;
   prompt: string;
   plan: RoutePlan;
+  harnessOverridden: boolean;
   selectedHarnessIds: string[];
   taskIds: string[];
   compareId?: string;
@@ -248,6 +260,7 @@ export class RunManager {
       compareMode,
       prompt: input.prompt,
       plan,
+      harnessOverridden: Boolean(input.harnessId),
       selectedHarnessIds,
       taskIds: [],
       createdAtMs: now,
@@ -368,6 +381,7 @@ export class RunManager {
       const started = this.dependencies.taskManager.start(adapter, discovery, {
         prompt: input.prompt,
         cwd: input.cwd,
+        isolateCwd: input.isolateCwd,
         model: input.model,
         timeoutMs: input.timeoutMs,
         skills: input.skills,
@@ -566,6 +580,7 @@ export class RunManager {
       endedAt: run.endedAtMs ? new Date(run.endedAtMs).toISOString() : undefined,
       elapsedMs: Math.max(0, end - run.createdAtMs),
       plan: run.plan,
+      harnessOverridden: run.harnessOverridden,
       selectedHarnessIds: run.selectedHarnessIds,
       taskIds: run.taskIds,
       compareId: run.compareId,
@@ -865,21 +880,25 @@ function eventFromTask(task: TaskView): Omit<RunEvent, "at"> {
   };
 }
 
+function taskOutputText(task: TaskView): string {
+  return task.finalMessage?.trim() ||
+    `${task.stdout.trim()}\n${task.stderr.trim()}`.trim();
+}
+
 function hasComparableOutput(task: TaskView): boolean {
-  return `${task.stdout.trim()}\n${task.stderr.trim()}`.trim().length > 0;
+  return taskOutputText(task).length > 0;
 }
 
 function formatTaskOutputs(tasks: TaskView[]): string {
   if (tasks.length === 1) {
-    return `${tasks[0].stdout.trim()}\n${tasks[0].stderr.trim()}`.trim();
+    return taskOutputText(tasks[0]);
   }
 
   return tasks
     .map((task) =>
       [
         `## ${task.harnessName} (${task.id})`,
-        `${task.stdout.trim()}\n${task.stderr.trim()}`.trim() ||
-          "(no output)",
+        taskOutputText(task) || "(no output)",
       ].join("\n\n")
     )
     .join("\n\n");

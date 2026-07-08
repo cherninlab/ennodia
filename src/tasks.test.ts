@@ -1,4 +1,7 @@
 import { describe, expect, it } from "bun:test";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { HarnessAdapter, HarnessDiscovery } from "./harnesses";
 import { TaskManager, type TaskSpawn } from "./tasks";
 
@@ -299,6 +302,89 @@ describe("TaskManager", () => {
     expect(result.stdout).not.toContain("Always add tests.");
     expect(result.stdout).toContain("hello");
   });
+
+  it("isolates cwd so concurrent tasks writing the same filename don't clobber each other", async () => {
+    const sharedCwd = mkdtempSync(join(tmpdir(), "ennodia-isolate-test-"));
+    writeFileSync(join(sharedCwd, "marker.txt"), "original");
+
+    const manager = new TaskManager();
+    try {
+      const first = manager.start(writeMarkerAdapter, echoDiscovery, {
+        prompt: "first",
+        cwd: sharedCwd,
+        isolateCwd: true,
+        timeoutMs: 5_000,
+      }).task;
+      const second = manager.start(writeMarkerAdapter, echoDiscovery, {
+        prompt: "second",
+        cwd: sharedCwd,
+        isolateCwd: true,
+        timeoutMs: 5_000,
+      }).task;
+
+      const firstResult = await waitForTask(manager, first.id);
+      const secondResult = await waitForTask(manager, second.id);
+
+      expect(firstResult.status).toBe("succeeded");
+      expect(secondResult.status).toBe("succeeded");
+      expect(firstResult.cwd).not.toBe(secondResult.cwd);
+      expect(firstResult.isolatedFrom).toBe(sharedCwd);
+      expect(secondResult.isolatedFrom).toBe(sharedCwd);
+
+      expect(readFileSync(join(firstResult.cwd, "marker.txt"), "utf8")).toBe("first");
+      expect(readFileSync(join(secondResult.cwd, "marker.txt"), "utf8")).toBe("second");
+      expect(readFileSync(join(sharedCwd, "marker.txt"), "utf8")).toBe("original");
+    } finally {
+      rmSync(sharedCwd, { recursive: true, force: true });
+    }
+  });
+
+  it("does not isolate cwd when isolateCwd is not requested", async () => {
+    const sharedCwd = mkdtempSync(join(tmpdir(), "ennodia-no-isolate-test-"));
+
+    const manager = new TaskManager();
+    try {
+      const { task } = manager.start(writeMarkerAdapter, echoDiscovery, {
+        prompt: "hello",
+        cwd: sharedCwd,
+        timeoutMs: 5_000,
+      });
+      const result = await waitForTask(manager, task.id);
+
+      expect(result.cwd).toBe(sharedCwd);
+      expect(result.isolatedFrom).toBeUndefined();
+    } finally {
+      rmSync(sharedCwd, { recursive: true, force: true });
+    }
+  });
+
+  it("captures a clean final message from an adapter-written file, separate from raw stdout", async () => {
+    const manager = new TaskManager();
+    const { task } = manager.start(finalMessageAdapter, echoDiscovery, {
+      prompt: "hello",
+      timeoutMs: 5_000,
+    });
+
+    const result = await waitForTask(manager, task.id);
+
+    expect(result.status).toBe("succeeded");
+    expect(result.finalMessage).toBe("clean answer");
+    expect(result.stdout).toContain("noisy transcript");
+    expect(result.stdout).not.toBe("clean answer");
+  });
+
+  it("extracts best-effort usage via the adapter's extractUsage hook", async () => {
+    const manager = new TaskManager();
+    const { task } = manager.start(usageReportingAdapter, echoDiscovery, {
+      prompt: "hello",
+      timeoutMs: 5_000,
+    });
+
+    const result = await waitForTask(manager, task.id);
+
+    expect(result.status).toBe("succeeded");
+    expect(result.usage?.tokensUsed).toBe(42586);
+  });
 });
 
 const echoAdapter: HarnessAdapter = {
@@ -327,6 +413,57 @@ const echoDiscovery: HarnessDiscovery = {
   commandPath: "/bin/sh",
   capabilities: echoAdapter.capabilities,
   notes: [],
+};
+
+const writeMarkerAdapter: HarnessAdapter = {
+  id: "write-marker-agent",
+  name: "Write Marker Agent",
+  kind: "cli",
+  commandCandidates: ["sh"],
+  capabilities: ["smoke-test"],
+  buildCommand: (commandPath, input) => ({
+    command: commandPath,
+    args: ["-c", 'printf "%s" "$1" > marker.txt', "write-marker-agent", input.prompt],
+    cwd: input.cwd,
+  }),
+};
+
+const finalMessageAdapter: HarnessAdapter = {
+  id: "final-message-agent",
+  name: "Final Message Agent",
+  kind: "cli",
+  commandCandidates: ["sh"],
+  capabilities: ["smoke-test"],
+  buildCommand: (commandPath, input) => ({
+    command: commandPath,
+    args: [
+      "-c",
+      'printf "noisy transcript\\n"; [ -n "$1" ] && printf "%s" "clean answer" > "$1"',
+      "final-message-agent",
+      input.finalMessagePath ?? "",
+    ],
+  }),
+};
+
+const usageReportingAdapter: HarnessAdapter = {
+  id: "usage-reporting-agent",
+  name: "Usage Reporting Agent",
+  kind: "cli",
+  commandCandidates: ["sh"],
+  capabilities: ["smoke-test"],
+  buildCommand: (commandPath) => ({
+    command: commandPath,
+    args: ["-c", 'printf "tokens used\\n42,586\\n"'],
+  }),
+  extractUsage: (stdout) => {
+    const match = /tokens used\s*\n\s*([\d,]+)/i.exec(stdout);
+    if (!match) {
+      return undefined;
+    }
+
+    const tokensUsed = Number(match[1].replace(/,/g, ""));
+    return Number.isFinite(tokensUsed) ? { tokensUsed } : undefined;
+  },
 };
 
 const stdinEchoAdapter: HarnessAdapter = {
