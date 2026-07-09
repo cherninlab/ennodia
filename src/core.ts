@@ -622,6 +622,11 @@ export class EnnodiaCore {
     const discovery = await discoverSkillsWithWarnings(cwd);
 
     return discovery.skills
+      .filter((skill) =>
+        skill.installations.some((installation) =>
+          installation.scope === "project" && installation.native
+        )
+      )
       .map((skill) => skill.id)
       .filter((id) => !requestedIds.has(id));
   }

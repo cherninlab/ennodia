@@ -109,7 +109,7 @@ describe("EnnodiaCore", () => {
   });
 
   it("flags skills discoverable in cwd but not requested by this task batch", async () => {
-    const core = createFixtureCore();
+    const core = createCodexFixtureCore();
     const cwd = await mkdtemp(join(tmpdir(), "ennodia-unrequested-skill-"));
 
     try {
@@ -142,7 +142,7 @@ describe("EnnodiaCore", () => {
   });
 
   it("does not flag a skill as unrequested once it's part of skillIds", async () => {
-    const core = createFixtureCore();
+    const core = createCodexFixtureCore();
     const cwd = await mkdtemp(join(tmpdir(), "ennodia-requested-skill-"));
 
     try {
@@ -260,6 +260,28 @@ function createFixtureCore(): EnnodiaCore {
     discoverHarnesses: async () => [coreDiscovery],
     findHarnessAdapter: (id) => id === coreAdapter.id ? coreAdapter : undefined,
     planRoute: () => coreRoutePlan,
+  });
+}
+
+function createCodexFixtureCore(): EnnodiaCore {
+  const adapter: HarnessAdapter = {
+    ...coreAdapter,
+    id: "codex",
+  };
+  const discovery: HarnessDiscovery = {
+    ...coreDiscovery,
+    id: adapter.id,
+  };
+  const plan: RoutePlan = {
+    ...coreRoutePlan,
+    candidates: [adapter.id],
+    selected: adapter.id,
+  };
+
+  return new EnnodiaCore({
+    discoverHarnesses: async () => [discovery],
+    findHarnessAdapter: (id) => id === adapter.id ? adapter : undefined,
+    planRoute: () => plan,
   });
 }
 
