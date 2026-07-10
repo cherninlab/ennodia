@@ -9,6 +9,19 @@ export type HarnessRunInput = {
   model?: string;
   timeoutMs?: number;
   skills?: Skill[];
+  /** Run the task against an isolated copy of cwd instead of cwd itself, so
+   * concurrent tasks sharing a cwd cannot clobber each other's file writes. */
+  isolateCwd?: boolean;
+  /** Scratch file path an adapter can write its clean final message to,
+   * separate from the harness's raw stdout (which may include a full
+   * transcript). Populated by TaskManager; adapters opt in by referencing it. */
+  finalMessagePath?: string;
+};
+
+export type HarnessUsage = {
+  /** Best-effort, adapter-reported token count. Not guaranteed available or
+   * billing-accurate; parsed from each CLI's own text output where possible. */
+  tokensUsed?: number;
 };
 
 export type CommandSpec = {
@@ -29,6 +42,8 @@ export type HarnessAdapter = {
   capabilities: string[];
   notes?: string[];
   buildCommand?: (commandPath: string, input: HarnessRunInput) => CommandSpec;
+  /** Best-effort usage extraction from a finished task's captured output. */
+  extractUsage?: (stdout: string, stderr: string) => HarnessUsage | undefined;
 };
 
 export type HarnessDiscovery = {
@@ -116,8 +131,21 @@ export const harnessAdapters: HarnessAdapter[] = [
         args.push("--model", input.model);
       }
 
+      if (input.finalMessagePath) {
+        args.push("-o", input.finalMessagePath);
+      }
+
       args.push(input.prompt);
       return { command: commandPath, args, cwd: input.cwd };
+    },
+    extractUsage: (stdout) => {
+      const match = /tokens used\s*\n\s*([\d,]+)/i.exec(stdout);
+      if (!match) {
+        return undefined;
+      }
+
+      const tokensUsed = Number(match[1].replace(/,/g, ""));
+      return Number.isFinite(tokensUsed) ? { tokensUsed } : undefined;
     },
   },
   {

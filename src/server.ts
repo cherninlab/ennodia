@@ -286,6 +286,12 @@ export function createEnnodiaServer(core: EnnodiaCore = defaultCore): McpServer 
           .string()
           .optional()
           .describe("Working directory for child harness commands."),
+        isolateCwd: z
+          .boolean()
+          .optional()
+          .describe(
+            "Run each task against an isolated copy of cwd instead of cwd itself. Use this whenever starting more than one task against the same cwd (e.g. comparing skills or harnesses), so concurrent file writes cannot clobber each other. The isolated path is reported as each task's cwd.",
+          ),
         model: z
           .string()
           .optional()
@@ -339,6 +345,12 @@ export function createEnnodiaServer(core: EnnodiaCore = defaultCore): McpServer 
           .string()
           .optional()
           .describe("Working directory for child harness commands."),
+        isolateCwd: z
+          .boolean()
+          .optional()
+          .describe(
+            "Run each slice's task against an isolated copy of cwd instead of cwd itself, so slices that write files cannot clobber each other. The isolated path is reported as each task's cwd.",
+          ),
         timeoutMs: z
           .number()
           .int()
@@ -423,6 +435,12 @@ export function createEnnodiaServer(core: EnnodiaCore = defaultCore): McpServer 
           .string()
           .optional()
           .describe("Working directory for child harness commands."),
+        isolateCwd: z
+          .boolean()
+          .optional()
+          .describe(
+            "Run each selected harness against an isolated copy of cwd instead of cwd itself. Use this in parallel mode or whenever comparing skills/harnesses against the same cwd, so concurrent file writes cannot clobber each other. The isolated path is reported as each task's cwd.",
+          ),
         model: z
           .string()
           .optional()

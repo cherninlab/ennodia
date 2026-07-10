@@ -141,6 +141,7 @@ function snapshot(id: string, answer: string, offset: number): RunHistorySnapsho
         parallelSuggested: false,
         compareSuggested: false,
       },
+      harnessOverridden: false,
       selectedHarnessIds: ["codex"],
       taskIds: [],
       remainingMs: 0,

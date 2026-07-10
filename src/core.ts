@@ -116,6 +116,7 @@ export type TaskBatchStartInput = {
   harnessId?: string;
   mode?: "single" | "parallel";
   cwd?: string;
+  isolateCwd?: boolean;
   model?: string;
   timeoutMs?: number;
   refresh?: boolean;
@@ -127,12 +128,17 @@ export type TaskBatchStart = {
   plan: RoutePlan;
   tasks: TaskView[];
   budget: BudgetCheck;
+  /** Skills discoverable in cwd's native skill directories but not part of
+   * skillIds. A harness may self-select these on its own initiative even
+   * though this run didn't request them - see skillIds isolation caveat. */
+  unrequestedSkillsPresent: string[];
 };
 
 export type CompositionalEstimateInput = {
   prompt: string;
   slices: CompositionalSliceInput[];
   cwd?: string;
+  isolateCwd?: boolean;
   refresh?: boolean;
   skillIds?: string[];
   includeCompareEstimate?: boolean;
@@ -162,6 +168,7 @@ export type CompositionalStart = {
   tasks: CompositionalTaskStart[];
   budget: BudgetCheck;
   compareNext: CompositionalCompareNext;
+  unrequestedSkillsPresent: string[];
 };
 
 export type CompositionalStatusInput = {
@@ -342,13 +349,18 @@ export class EnnodiaCore {
       return this.taskManager.start(adapter, discovery, {
         prompt: input.prompt,
         cwd: input.cwd,
+        isolateCwd: input.isolateCwd,
         model: input.model,
         timeoutMs: input.timeoutMs,
         skills,
       }).task;
     });
+    const unrequestedSkillsPresent = await this.findUnrequestedSkills(
+      input.cwd,
+      skills,
+    );
 
-    return { plan, tasks, budget };
+    return { plan, tasks, budget, unrequestedSkillsPresent };
   }
 
   async estimateCompositional(
@@ -396,12 +408,17 @@ export class EnnodiaCore {
         task: this.taskManager.start(adapter, discovery, {
           prompt: slice.prompt,
           cwd: input.cwd,
+          isolateCwd: input.isolateCwd,
           model: slice.model,
           timeoutMs: input.timeoutMs,
           skills,
         }).task,
       };
     });
+    const unrequestedSkillsPresent = await this.findUnrequestedSkills(
+      input.cwd,
+      skills,
+    );
 
     return {
       tasks,
@@ -411,6 +428,7 @@ export class EnnodiaCore {
         taskIds: tasks.map((item) => item.task.id),
         maxOutputChars: input.maxOutputChars,
       },
+      unrequestedSkillsPresent,
     };
   }
 
@@ -445,7 +463,13 @@ export class EnnodiaCore {
         ? await loadRunnableSkillsByIds(skillIds, runInput.cwd)
         : undefined);
 
-    return this.runManager.start({ ...runInput, skills });
+    const view = await this.runManager.start({ ...runInput, skills });
+    const unrequestedSkillsPresent = await this.findUnrequestedSkills(
+      runInput.cwd,
+      skills ?? [],
+    );
+
+    return { ...view, unrequestedSkillsPresent };
   }
 
   listRuns(options: RunViewOptions = {}): RunView[] {
@@ -576,6 +600,35 @@ export class EnnodiaCore {
     }
 
     return skills;
+  }
+
+  /**
+   * Skills discoverable in cwd's native skill directories that were not part
+   * of this run's requested skills. A harness's own skill mechanism can pick
+   * these up on its own initiative (observed: Codex reading and applying an
+   * unrequested skill file purely because it existed on disk), independent
+   * of what Ennodia told it to use via skillIds. This does not prevent that;
+   * it only makes the exposure visible to the caller.
+   */
+  private async findUnrequestedSkills(
+    cwd: string | undefined,
+    requestedSkills: Skill[],
+  ): Promise<string[]> {
+    if (!cwd) {
+      return [];
+    }
+
+    const requestedIds = new Set(requestedSkills.map((skill) => skill.id));
+    const discovery = await discoverSkillsWithWarnings(cwd);
+
+    return discovery.skills
+      .filter((skill) =>
+        skill.installations.some((installation) =>
+          installation.scope === "project" && installation.native
+        )
+      )
+      .map((skill) => skill.id)
+      .filter((id) => !requestedIds.has(id));
   }
 
   private requireRunnableHarness(

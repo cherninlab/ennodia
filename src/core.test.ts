@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -107,6 +108,73 @@ describe("EnnodiaCore", () => {
     await core.shutdown();
   });
 
+  it("flags skills discoverable in cwd but not requested by this task batch", async () => {
+    const core = createCodexFixtureCore();
+    const cwd = await mkdtemp(join(tmpdir(), "ennodia-unrequested-skill-"));
+
+    try {
+      const skillDir = join(cwd, ".agents", "skills", "leftover-skill");
+      mkdirSync(skillDir, { recursive: true });
+      writeFileSync(
+        join(skillDir, "SKILL.md"),
+        [
+          "---",
+          "name: leftover-skill",
+          "description: A skill left over from another run.",
+          "---",
+          "Instructions.",
+        ].join("\n"),
+      );
+
+      const started = await core.startTasks({
+        prompt: "start me",
+        cwd,
+        timeoutMs: 5_000,
+      });
+
+      expect(started.unrequestedSkillsPresent).toEqual(["leftover-skill"]);
+
+      await core.taskManager.waitForTerminal(started.tasks[0].id, 10_000);
+    } finally {
+      await core.shutdown();
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("does not flag a skill as unrequested once it's part of skillIds", async () => {
+    const core = createCodexFixtureCore();
+    const cwd = await mkdtemp(join(tmpdir(), "ennodia-requested-skill-"));
+
+    try {
+      const skillDir = join(cwd, ".agents", "skills", "wanted-skill");
+      mkdirSync(skillDir, { recursive: true });
+      writeFileSync(
+        join(skillDir, "SKILL.md"),
+        [
+          "---",
+          "name: wanted-skill",
+          "description: A skill this run actually wants.",
+          "---",
+          "Instructions.",
+        ].join("\n"),
+      );
+
+      const started = await core.startTasks({
+        prompt: "start me",
+        cwd,
+        skillIds: ["wanted-skill"],
+        timeoutMs: 5_000,
+      });
+
+      expect(started.unrequestedSkillsPresent).toEqual([]);
+
+      await core.taskManager.waitForTerminal(started.tasks[0].id, 10_000);
+    } finally {
+      await core.shutdown();
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
   it("runs compositional slices and reports Compare readiness", async () => {
     const core = createFixtureCore();
 
@@ -192,6 +260,28 @@ function createFixtureCore(): EnnodiaCore {
     discoverHarnesses: async () => [coreDiscovery],
     findHarnessAdapter: (id) => id === coreAdapter.id ? coreAdapter : undefined,
     planRoute: () => coreRoutePlan,
+  });
+}
+
+function createCodexFixtureCore(): EnnodiaCore {
+  const adapter: HarnessAdapter = {
+    ...coreAdapter,
+    id: "codex",
+  };
+  const discovery: HarnessDiscovery = {
+    ...coreDiscovery,
+    id: adapter.id,
+  };
+  const plan: RoutePlan = {
+    ...coreRoutePlan,
+    candidates: [adapter.id],
+    selected: adapter.id,
+  };
+
+  return new EnnodiaCore({
+    discoverHarnesses: async () => [discovery],
+    findHarnessAdapter: (id) => id === adapter.id ? adapter : undefined,
+    planRoute: () => plan,
   });
 }
 

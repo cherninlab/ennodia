@@ -1,10 +1,13 @@
-import { existsSync } from "node:fs";
-import { basename } from "node:path";
+import { cpSync, existsSync, mkdtempSync, rmSync } from "node:fs";
+import { readFile } from "node:fs/promises";
+import { basename, join } from "node:path";
+import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
 import type {
   HarnessAdapter,
   HarnessDiscovery,
   HarnessRunInput,
+  HarnessUsage,
 } from "./harnesses";
 import { preview, tailItems } from "./internal";
 import {
@@ -49,6 +52,16 @@ export type TaskView = {
   stderr: string;
   events: TaskEvent[];
   appliedSkills?: AppliedSkillInfo[];
+  /** Clean final message, distinct from raw stdout, when the adapter supports
+   * writing one out-of-band (e.g. Codex's --output-last-message). Prefer this
+   * over stdout for cross-harness comparisons: some adapters' stdout is a
+   * full session transcript, others' is just the final reply. */
+  finalMessage?: string;
+  /** Best-effort usage metrics parsed from the adapter's own output. */
+  usage?: HarnessUsage;
+  /** Set when this task ran against an isolated copy of the requested cwd
+   * (see HarnessRunInput.isolateCwd), naming the original directory. */
+  isolatedFrom?: string;
 };
 
 export type TaskViewOptions = {
@@ -91,6 +104,8 @@ type InternalTask = Omit<
   settled?: Promise<void>;
   streamReaders: Set<ReadableStreamDefaultReader<Uint8Array>>;
   timeout?: Timer;
+  finalMessagePath?: string;
+  extractUsage?: HarnessAdapter["extractUsage"];
 };
 
 export type StartTaskResult = {
@@ -142,13 +157,33 @@ export class TaskManager {
       throw new Error(`${adapter.name} is not runnable through Ennodia yet.`);
     }
 
+    if (input.cwd && !existsSync(input.cwd)) {
+      throw new Error(`Working directory does not exist: ${input.cwd}`);
+    }
+
+    let isolatedFrom: string | undefined;
+    let resolvedInputCwd = input.cwd;
+    if (input.isolateCwd && input.cwd) {
+      resolvedInputCwd = isolateDirectory(input.cwd);
+      isolatedFrom = input.cwd;
+    }
+
+    // Always allocate a scratch path; adapters that support writing a clean
+    // final message (e.g. Codex's --output-last-message) opt in by
+    // referencing input.finalMessagePath in buildCommand. Adapters that
+    // don't support it simply never create the file, and it's cleaned up
+    // as a no-op.
+    const finalMessagePath = join(tmpdir(), `ennodia-final-${randomUUID()}.txt`);
+
     const timeoutMs = input.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     const augmentedPrompt = input.skills && input.skills.length > 0
       ? augmentPrompt(input.prompt, input.skills, adapter.id)
       : input.prompt;
     const commandSpec = adapter.buildCommand(discovery.commandPath, {
       ...input,
+      cwd: resolvedInputCwd,
       prompt: augmentedPrompt,
+      finalMessagePath,
     });
     const cwd = commandSpec.cwd ?? process.cwd();
 
@@ -163,6 +198,7 @@ export class TaskManager {
       harnessName: adapter.name,
       status: "running",
       cwd,
+      isolatedFrom,
       command: [
         basename(commandSpec.command),
         ...commandSpec.args.map((arg) => arg === augmentedPrompt ? "<prompt>" : arg),
@@ -180,6 +216,8 @@ export class TaskManager {
       events: [],
       streamReaders: new Set(),
       appliedSkills: input.skills?.map(toAppliedSkillInfo),
+      finalMessagePath,
+      extractUsage: adapter.extractUsage,
     };
 
     this.tasks.set(task.id, task);
@@ -366,9 +404,46 @@ export class TaskManager {
         message: error instanceof Error ? error.message : String(error),
       });
     } finally {
+      await this.collectFinalMessage(task);
+      this.collectUsage(task);
       this.clearTimers(task);
       this.touch(task);
       this.pruneTasks(task.id);
+    }
+  }
+
+  private async collectFinalMessage(task: InternalTask): Promise<void> {
+    if (!task.finalMessagePath) {
+      return;
+    }
+
+    try {
+      if (existsSync(task.finalMessagePath)) {
+        const content = (await readFile(task.finalMessagePath, "utf8")).trim();
+        if (content) {
+          task.finalMessage = content;
+        }
+        rmSync(task.finalMessagePath, { force: true });
+      }
+    } catch (error) {
+      this.pushEvent(task, {
+        type: "error",
+        message: `Failed to read final message file: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      });
+    }
+  }
+
+  private collectUsage(task: InternalTask): void {
+    if (!task.extractUsage) {
+      return;
+    }
+
+    try {
+      task.usage = task.extractUsage(task.stdout, task.stderr);
+    } catch {
+      task.usage = undefined;
     }
   }
 
@@ -569,6 +644,9 @@ export class TaskManager {
       stderr: includeOutput ? tail(task.stderr, maxOutputChars) : "",
       events: includeEvents ? tailItems(task.events, maxEvents) : [],
       appliedSkills: task.appliedSkills,
+      finalMessage: includeOutput ? task.finalMessage : undefined,
+      usage: task.usage,
+      isolatedFrom: task.isolatedFrom,
     };
   }
 
@@ -626,4 +704,15 @@ function trimEventMessage(message: string): string {
   }
 
   return `${message.slice(0, MAX_EVENT_MESSAGE_CHARS)}...`;
+}
+
+const ISOLATION_EXCLUDED_DIRS = new Set(["node_modules", ".git"]);
+
+function isolateDirectory(source: string): string {
+  const target = mkdtempSync(join(tmpdir(), "ennodia-cwd-"));
+  cpSync(source, target, {
+    recursive: true,
+    filter: (candidate) => !ISOLATION_EXCLUDED_DIRS.has(basename(candidate)),
+  });
+  return target;
 }

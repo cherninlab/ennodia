@@ -24,6 +24,54 @@ describe("RunManager", () => {
     expect(result.events.map((event) => event.type)).toContain("task-succeeded");
   });
 
+  it("marks harnessOverridden true only when harnessId is explicitly forced", async () => {
+    const fixture = createFixture([echoDiscovery("agent-a", "Agent A")]);
+
+    const forced = await fixture.manager.start({
+      prompt: "hello",
+      harnessId: "agent-a",
+      compare: false,
+      timeoutMs: 5_000,
+    });
+    await waitForRun(fixture.manager, forced.id);
+    expect(fixture.manager.get(forced.id)?.harnessOverridden).toBe(true);
+
+    const planned = await fixture.manager.start({
+      prompt: "hello",
+      mode: "single",
+      compare: false,
+      timeoutMs: 5_000,
+    });
+    await waitForRun(fixture.manager, planned.id);
+    expect(fixture.manager.get(planned.id)?.harnessOverridden).toBe(false);
+  });
+
+  it("prefers a task's clean finalMessage over its raw stdout for the run's answer", async () => {
+    const taskManager = new TaskManager();
+    const compareManager = new CompareManager(taskManager, async () => ({
+      adapter: compareAdapter,
+      discovery: compareDiscovery,
+    }));
+    const manager = new RunManager({
+      taskManager,
+      compareManager,
+      discoverHarnesses: async () => [echoDiscovery("agent-a", "Agent A")],
+      findHarnessAdapter: (id) => id === "agent-a" ? finalMessageEchoAdapter : undefined,
+      planRoute,
+    });
+
+    const started = await manager.start({
+      prompt: "hello",
+      harnessId: "agent-a",
+      compare: false,
+      timeoutMs: 5_000,
+    });
+    const result = await waitForRun(manager, started.id);
+
+    expect(result.status).toBe("succeeded");
+    expect(result.finalAnswer).toBe("clean answer");
+  });
+
   it("bounds run events and final answers at zero and tiny limits", async () => {
     const fixture = createFixture([echoDiscovery("agent-a", "Agent A")]);
 
@@ -424,6 +472,23 @@ function echoAdapter(id: string, name: string): HarnessAdapter {
     }),
   };
 }
+
+const finalMessageEchoAdapter: HarnessAdapter = {
+  id: "agent-a",
+  name: "Agent A",
+  kind: "cli",
+  commandCandidates: ["sh"],
+  capabilities: ["run-test"],
+  buildCommand: (commandPath, input) => ({
+    command: commandPath,
+    args: [
+      "-c",
+      'printf "noisy transcript\\n"; [ -n "$1" ] && printf "%s" "clean answer" > "$1"',
+      "agent-a",
+      input.finalMessagePath ?? "",
+    ],
+  }),
+};
 
 function echoDiscovery(id: string, name: string): HarnessDiscovery {
   return {

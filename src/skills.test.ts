@@ -106,6 +106,50 @@ describe("Agent Skills", () => {
       expect(skill.hash.length).toBe(64);
     });
 
+    it("folds a YAML block scalar description across multiple lines", async () => {
+      const filePath = join(testDir, "folded-skill", "SKILL.md");
+      mkdirSync(join(testDir, "folded-skill"), { recursive: true });
+      writeFileSync(filePath, [
+        "---",
+        "name: folded-skill",
+        "description: >",
+        "  Ultra-compressed communication mode. Cuts output tokens 65% (measured) by speaking like caveman",
+        "  while keeping full technical accuracy.",
+        "license: MIT",
+        "---",
+        "# Folded Skill",
+        "",
+        "Body text.",
+      ].join("\n"));
+
+      const skill = await loadSkillFromFile(filePath, "user", ["codex"], true);
+
+      expect(skill.description).toBe(
+        "Ultra-compressed communication mode. Cuts output tokens 65% (measured) by speaking like caveman while keeping full technical accuracy.",
+      );
+    });
+
+    it("preserves a YAML literal block scalar's line breaks", async () => {
+      const filePath = join(testDir, "literal-skill", "SKILL.md");
+      mkdirSync(join(testDir, "literal-skill"), { recursive: true });
+      writeFileSync(filePath, [
+        "---",
+        "name: literal-skill",
+        "description: |",
+        "  Line one.",
+        "  Line two.",
+        "license: MIT",
+        "---",
+        "# Literal Skill",
+        "",
+        "Body text.",
+      ].join("\n"));
+
+      const skill = await loadSkillFromFile(filePath, "user", ["codex"], true);
+
+      expect(skill.description).toBe("Line one.\nLine two.");
+    });
+
     it("keeps legacy JSON skills readable", async () => {
       const filePath = join(testDir, "valid-skill.json");
       writeFileSync(filePath, JSON.stringify({

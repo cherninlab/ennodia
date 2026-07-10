@@ -519,6 +519,7 @@ function makeRunView(overrides: Partial<RunView> = {}): RunView {
       parallelSuggested: false,
       compareSuggested: false,
     },
+    harnessOverridden: false,
     selectedHarnessIds: ["codex"],
     taskIds: ["task-1"],
     remainingMs: 0,

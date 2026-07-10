@@ -9,19 +9,24 @@ node_modules/
 
 # Build output
 dist/
-website/dist/
 website/.astro/
 website/src/content/docs/docs/
 bench/results/*
 !bench/results/.gitkeep
+
+# Local tool and agent state
 .wrangler/
 .kiro/
 .opencode/
+.claude/settings.local.json
 
 # OS files
 .DS_Store
+Thumbs.db
 
 # Temporary files
 .tmp/
 repomix-output.*
 *.mcpb
+*.tgz
+*.log

@@ -1,10 +1,10 @@
 <div align="center">
 
 <a href="https://ennodia.cherninlab.com">
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.svg">
-  <source media="(prefers-color-scheme: light)" srcset="docs/assets/logo.svg">
-  <img alt="Ennodia" src="docs/assets/logo.svg" width="235" height="50">
+<picture> 
+  <source media="(prefers-color-scheme: dark)" srcset="https://github.com/cherninlab/ennodia/raw/main/docs/assets/logo-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="https://github.com/cherninlab/ennodia/raw/main/docs/assets/logo.svg">
+  <img alt="Ennodia" src="https://github.com/cherninlab/ennodia/raw/main/docs/assets/logo.svg" width="235" height="50">
 </picture>
 </a>
 
@@ -17,21 +17,14 @@
 </p>
 
 <p align="center">
-  <img alt="Ennodia terminal comparing three completed AI reviews" src="docs/assets/terminal.png" width="600">
+  <img alt="Ennodia terminal comparing three completed AI reviews" src="https://github.com/cherninlab/ennodia/raw/main/docs/assets/terminal.png" width="600">
 </p>
 
 </div>
 
-No single model or agent should be the only reviewer for work that matters.
 Ennodia lets your primary agent ask the installed agent CLIs you already have,
 track every child task, and use model-led Compare to surface agreements,
 disagreements, blind spots, and one synthesized answer with receipts.
-
-The subscription-pool idea is secondary: if you already pay for Codex, Claude
-Code, Antigravity, OpenCode, and other local agent tools, Ennodia gives your
-main agent one MCP doorway to use them as an independent review panel. The
-experimental IO package exposes a small local HTTP subset for apps, but the
-supported first-class surface is MCP.
 
 ## Install
 
@@ -40,19 +33,20 @@ Send this to your primary agent and let it handle setup:
 ```text
 try-ennodia.cherninlab.com
 ```
-Or run it directly as a stdio MCP server from npm:
+Or run it directly as a stdio MCP server:
 
 ```sh
 npx -y ennodia
 ```
+Prefer Bun directly?  
+Use `bunx ennodia`.
 
-Prefer a registry or client installer? Use the
+
+Prefer a registry or client installer?  
+Use the
 [Ennodia Smithery listing](https://smithery.ai/servers/cherninlab/ennodia).
-It uses the same stdio command from `smithery.yaml` (`npx -y ennodia`) and
-does not need Ennodia-specific configuration.
 
-Requires Bun `1.3.14` or newer — `npx` downloads Ennodia, Bun runs it. Prefer
-Bun directly? Use `bunx ennodia`. For manual setup, local development,
+For manual setup, local development,
 or a full walkthrough, see
 [Quickstart](https://ennodia.cherninlab.com/docs/getting-started/).
 
