@@ -1,10 +1,10 @@
 <div align="center">
 
 <a href="https://ennodia.cherninlab.com">
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.svg">
-  <source media="(prefers-color-scheme: light)" srcset="docs/assets/logo.svg">
-  <img alt="Ennodia" src="docs/assets/logo.svg" width="235" height="50">
+<picture> 
+  <source media="(prefers-color-scheme: dark)" srcset="https://github.com/cherninlab/ennodia/raw/main/docs/assets/logo-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="https://github.com/cherninlab/ennodia/raw/main/docs/assets/logo.svg">
+  <img alt="Ennodia" src="https://github.com/cherninlab/ennodia/raw/main/docs/assets/logo.svg" width="235" height="50">
 </picture>
 </a>
 
@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img alt="Ennodia terminal comparing three completed AI reviews" src="docs/assets/terminal.png" width="600">
+  <img alt="Ennodia terminal comparing three completed AI reviews" src="https://github.com/cherninlab/ennodia/raw/main/docs/assets/terminal.png" width="600">
 </p>
 
 </div>
