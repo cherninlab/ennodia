@@ -1,3 +1,5 @@
+
+
 <div align="center">
 
 <a href="https://ennodia.cherninlab.com">
@@ -38,6 +40,9 @@ Or run it directly as a stdio MCP server:
 ```sh
 npx -y ennodia
 ```
+
+Requires Bun `1.3.14` or newer.
+
 Prefer Bun directly?  
 Use `bunx ennodia`.
 
