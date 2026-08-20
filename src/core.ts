@@ -1,8 +1,14 @@
+import { createHash } from "node:crypto";
+import type {
+  AdvisorExecutionPlan,
+  AdvisorInventorySnapshot,
+} from "./advisor";
 import {
   assertBudgetWithinLimits,
   checkBudgetLimits,
   estimateCompareBudget,
   estimateRunBudget,
+  estimateTaskBatchBudget,
   type BudgetCheck,
   type BudgetLimits,
 } from "./budget";
@@ -62,6 +68,7 @@ import {
 } from "./runs";
 import {
   assertSkillsSupportHarnesses,
+  discoverSkills,
   discoverSkillsWithWarnings,
   installBundledSkills,
   loadRunnableSkillsByIds,
@@ -77,6 +84,12 @@ import {
   type TaskView,
   type TaskViewOptions,
 } from "./tasks";
+import {
+  PlanAdviceManager,
+  type PlanAdviceManagerOptions,
+  type PlanAdviceView,
+  type PlanAdviceViewOptions,
+} from "./plan-advice";
 
 export type EnnodiaCoreOptions = {
   discoverHarnesses?: DiscoverHarnesses;
@@ -85,9 +98,11 @@ export type EnnodiaCoreOptions = {
   taskManager?: TaskManager;
   compareManager?: CompareManager;
   runManager?: RunManager;
+  planAdviceManager?: PlanAdviceManager;
   taskManagerOptions?: TaskManagerOptions;
   compareManagerOptions?: CompareManagerOptions;
   runManagerOptions?: RunManagerOptions;
+  planAdviceManagerOptions?: PlanAdviceManagerOptions;
   historySink?: HistorySink;
 };
 
@@ -191,10 +206,70 @@ export type RunStartWithSkillIdsInput = RunStartInput & {
   skillIds?: string[];
 };
 
+export type PlanAdviceStartInput = {
+  prompt: string;
+  cwd?: string;
+  refresh?: boolean;
+  advisorHarnessId?: string;
+  advisorModel?: string;
+  /** Worker harnesses the Advisor may select. Defaults to every runnable
+   * harness with a public Ennodia adapter. */
+  allowedHarnessIds?: string[];
+  /** Exact caller-approved model IDs per worker harness. Omitted harnesses may
+   * still be selected, but only with their configured harness default. */
+  allowedModels?: Record<string, string[]>;
+  maxSlices?: number;
+  maxSkillsPerSlice?: number;
+  maxTotalSkillAssignments?: number;
+  timeoutMs?: number;
+  budget?: BudgetLimits;
+};
+
+export type AdvisedPlanStartInput = {
+  adviceId: string;
+  expectedPlanDigest: string;
+  cwd?: string;
+  isolateCwd?: boolean;
+  timeoutMs?: number;
+  budget?: BudgetLimits;
+};
+
+export type AdvisedPlanTaskStart = {
+  sliceId: string;
+  sliceTitle?: string;
+  harnessId: string;
+  model?: string;
+  skillIds: string[];
+  task: TaskView;
+};
+
+export type AdvisedPlanStart = {
+  adviceId: string;
+  planDigest: string;
+  inventorySnapshotId: string;
+  plan: AdvisorExecutionPlan;
+  tasks: AdvisedPlanTaskStart[];
+  budget: BudgetCheck;
+  execution: {
+    cwd?: string;
+    isolateCwd: boolean;
+    timeoutMs?: number;
+  };
+  unrequestedSkillsPresent: string[];
+};
+
+type AdvisorInventoryRuntime = {
+  inventory: AdvisorInventorySnapshot;
+  harnesses: ResolvedHarness[];
+  skills: Skill[];
+  projectNativeSkillIds: string[];
+};
+
 export class EnnodiaCore {
   readonly taskManager: TaskManager;
   readonly compareManager: CompareManager;
   readonly runManager: RunManager;
+  readonly planAdviceManager: PlanAdviceManager;
   readonly discoverHarnesses: DiscoverHarnesses;
   readonly findHarnessAdapter: FindHarnessAdapter;
   readonly planRoute: PlanRoute;
@@ -211,6 +286,11 @@ export class EnnodiaCore {
       noopHistorySink;
     this.taskManager = options.taskManager ??
       new TaskManager(options.taskManagerOptions);
+    this.planAdviceManager = options.planAdviceManager ??
+      new PlanAdviceManager(
+        this.taskManager,
+        options.planAdviceManagerOptions,
+      );
     this.compareManager = options.compareManager ??
       new CompareManager(
         this.taskManager,
@@ -253,6 +333,198 @@ export class EnnodiaCore {
   ): Promise<RoutePlan> {
     const harnesses = await this.discoverHarnesses(options);
     return this.planRoute(prompt, harnesses, { category: options.category });
+  }
+
+  async startPlanAdvice(
+    input: PlanAdviceStartInput,
+  ): Promise<PlanAdviceView> {
+    const { inventory } = await this.buildAdvisorInventory({
+      cwd: input.cwd,
+      refresh: input.refresh,
+      allowedHarnessIds: input.allowedHarnessIds,
+      allowedModels: input.allowedModels,
+      maxSlices: Math.min(
+        input.maxSlices ?? 8,
+        input.budget?.maxChildTasks ?? Number.POSITIVE_INFINITY,
+      ),
+      maxSkillsPerSlice: input.maxSkillsPerSlice ?? 8,
+      maxTotalSkillAssignments: input.maxTotalSkillAssignments ?? 32,
+    });
+    const advisor = await this.resolveRunnableHarness(input.advisorHarnessId);
+
+    return this.planAdviceManager.start({
+      prompt: input.prompt,
+      inventory,
+      inventoryCwd: input.cwd,
+      advisor,
+      advisorModel: input.advisorModel,
+      timeoutMs: input.timeoutMs,
+      budget: input.budget,
+    });
+  }
+
+  listPlanAdvice(
+    options: PlanAdviceViewOptions = {},
+  ): PlanAdviceView[] {
+    return this.planAdviceManager.listViews(options);
+  }
+
+  getPlanAdvice(
+    id: string,
+    options: PlanAdviceViewOptions = {},
+  ): PlanAdviceView | undefined {
+    return this.planAdviceManager.get(id, options);
+  }
+
+  waitForPlanAdvice(
+    id: string,
+    timeoutMs?: number,
+    options: PlanAdviceViewOptions = {},
+  ): Promise<PlanAdviceView | undefined> {
+    return this.planAdviceManager.waitForTerminal(id, timeoutMs, options);
+  }
+
+  cancelPlanAdvice(id: string): PlanAdviceView {
+    return this.planAdviceManager.cancel(id);
+  }
+
+  async startAdvisedPlan(
+    input: AdvisedPlanStartInput,
+  ): Promise<AdvisedPlanStart> {
+    const context = this.planAdviceManager.getRevalidationContext(
+      input.adviceId,
+    );
+    const executionCwd = input.cwd ?? context.inventoryCwd;
+    const currentRuntime = await this.buildAdvisorInventory({
+      cwd: executionCwd,
+      refresh: true,
+      allowedHarnessIds: context.inventory.harnesses.map((harness) =>
+        harness.id
+      ),
+      allowedModels: Object.fromEntries(
+        context.inventory.harnesses.map((harness) => [
+          harness.id,
+          harness.allowedModelIds,
+        ]),
+      ),
+      ...context.inventory.limits,
+    });
+    let budget!: BudgetCheck;
+    let resolved!: Array<{
+      slice: AdvisorExecutionPlan["slices"][number];
+      harness: ResolvedHarness;
+      skills: Skill[];
+    }>;
+    let requestedSkillIds: string[] = [];
+    const plan = this.planAdviceManager.authorizeExecution(
+      input.adviceId,
+      input.expectedPlanDigest,
+      currentRuntime.inventory,
+      (authorizedPlan) => {
+        budget = checkBudgetLimits(
+          estimateTaskBatchBudget({
+            tasks: authorizedPlan.slices.map((slice) => ({
+              prompt: slice.prompt,
+              harnessId: slice.harnessId,
+            })),
+            comparePlanned: false,
+          }),
+          input.budget,
+        );
+        assertBudgetWithinLimits(budget);
+
+        // Resolve and validate every harness/skill before launching the first
+        // task. This preserves the zero-launch guarantee for deterministic
+        // validation, inventory drift, digest, and budget failures.
+        requestedSkillIds = [
+          ...new Set(authorizedPlan.slices.flatMap((slice) => slice.skillIds)),
+        ];
+        const runtimeSkillsById = new Map(
+          currentRuntime.skills.map((skill) => [skill.id, skill]),
+        );
+        const requestedSkills = requestedSkillIds.map((skillId) => {
+          const skill = runtimeSkillsById.get(skillId);
+          if (!skill) {
+            throw new Error(
+              `Skill not found in authorized inventory: ${skillId}`,
+            );
+          }
+          return skill;
+        });
+        const skillsById = new Map(
+          requestedSkills.map((skill) => [skill.id, skill]),
+        );
+        const harnessesById = new Map(
+          currentRuntime.harnesses.map((harness) => [
+            harness.discovery.id,
+            harness,
+          ]),
+        );
+        resolved = authorizedPlan.slices.map((slice) => {
+          const harness = harnessesById.get(slice.harnessId);
+          if (!harness) {
+            throw new Error(
+              `Harness not found in authorized inventory: ${slice.harnessId}`,
+            );
+          }
+          const skills = slice.skillIds.map((skillId) => {
+            const skill = skillsById.get(skillId);
+            if (!skill) {
+              throw new Error(`Skill not found after loading: ${skillId}`);
+            }
+            return skill;
+          });
+          if (skills.length > 0) {
+            assertSkillsSupportHarnesses(skills, [slice.harnessId]);
+          }
+          return { slice, harness, skills };
+        });
+      },
+    );
+
+    const requestedIds = new Set(requestedSkillIds);
+    const unrequestedSkillsPresent = currentRuntime.projectNativeSkillIds
+      .filter((skillId) => !requestedIds.has(skillId));
+
+    const tasks: AdvisedPlanTaskStart[] = [];
+    try {
+      for (const { slice, harness, skills } of resolved) {
+        tasks.push({
+          sliceId: slice.id,
+          sliceTitle: slice.title,
+          harnessId: slice.harnessId,
+          model: slice.model,
+          skillIds: [...slice.skillIds],
+          task: this.taskManager.start(harness.adapter, harness.discovery, {
+            prompt: slice.prompt,
+            cwd: executionCwd,
+            isolateCwd: input.isolateCwd,
+            model: slice.model,
+            timeoutMs: input.timeoutMs,
+            skills,
+          }).task,
+        });
+      }
+    } catch (error) {
+      for (const started of tasks) {
+        this.taskManager.cancel(started.task.id);
+      }
+      throw error;
+    }
+    return {
+      adviceId: input.adviceId,
+      planDigest: input.expectedPlanDigest,
+      inventorySnapshotId: currentRuntime.inventory.snapshotId,
+      plan,
+      tasks,
+      budget,
+      execution: {
+        cwd: executionCwd,
+        isolateCwd: input.isolateCwd ?? false,
+        timeoutMs: input.timeoutMs,
+      },
+      unrequestedSkillsPresent,
+    };
   }
 
   async resolveRunnableHarness(harnessId?: string): Promise<ResolvedHarness> {
@@ -384,7 +656,7 @@ export class EnnodiaCore {
   async startCompositional(
     input: CompositionalStartInput,
   ): Promise<CompositionalStart> {
-    const { harnesses, resolvedSlices, skills } = await this
+    const { harnesses, resolvedSlices, sliceSkills, requestedSkills } = await this
       .resolveCompositional(input);
     const budget = estimateCompositionalBudget(
       resolvedSlices,
@@ -394,7 +666,7 @@ export class EnnodiaCore {
     );
     assertBudgetWithinLimits(budget);
 
-    const tasks = resolvedSlices.map((slice) => {
+    const tasks = resolvedSlices.map((slice, index) => {
       const { adapter, discovery } = this.requireRunnableHarness(
         slice.harnessId,
         harnesses,
@@ -411,13 +683,13 @@ export class EnnodiaCore {
           isolateCwd: input.isolateCwd,
           model: slice.model,
           timeoutMs: input.timeoutMs,
-          skills,
+          skills: sliceSkills[index] ?? [],
         }).task,
       };
     });
     const unrequestedSkillsPresent = await this.findUnrequestedSkills(
       input.cwd,
-      skills,
+      requestedSkills,
     );
 
     return {
@@ -499,12 +771,31 @@ export class EnnodiaCore {
   }
 
   async startCompare(input: CompareStartWithBudgetInput): Promise<CompareStart> {
-    const { budget: budgetLimits, ...compareInput } = input;
+    const {
+      budget: budgetLimits,
+      advisorHarnessId: preferredAdvisorHarnessId,
+      advisorModel: preferredAdvisorModel,
+      synthesizerHarnessId,
+      synthesizerModel,
+      ...compareInput
+    } = input;
+    const advisorHarnessId = resolvePreferredAlias(
+      "advisorHarnessId",
+      preferredAdvisorHarnessId,
+      "synthesizerHarnessId",
+      synthesizerHarnessId,
+    );
+    const advisorModel = resolvePreferredAlias(
+      "advisorModel",
+      preferredAdvisorModel,
+      "synthesizerModel",
+      synthesizerModel,
+    );
     const judgeHarness = await this.resolveRunnableHarness(
       compareInput.judgeHarnessId,
     );
-    const synthesizerHarness = compareInput.synthesizerHarnessId
-      ? await this.resolveRunnableHarness(compareInput.synthesizerHarnessId)
+    const advisorHarness = advisorHarnessId
+      ? await this.resolveRunnableHarness(advisorHarnessId)
       : judgeHarness;
     const budget = checkBudgetLimits(
       estimateCompareBudget({
@@ -515,7 +806,7 @@ export class EnnodiaCore {
           0,
         ),
         judgeHarnessId: judgeHarness.adapter.id,
-        synthesizerHarnessId: synthesizerHarness.adapter.id,
+        advisorHarnessId: advisorHarness.adapter.id,
         maxOutputChars: compareInput.maxOutputChars,
       }),
       budgetLimits,
@@ -525,7 +816,8 @@ export class EnnodiaCore {
     const compare = await this.compareManager.start({
       ...compareInput,
       judgeHarnessId: judgeHarness.adapter.id,
-      synthesizerHarnessId: synthesizerHarness.adapter.id,
+      advisorHarnessId: advisorHarness.adapter.id,
+      advisorModel,
     });
 
     return { ...compare, budget };
@@ -558,14 +850,140 @@ export class EnnodiaCore {
   async shutdown(options: EnnodiaCoreShutdownOptions = {}): Promise<void> {
     await this.runManager.shutdown(options);
     await this.compareManager.shutdown(options);
+    await this.planAdviceManager.shutdown(options);
     await this.taskManager.shutdown(options);
+  }
+
+  private async buildAdvisorInventory(input: {
+    cwd?: string;
+    refresh?: boolean;
+    allowedHarnessIds?: string[];
+    allowedModels?: Record<string, string[]>;
+    maxSlices: number;
+    maxSkillsPerSlice: number;
+    maxTotalSkillAssignments: number;
+  }): Promise<AdvisorInventoryRuntime> {
+    const discoveredHarnesses = await this.discoverHarnesses({
+      refresh: input.refresh,
+    });
+    const requestedHarnessIds = input.allowedHarnessIds
+      ? [...new Set(input.allowedHarnessIds)]
+      : discoveredHarnesses
+        .filter((harness) =>
+          harness.runnable && Boolean(this.findHarnessAdapter(harness.id)?.buildCommand)
+        )
+        .map((harness) => harness.id);
+
+    if (requestedHarnessIds.length === 0) {
+      throw new Error("Plan Advisor needs at least one runnable worker harness.");
+    }
+    this.assertHarnessesRunnable(requestedHarnessIds, discoveredHarnesses);
+
+    const outsideInventory = Object.keys(input.allowedModels ?? {}).filter(
+      (harnessId) => !requestedHarnessIds.includes(harnessId),
+    );
+    if (outsideInventory.length > 0) {
+      throw new Error(
+        `Model allowlist references a harness outside allowedHarnessIds: ${
+          outsideInventory.join(", ")
+        }`,
+      );
+    }
+
+    const selectedHarnesses = requestedHarnessIds
+      .map((harnessId) =>
+        this.requireRunnableHarness(harnessId, discoveredHarnesses)
+      )
+      .sort((left, right) =>
+        left.discovery.id.localeCompare(right.discovery.id)
+      );
+    const inventoryHarnesses = selectedHarnesses.map(({ discovery }) => ({
+      id: discovery.id,
+      name: discovery.name,
+      runnable: true,
+      capabilities: [...new Set(discovery.capabilities)].sort(),
+      allowedModelIds: [
+        ...new Set(input.allowedModels?.[discovery.id] ?? []),
+      ].sort(),
+    }));
+    const harnessIds = new Set(inventoryHarnesses.map((harness) => harness.id));
+    const discoveredSkills = await discoverSkills(input.cwd);
+    const inventorySkills = discoveredSkills
+      .filter((skill) => skill.native)
+      .map((skill) => {
+        // A same-content legacy installation can merge into a native skill.
+        // It must not turn that skill into a wildcard: only native
+        // installations can make a skill available to a harness here.
+        const supportedHarnessIds = skill.installations
+          .filter((installation) => installation.native)
+          .flatMap((installation) => installation.harnessIds)
+          .filter((harnessId) =>
+            harnessIds.has(harnessId) && skill.harnessIds.includes(harnessId)
+          );
+        return {
+          skill,
+          supportedHarnessIds: [...new Set(supportedHarnessIds)].sort(),
+        };
+      })
+      .filter((entry) => entry.supportedHarnessIds.length > 0)
+      .sort((left, right) => left.skill.id.localeCompare(right.skill.id));
+    const limits = {
+      maxSlices: input.maxSlices,
+      maxSkillsPerSlice: input.maxSkillsPerSlice,
+      maxTotalSkillAssignments: input.maxTotalSkillAssignments,
+    };
+    const snapshotBody = {
+      schemaVersion: 1 as const,
+      harnesses: inventoryHarnesses,
+      skills: inventorySkills.map(({ skill, supportedHarnessIds }) => ({
+        id: skill.id,
+        name: skill.name,
+        description: skill.description,
+        harnessIds: supportedHarnessIds,
+      })),
+      limits,
+    };
+    const fingerprintMaterial = {
+      ...snapshotBody,
+      harnessRuntime: selectedHarnesses.map(({ discovery }) => ({
+        id: discovery.id,
+        commandPath: discovery.commandPath,
+        version: discovery.version,
+      })),
+      skillRuntime: inventorySkills.map(({ skill, supportedHarnessIds }) => ({
+        id: skill.id,
+        version: skill.version,
+        hash: skill.hash,
+        native: skill.native,
+        harnessIds: supportedHarnessIds,
+      })),
+    };
+
+    return {
+      inventory: {
+        ...snapshotBody,
+        snapshotId: `sha256:${
+          createHash("sha256").update(stableJson(fingerprintMaterial)).digest("hex")
+        }`,
+      },
+      harnesses: selectedHarnesses,
+      skills: inventorySkills.map(({ skill }) => skill),
+      projectNativeSkillIds: discoveredSkills
+        .filter((skill) =>
+          skill.native && skill.installations.some((installation) =>
+            installation.scope === "project" && installation.native
+          )
+        )
+        .map((skill) => skill.id),
+    };
   }
 
   private async resolveCompositional(input: CompositionalEstimateInput): Promise<{
     harnesses: HarnessDiscovery[];
     resolvedSlices: ResolvedCompositionalSlice[];
     selectedHarnessIds: string[];
-    skills: Skill[];
+    sliceSkills: Skill[][];
+    requestedSkills: Skill[];
   }> {
     assertUniqueSliceIds(input.slices);
     const harnesses = await this.discoverHarnesses({ refresh: input.refresh });
@@ -574,16 +992,42 @@ export class EnnodiaCore {
       input.slices,
       harnesses,
       this.planRoute,
+      input.skillIds,
     );
     const selectedHarnessIds = resolvedSlices.map((slice) => slice.harnessId);
     this.assertHarnessesRunnable(selectedHarnessIds, harnesses);
-    const skills = await this.loadSkillsFor(
-      selectedHarnessIds,
-      input.skillIds,
-      input.cwd,
+    const requestedSkillIds = [
+      ...new Set(resolvedSlices.flatMap((slice) => slice.skillIds)),
+    ];
+    const requestedSkills = requestedSkillIds.length
+      ? await loadRunnableSkillsByIds(requestedSkillIds, input.cwd)
+      : [];
+    const skillsById = new Map(
+      requestedSkills.map((skill) => [skill.id, skill]),
     );
+    const sliceSkills = resolvedSlices.map((slice) => {
+      const skills = slice.skillIds.map((skillId) => {
+        const skill = skillsById.get(skillId);
+        if (!skill) {
+          throw new Error(`Skill not found after loading: ${skillId}`);
+        }
+        return skill;
+      });
 
-    return { harnesses, resolvedSlices, selectedHarnessIds, skills };
+      if (skills.length > 0) {
+        assertSkillsSupportHarnesses(skills, [slice.harnessId]);
+      }
+
+      return skills;
+    });
+
+    return {
+      harnesses,
+      resolvedSlices,
+      selectedHarnessIds,
+      sliceSkills,
+      requestedSkills,
+    };
   }
 
   private async loadSkillsFor(
@@ -668,4 +1112,38 @@ export function createDefaultEnnodiaCore(
       options.runManagerOptions?.historySink ??
       createDefaultHistorySink(),
   });
+}
+
+function resolvePreferredAlias(
+  preferredName: string,
+  preferredValue: string | undefined,
+  legacyName: string,
+  legacyValue: string | undefined,
+): string | undefined {
+  if (
+    preferredValue !== undefined &&
+    legacyValue !== undefined &&
+    preferredValue !== legacyValue
+  ) {
+    throw new Error(
+      `Conflicting Compare fields: ${preferredName} and deprecated ${legacyName}.`,
+    );
+  }
+  return preferredValue ?? legacyValue;
+}
+
+function stableJson(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map(stableJson).join(",")}]`;
+  }
+  if (value && typeof value === "object") {
+    return `{${
+      Object.entries(value as Record<string, unknown>)
+        .filter(([, entry]) => entry !== undefined)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, entry]) => `${JSON.stringify(key)}:${stableJson(entry)}`)
+        .join(",")
+    }}`;
+  }
+  return JSON.stringify(value);
 }

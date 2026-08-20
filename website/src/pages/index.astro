@@ -17,9 +17,9 @@ import antigravityLogoSrc from "../../../docs/assets/agents/antigravity-color.sv
 import mcpLogoSrc from "../../../docs/assets/agents/mcp.svg?url";
 
 const pageTitle =
-  "Ennodia - multi-agent review with Compare and traceable receipts";
+  "Ennodia - agent review with Plan Advisor, Judge, and Result Advisor";
 const pageDescription =
-  "Ennodia lets your primary agent ask installed local AI tools for second opinions, track every run, and surface disagreements with model-led Compare.";
+  "Ennodia lets your primary agent use local artificial intelligence (AI) tools for second opinions, bounded team advice, and controlled comparisons.";
 const siteUrl = Astro.site ?? new URL("https://ennodia.cherninlab.com");
 const canonicalUrl = new URL(Astro.url.pathname, siteUrl).toString();
 const socialImageUrl = new URL("/og.png", siteUrl).toString();
@@ -51,24 +51,28 @@ const examplePrompt = `Use Ennodia to ask the best available local agents:
 "Review this change before I ship it. Find the highest-risk issue, docs drift, and install confusion. Compare disagreements with a model and give me the next action."`;
 const examples = [
   {
-    title: "Stubborn bug",
-    text: "Run several agents when one answer is not enough, then compare the likely root causes before editing.",
+    title: "Persistent bug",
+    text: "Run some agents when one answer is not sufficient. Compare likely causes before you edit.",
   },
   {
     title: "Planning tradeoff",
-    text: "Ask different models for migration plans so their biases show up before the project commits to one path.",
+    text: "Request migration plans from different models. Compare their assumptions before the project selects a plan.",
+  },
+  {
+    title: "Team suggestion",
+    text: "Use the Plan Advisor to propose a bounded mix of harnesses, models, and skills. Inspect the plan before you start it.",
   },
   {
     title: "Skill comparison",
-    text: "Run with and without a skill such as source-grounded-audit, then compare what the skill changed.",
+    text: "Run one task with a skill such as source-grounded-audit. Run a second task without it. Compare the results.",
   },
   {
     title: "Large plan review",
-    text: "Split a broad proposal into focused audit slices, send them to different local agents, then synthesize the useful results.",
+    text: "Divide a broad proposal into focused audit slices. Send the slices to different local agents. Compare the useful results.",
   },
   {
     title: "Benchmark receipts",
-    text: "Check deterministic bug-recall fixtures before trusting the pitch, then rerun them from the checkout.",
+    text: "Run deterministic bug-recall fixtures before you accept a claim. Repeat the test from the checkout.",
   },
 ];
 const interfaces = [
@@ -76,87 +80,93 @@ const interfaces = [
     title: "Ennodia MCP",
     logoSrc: mcpLogoSrc,
     status: "Available",
-    text: "The shipped interface agents use today: MCP tools for harness discovery, runs, budget checks, tasks, and Compare.",
+    text: "Agents use this shipped interface. It provides MCP tools for discovery, plan advice, runs, budgets, tasks, and Compare.",
   },
   {
     title: "Ennodia Core",
     status: "Available",
-    text: "The shared orchestration behavior behind MCP and the IO package: routing, task lifecycle, failure visibility, and model-led synthesis.",
+    text: "Ennodia Core contains shared behavior for MCP and the IO package. It controls routes, advice, tasks, failures, and Compare.",
   },
 ];
 const advantages = [
-  "Uses local agent CLIs, installs, subscriptions, and model choices you already have as a review panel",
-  "Discovers supported harnesses automatically and keeps adapters thin",
-  "Provides a preflight input-token estimate plus hard local caps for max child tasks and estimated input",
-  "Tracks child task IDs, ETA, output, failures, Compare state, and durable terminal run history",
-  "Lets a model judge and synthesize parallel answers so the user is not the comparison engine",
-  "Keeps model and skill preference memory on the roadmap instead of pretending it exists",
+  "Ennodia uses your local agent command-line interface (CLI) programs, subscriptions, and model choices as a review panel",
+  "Ennodia finds supported harnesses automatically and keeps adapters thin",
+  "The Plan Advisor proposes a bounded team as inert data. A separate validated call starts the plan",
+  "Ennodia estimates preflight input tokens and applies hard local limits",
+  "Ennodia tracks task IDs, time estimates, output, failures, Compare state, and terminal run history",
+  "The Judge maps parallel answers. The Result Advisor recommends an answer",
+  "Model and skill preference memory remains on the roadmap",
 ];
 const faqItems = [
   {
     question: "What is Ennodia?",
     answer:
-      "Ennodia is a local MCP server for multi-agent review: your primary agent can ask other installed agent CLIs for second opinions, then compare the answers.",
+      "Ennodia is a local Model Context Protocol (MCP) server for agent review. Your primary agent can request second opinions and compare the answers.",
   },
   {
-    question: "Why would one AI agent ask other agents for help?",
+    question: "Why would one AI agent request help from other agents?",
     answer:
-      "Different agents miss different things. Ennodia is useful when extra model work is worth spending because quality, risk, or planning uncertainty matters.",
+      "Different agents find different defects. Use additional model work when quality, risk, or plan uncertainty is important.",
   },
   {
     question: "How long does a run take?",
     answer:
-      "Usually minutes, not seconds. Ennodia starts real local agent CLIs, and Compare adds a judge pass plus a synthesizer pass after child agents finish.",
+      "A run usually takes minutes. Ennodia starts local agent command-line interfaces (CLIs). Compare then adds a Judge task and a Result Advisor task.",
   },
   {
-    question: "Do I need to know MCP?",
+    question: "Can Ennodia suggest a team for my task?",
     answer:
-      "No. You can paste the install line into Codex, Claude Code, Antigravity, or another agent and ask it to install Ennodia for you.",
+      "Yes. The Plan Advisor proposes explicit harness, model, and skill assignments. Ennodia validates the proposal as inert data. A separate call starts it.",
+  },
+  {
+    question: "Do I need to know Model Context Protocol (MCP)?",
+    answer:
+      "No. Paste the install line into Codex, Claude Code, Antigravity, or another agent. Tell the agent to install Ennodia.",
   },
   {
     question: "Does Ennodia replace my main AI agent?",
     answer:
-      "No. Your primary agent stays in charge. Ennodia gives it a way to route a question to other local agents and bring their answers back into the same workflow.",
+      "No. Your primary agent remains responsible. Ennodia routes a request to other local agents and returns their answers to the same workflow.",
   },
   {
-    question: "Which agents can Ennodia ask?",
+    question: "Which agents can Ennodia use?",
     answer:
-      "Ennodia works through local harness adapters for agent CLIs such as Codex CLI, Claude Code, OpenCode, Kilo Code, Kiro CLI, Cline CLI, Hermes Agent, and Antigravity.",
+      "Ennodia uses local harness adapters. Supported CLIs include Codex, Claude Code, OpenCode, Kilo Code, Kiro CLI, Cline, Hermes Agent, and Antigravity.",
   },
   {
-    question: "Does Ennodia expose an OpenAI-compatible API?",
+    question: "Does Ennodia expose an OpenAI-compatible application programming interface (API)?",
     answer:
       "The separate Ennodia IO package exposes experimental local provider options and a non-streaming chat-completions subset.",
   },
   {
     question: "Does Ennodia send my code to Ennodia servers?",
     answer:
-      "No. Ennodia runs locally and does not use an Ennodia-hosted service. The child agent CLIs you choose may still call their own model providers according to their own settings.",
+      "No. Ennodia runs locally and does not use an Ennodia-hosted service. A selected agent CLI can contact its configured model provider.",
   },
   {
     question: "Why not manually copy prompts between tools?",
     answer:
-      "Manual copy-paste loses traceability and makes you the judge. Ennodia keeps selected agents, task IDs, failures, timing, outputs, model-led Compare, and the final answer in one run.",
+      "Manual copies lose traceability and require you to compare the answers. Ennodia keeps agents, task IDs, failures, timing, findings, and results together.",
   },
   {
     question: "Can Ennodia limit spend?",
     answer:
-      "Ennodia can estimate preflight input tokens and enforce local limits such as maxChildTasks and maxEstimatedInputTokens on that estimate. It cannot know provider billing or harness-internal context in advance.",
+      "Ennodia estimates preflight input tokens. It can enforce maxChildTasks and maxEstimatedInputTokens. It cannot predict provider billing or internal harness context.",
   },
   {
     question: "Is there a benchmark?",
     answer:
-      "Yes. The deterministic bug-recall benchmark is published in the docs with a dated snapshot and can be rerun from a checkout with bun run bench:bug-recall.",
+      "Yes. The documentation contains a dated bug-recall benchmark. Run bun run bench:bug-recall to repeat it from a checkout.",
   },
   {
     question: "Does Ennodia support files and screenshots?",
     answer:
-      "File and screenshot workflows depend on what each local harness can access. Include file paths and short descriptions today; better attachment staging is an important next step.",
+      "Available file and screenshot operations depend on each local harness. Provide file paths and short descriptions. Ennodia does not yet stage attachments.",
   },
   {
     question: "Is Ennodia only for code review?",
     answer:
-      "No. Code review is a good fit, but Ennodia also works for docs audits, release checks, migrations, research checks, and design critique.",
+      "No. Ennodia also supports documentation audits, release checks, migrations, research checks, and design inspections.",
   },
 ];
 const faqStructuredData = {
@@ -178,7 +188,7 @@ const softwareStructuredData = {
   description: pageDescription,
   url: siteUrl.toString(),
   applicationCategory: "DeveloperApplication",
-  operatingSystem: "macOS, Linux, Windows",
+  operatingSystem: "macOS, Linux",
   offers: {
     "@type": "Offer",
     price: "0",
@@ -234,12 +244,12 @@ const softwareStructuredData = {
             <span class="hero-title-text">AI makes mistakes</span>
           </h1>
           <p class="hero-subtitle">
-            But what&nbsp;one&nbsp;misses, another&nbsp;catches!
+            Artificial intelligence (AI) tools can find different defects.
           </p>
           <div
             class="hero-terminal"
             role="img"
-            aria-label="Three AI tools review the same work, compare their answers, and return one checked answer."
+            aria-label="Three AI tools inspect the same work. Compare returns one checked answer."
           >
             <div class="terminal-command">
               <span class="terminal-muted">›</span>
@@ -248,7 +258,7 @@ const softwareStructuredData = {
             </div>
             <div class="terminal-line terminal-delay-1">
               <span class="terminal-muted"
-                >asking three AIs for their opinion...</span
+                >three AI agents inspect the work...</span
               >
             </div>
             <div class="terminal-rows">
@@ -278,16 +288,16 @@ const softwareStructuredData = {
               </div>
             </div>
             <div class="terminal-line terminal-delay-5">
-              <span class="terminal-muted">comparing their answers...</span>
+              <span class="terminal-muted">Compare examines the answers...</span>
             </div>
             <div class="terminal-line terminal-good terminal-delay-6">
               ✓ all three agree on 2 issues
             </div>
             <div class="terminal-line terminal-warn terminal-delay-7">
-              ! only Claude Code caught the 3rd - the risky one
+              ! Claude Code found issue 3. It has high risk.
             </div>
             <div class="terminal-line terminal-final terminal-delay-8">
-              → one answer, checked three ways
+              one checked answer
             </div>
           </div>
           <div class="hero-prompt">
@@ -419,7 +429,7 @@ const softwareStructuredData = {
       <section class="section intro-section" aria-labelledby="intro-title">
         <div class="section-label">Use cases</div>
         <div class="section-body">
-          <h2 id="intro-title">What Ennodia helps with</h2>
+          <h2 id="intro-title">Ennodia use cases</h2>
           <ul class="example-list">
             {
               examples.map((example) => (
@@ -436,7 +446,7 @@ const softwareStructuredData = {
       <section class="section example-section" aria-labelledby="example-title">
         <div class="section-label">Example prompt</div>
         <div class="section-body">
-          <h2 id="example-title">Try a model-led review</h2>
+          <h2 id="example-title">Try an agent review</h2>
           <p>
             This asks Ennodia to run other agents, compare disagreements, and
             return one next action.
@@ -462,7 +472,7 @@ const softwareStructuredData = {
             <li>
               <div class="process-number">1</div>
               <div class="process-copy">
-                <h3>Ask</h3>
+                <h3>Request</h3>
                 <p>Your primary agent sends one request.</p>
               </div>
               <div class="process-visual">
@@ -474,24 +484,21 @@ const softwareStructuredData = {
             <li>
               <div class="process-number">2</div>
               <div class="process-copy">
-                <h3>Route</h3>
-                <p>Available local harnesses are selected.</p>
+                <h3>Route or advise</h3>
+                <p>Ennodia selects a route. The Plan Advisor can propose an inert plan.</p>
               </div>
               <div class="process-visual process-visual-cluster">
                 <span class="process-node process-node-dark">Ennodia</span>
                 <span class="process-line" aria-hidden="true"></span>
-                <span class="process-cluster" aria-label="Selected agents">
-                  <span class="process-node process-node-small">Codex</span>
-                  <span class="process-node process-node-small">Claude</span>
-                  <span class="process-node process-node-small">Antigrav</span>
-                </span>
+                <span class="process-node process-node-dotted">Plan Advisor</span>
+                <span class="process-node process-node-small">Plan</span>
               </div>
             </li>
             <li>
               <div class="process-number">3</div>
               <div class="process-copy">
                 <h3>Review</h3>
-                <p>Each agent answers independently.</p>
+                <p>Each worker completes its explicit slice.</p>
               </div>
               <div class="process-visual process-visual-cluster">
                 <span class="process-cluster" aria-label="Agent answers">
@@ -506,14 +513,14 @@ const softwareStructuredData = {
             <li>
               <div class="process-number">4</div>
               <div class="process-copy">
-                <h3>Return</h3>
-                <p>A model compares; you get the answer and trace.</p>
+                <h3>Judge and advise</h3>
+                <p>The Judge maps evidence. The Result Advisor recommends an answer.</p>
               </div>
               <div class="process-visual">
                 <span class="process-node process-node-dotted">Judge</span>
                 <span class="process-line" aria-hidden="true"></span>
-                <span class="process-node process-node-dark">Answer</span>
-                <span class="process-node process-node-small">Trace</span>
+                <span class="process-node process-node-dotted">Result Advisor</span>
+                <span class="process-node process-node-dark">Answer and trace</span>
               </div>
             </li>
           </ol>
@@ -526,7 +533,7 @@ const softwareStructuredData = {
       >
         <div class="section-label">Interfaces</div>
         <div class="section-body">
-          <h2 id="interfaces-title">Core & MCP</h2>
+          <h2 id="interfaces-title">Core and MCP</h2>
           <ul class="example-list">
             {
               interfaces.map((item) => (
@@ -565,37 +572,37 @@ const softwareStructuredData = {
         class="section compare-section"
         aria-labelledby="model-compare-title"
       >
-        <div class="section-label">Compare</div>
+        <div class="section-label">Judge and Result Advisor</div>
         <div class="section-body">
-          <h2 id="model-compare-title">The model does the comparison</h2>
-          <ol class="compare-flow" aria-label="Ennodia compare flow">
+          <h2 id="model-compare-title">Clear roles before and after work</h2>
+          <ol class="compare-flow" aria-label="Ennodia Plan Advisor, Judge, and Result Advisor roles">
             <li>
               <div class="concept-mark" aria-hidden="true">1</div>
               <div>
-                <h3>Judge</h3>
+                <h3>Plan Advisor</h3>
                 <p>
-                  Names agreements, disagreements, missing context, unique
-                  value, and risk.
+                  Before work, it proposes a bounded team as inert data. It
+                  never starts the plan. The caller must start it explicitly.
                 </p>
               </div>
             </li>
             <li>
               <div class="concept-mark" aria-hidden="true">2</div>
               <div>
-                <h3>Synthesizer</h3>
+                <h3>Judge</h3>
                 <p>
-                  Turns the original answers and judge notes into one answer the
-                  caller can use.
+                  During Compare, it identifies agreements, contradictions,
+                  missing context, unique value, and risk.
                 </p>
               </div>
             </li>
             <li>
               <div class="concept-mark" aria-hidden="true">3</div>
               <div>
-                <h3>Trace</h3>
+                <h3>Result Advisor</h3>
                 <p>
-                  Keeps task IDs, failures, timing, partial output, and final
-                  status visible.
+                  It combines the Judge findings into a recommended answer. If
+                  the Judge fails, Ennodia shows a candidates-only basis.
                 </p>
               </div>
             </li>
@@ -611,10 +618,9 @@ const softwareStructuredData = {
         <div class="section-body">
           <h2 id="benchmark-title">Bug-recall benchmark</h2>
           <p>
-            The current deterministic snapshot covers 4 TypeScript review
+            The current deterministic snapshot contains four TypeScript review
             fixtures. Ennodia parallel Compare scored 100% recall and 100%
-            precision in fixture mode, with limitations documented beside the
-            table.
+            precision in fixture mode. The benchmark page lists its limits.
           </p>
           <p>
             <a href="/docs/reference/benchmarks/">Read the benchmark snapshot</a
@@ -633,10 +639,10 @@ const softwareStructuredData = {
               >
             </h2>
             <p>
-              LLM Council demonstrates the pattern: ask several models
-              independently, compare, synthesize. Ennodia brings that pattern
-              into local agent workflows, MCP, task tracing, failure visibility,
-              and reusable harness adapters.
+              That project demonstrates this pattern. It requests independent
+              answers from some models. It then compares and combines the
+              answers. Ennodia applies the pattern to local agent workflows,
+              MCP, task traces, failure visibility, and harness adapters.
             </p>
           </article>
         </div>
@@ -645,10 +651,10 @@ const softwareStructuredData = {
       <section class="section cta-section" aria-labelledby="cta-title">
         <div class="section-label">Get started</div>
         <div class="section-body">
-          <h2 id="cta-title">Ask for second opinions</h2>
+          <h2 id="cta-title">Request second opinions</h2>
           <p>
-            Paste the install line into your primary agent, then ask it to bring
-            in reviewers when a task deserves more than one model.
+            Paste the install line into your primary agent. Tell it to use other
+            agents when one model is not sufficient.
           </p>
           <div class="hero-actions cta-actions" aria-label="Final actions">
             <a class="button button-primary" href="/install">
@@ -670,7 +676,7 @@ const softwareStructuredData = {
     <footer class="site-footer">
       <div class="footer-inner">
         <img src={logoSrc} alt="Ennodia" />
-        <p>Open source. Local first. MIT licensed.</p>
+        <p>Ennodia is local-first software under the MIT license.</p>
       </div>
     </footer>
     <script>

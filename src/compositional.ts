@@ -17,6 +17,7 @@ export type CompositionalSliceInput = {
   category?: RouteCategory;
   harnessId?: string;
   model?: string;
+  skillIds?: string[];
 };
 
 export const compositionalSliceSchema: z.ZodType<CompositionalSliceInput> = z
@@ -59,6 +60,12 @@ export const compositionalSliceSchema: z.ZodType<CompositionalSliceInput> = z
       .describe(
         "Optional model override for this slice, passed only to harnesses that support model selection.",
       ),
+    skillIds: z
+      .array(z.string())
+      .optional()
+      .describe(
+        "Optional installed native skill IDs for this slice. When present, this replaces the batch-level skillIds; use an empty list to run this slice without requested skills.",
+      ),
   })
   .describe("One focused unit of compositional work.");
 
@@ -70,6 +77,7 @@ export type ResolvedCompositionalSlice = {
   category?: RouteCategory;
   harnessId: string;
   model?: string;
+  skillIds: string[];
   plan: RoutePlan;
 };
 
@@ -79,6 +87,7 @@ export type CompositionalSliceSummary = {
   sliceTitle?: string;
   harnessId: string;
   model?: string;
+  skillIds: string[];
   routeCategory: RoutePlan["category"];
   routeReasons: string[];
   routeCandidates: string[];
@@ -154,6 +163,7 @@ export function resolveCompositionalSlices(
     harnesses: HarnessDiscovery[],
     options?: { category?: RouteCategory },
   ) => RoutePlan,
+  batchSkillIds: string[] = [],
 ): ResolvedCompositionalSlice[] {
   return slices.map((slice, index) => {
     const plan = planRoute(slice.prompt, harnesses, {
@@ -173,6 +183,9 @@ export function resolveCompositionalSlices(
       category: slice.category,
       harnessId,
       model: slice.model,
+      skillIds: uniqueSkillIds(
+        slice.skillIds === undefined ? batchSkillIds : slice.skillIds,
+      ),
       plan,
     };
   });
@@ -187,10 +200,15 @@ export function compositionalSliceSummaries(
     sliceTitle: slice.title,
     harnessId: slice.harnessId,
     model: slice.model,
+    skillIds: slice.skillIds,
     routeCategory: slice.plan.category,
     routeReasons: slice.plan.reasons,
     routeCandidates: slice.plan.candidates,
   }));
+}
+
+function uniqueSkillIds(skillIds: string[]): string[] {
+  return [...new Set(skillIds)];
 }
 
 export function estimateCompositionalBudget(

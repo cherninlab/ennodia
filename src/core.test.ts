@@ -175,6 +175,126 @@ describe("EnnodiaCore", () => {
     }
   });
 
+  it("applies compositional skills per slice with explicit override semantics", async () => {
+    const core = createMixedSkillFixtureCore();
+    const cwd = await mkdtemp(join(tmpdir(), "ennodia-slice-skills-"));
+
+    try {
+      writeNativeSkill(cwd, ".agents/skills", "codex-batch");
+      writeNativeSkill(cwd, ".claude/skills", "claude-slice");
+      writeNativeSkill(cwd, ".agents/skills", "unrequested-skill");
+
+      const estimate = await core.estimateCompositional({
+        prompt: "overall goal",
+        cwd,
+        skillIds: ["codex-batch", "codex-batch"],
+        slices: [
+          { id: "inherited", harnessId: "codex", prompt: "use the batch skill" },
+          {
+            id: "overridden",
+            harnessId: "claude-code",
+            prompt: "use the slice skill",
+            skillIds: ["claude-slice"],
+          },
+          {
+            id: "disabled",
+            harnessId: "claude-code",
+            prompt: "use no requested skills",
+            skillIds: [],
+          },
+        ],
+      });
+
+      expect(estimate.slices.map((slice) => slice.skillIds)).toEqual([
+        ["codex-batch"],
+        ["claude-slice"],
+        [],
+      ]);
+
+      const started = await core.startCompositional({
+        prompt: "overall goal",
+        cwd,
+        skillIds: ["codex-batch"],
+        slices: [
+          { id: "inherited", harnessId: "codex", prompt: "use the batch skill" },
+          {
+            id: "overridden",
+            harnessId: "claude-code",
+            prompt: "use the slice skill",
+            skillIds: ["claude-slice"],
+          },
+          {
+            id: "disabled",
+            harnessId: "claude-code",
+            prompt: "use no requested skills",
+            skillIds: [],
+          },
+        ],
+        timeoutMs: 5_000,
+      });
+
+      expect(
+        started.tasks.map((item) =>
+          item.task.appliedSkills?.map((skill) => skill.id)
+        ),
+      ).toEqual([["codex-batch"], ["claude-slice"], []]);
+      expect(started.unrequestedSkillsPresent).toEqual(["unrequested-skill"]);
+
+      for (const item of started.tasks) {
+        await core.taskManager.waitForTerminal(item.task.id, 10_000);
+      }
+
+      await expect(
+        core.estimateCompositional({
+          prompt: "overall goal",
+          cwd,
+          skillIds: ["codex-batch"],
+          slices: [
+            {
+              harnessId: "claude-code",
+              prompt: "inherit an incompatible batch skill",
+            },
+          ],
+        }),
+      ).rejects.toThrow(
+        "Skill is not installed for claude-code: codex-batch",
+      );
+    } finally {
+      await core.shutdown();
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("reports an overridden batch skill as unrequested when no slice uses it", async () => {
+    const core = createMixedSkillFixtureCore();
+    const cwd = await mkdtemp(join(tmpdir(), "ennodia-overridden-skills-"));
+
+    try {
+      writeNativeSkill(cwd, ".agents/skills", "unused-batch");
+      writeNativeSkill(cwd, ".claude/skills", "used-slice");
+
+      const started = await core.startCompositional({
+        prompt: "overall goal",
+        cwd,
+        skillIds: ["unused-batch"],
+        slices: [
+          {
+            harnessId: "claude-code",
+            prompt: "override the batch selection",
+            skillIds: ["used-slice"],
+          },
+        ],
+        timeoutMs: 5_000,
+      });
+
+      expect(started.unrequestedSkillsPresent).toEqual(["unused-batch"]);
+      await core.taskManager.waitForTerminal(started.tasks[0].task.id, 10_000);
+    } finally {
+      await core.shutdown();
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
   it("runs compositional slices and reports Compare readiness", async () => {
     const core = createFixtureCore();
 
@@ -283,6 +403,44 @@ function createCodexFixtureCore(): EnnodiaCore {
     findHarnessAdapter: (id) => id === adapter.id ? adapter : undefined,
     planRoute: () => plan,
   });
+}
+
+function createMixedSkillFixtureCore(): EnnodiaCore {
+  const adapters = ["codex", "claude-code"].map((id) => ({
+    ...coreAdapter,
+    id,
+    name: id,
+  }));
+
+  return new EnnodiaCore({
+    discoverHarnesses: async () =>
+      adapters.map((adapter) => ({
+        ...coreDiscovery,
+        id: adapter.id,
+        name: adapter.name,
+      })),
+    findHarnessAdapter: (id) => adapters.find((adapter) => adapter.id === id),
+    planRoute: () => ({
+      ...coreRoutePlan,
+      candidates: adapters.map((adapter) => adapter.id),
+      selected: "codex",
+    }),
+  });
+}
+
+function writeNativeSkill(cwd: string, parent: string, id: string): void {
+  const skillDir = join(cwd, parent, id);
+  mkdirSync(skillDir, { recursive: true });
+  writeFileSync(
+    join(skillDir, "SKILL.md"),
+    [
+      "---",
+      `name: ${id}`,
+      `description: Native fixture skill ${id}.`,
+      "---",
+      "Instructions.",
+    ].join("\n"),
+  );
 }
 
 function createHistoryFixtureCore(historySink: FileHistorySink): EnnodiaCore {

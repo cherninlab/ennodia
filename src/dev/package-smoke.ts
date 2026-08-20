@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { tmpdir } from "node:os";
 import { ENNODIA_VERSION } from "../version";
@@ -55,6 +55,38 @@ try {
     "ennodia",
   ]);
 
+  const ioPack = await runCapture(
+    ["npm", "pack", "--json", "--pack-destination", tempDir],
+    { cwd: join(import.meta.dir, "../../packages/ennodia-io") },
+  );
+  const [ioPackResult] = JSON.parse(ioPack.stdout) as PackResult[];
+  if (!ioPackResult) {
+    throw new Error("Ennodia IO npm pack did not return package metadata.");
+  }
+  if (ioPackResult.version !== ENNODIA_VERSION) {
+    throw new Error(
+      `Packed IO version ${ioPackResult.version} did not match ${ENNODIA_VERSION}.`,
+    );
+  }
+  assertIoPackedFiles(ioPackResult.files.map((file) => file.path));
+
+  const ioTarball = join(tempDir, basename(ioPackResult.filename));
+  const consumerDir = join(tempDir, "consumer");
+  await mkdir(consumerDir);
+  await runCapture(["npm", "init", "--yes"], { cwd: consumerDir });
+  const installArgs = ["--ignore-scripts", "--no-audit", "--no-fund"];
+  await runCapture(["npm", "install", ...installArgs, tarball], {
+    cwd: consumerDir,
+  });
+  await runCapture(["npm", "install", ...installArgs, ioTarball], {
+    cwd: consumerDir,
+  });
+  await runCapture([
+    "bun",
+    "--eval",
+    'const io = await import("@cherninlab/ennodia-io"); if (typeof io.startEnnodiaIoServer !== "function") process.exit(1);',
+  ], { cwd: consumerDir });
+
   console.log(
     JSON.stringify(
       {
@@ -62,6 +94,9 @@ try {
         version: packResult.version,
         tarball: basename(tarball),
         smoke: ["bunx", "npm exec", "npx"],
+        ioPackage: ioPackResult.name,
+        ioTarball: basename(ioTarball),
+        ioSmoke: "fresh tarball install and import",
       },
       null,
       2,
@@ -71,6 +106,33 @@ try {
   await rm(tempDir, { recursive: true, force: true });
 }
 
+function assertIoPackedFiles(paths: string[]): void {
+  const expected = [
+    "package.json",
+    "README.md",
+    "bin/ennodia-io",
+    "src/cli.ts",
+    "src/index.ts",
+    "src/internal.ts",
+    "src/io.ts",
+  ];
+
+  for (const path of expected) {
+    if (!paths.includes(path)) {
+      throw new Error(`Packed Ennodia IO tarball is missing ${path}.`);
+    }
+  }
+
+  const forbidden = paths.filter((path) =>
+    path.includes("/dev/") || path.endsWith(".test.ts")
+  );
+  if (forbidden.length > 0) {
+    throw new Error(
+      `Packed Ennodia IO tarball contains forbidden files: ${forbidden.join(", ")}`,
+    );
+  }
+}
+
 function assertPackedFiles(paths: string[]): void {
   const expected = [
     "package.json",
@@ -78,6 +140,7 @@ function assertPackedFiles(paths: string[]): void {
     "LICENSE",
     "CONTRIBUTING.md",
     "bin/ennodia",
+    "src/advisor.ts",
     "src/budget.ts",
     "src/cli.ts",
     "src/compare.ts",
@@ -89,6 +152,7 @@ function assertPackedFiles(paths: string[]): void {
     "src/index.ts",
     "src/internal.ts",
     "src/planner.ts",
+    "src/plan-advice.ts",
     "src/priority.ts",
     "src/runs.ts",
     "src/server.ts",
@@ -167,9 +231,10 @@ async function assertMcpHandshake(label: string, command: string[]): Promise<voi
 
 async function runCapture(
   command: string[],
-  options: { input?: string; timeoutMs?: number } = {},
+  options: { cwd?: string; input?: string; timeoutMs?: number } = {},
 ): Promise<{ stdout: string; stderr: string }> {
   const proc = Bun.spawn(command, {
+    cwd: options.cwd,
     stdin: options.input ? "pipe" : "ignore",
     stdout: "pipe",
     stderr: "pipe",

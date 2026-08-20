@@ -4,8 +4,8 @@ description: Deterministic benchmark snapshots for Ennodia's multi-agent bug-rec
 ---
 
 The first benchmark is `multi-model-bug-recall`: TypeScript review fixtures with
-committed bug oracles. It measures whether a condition recalls required
-findings and avoids known false-positive traps.
+committed bug oracles. It measures required-finding recall for a condition and
+checks for known false-positive traps.
 
 ## Current Snapshot
 
@@ -18,6 +18,8 @@ bun run bench:bug-recall -- --out /tmp/ennodia-benchmark-snapshot
 ```
 
 Mode: fixture, using committed reference outputs.
+
+The F1 score combines recall and precision. FP means false positive.
 
 | Condition | Cases | Recall | Precision | F1 | High recall | FP traps |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -47,8 +49,8 @@ does not launch child agents:
 bun run bench:bug-recall
 ```
 
-Live mode starts real local harnesses and varies with installed CLI versions,
-models, account state, and machine configuration:
+Live mode starts real local harnesses and varies with installed command-line
+interface (CLI) versions, models, account state, and machine configuration:
 
 ```sh
 bun run bench:bug-recall:live -- --fixture 001-missing-await

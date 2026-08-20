@@ -21,7 +21,7 @@ type CliOptions = {
   timeoutMs: number;
   outDir?: string;
   judgeHarnessId?: string;
-  synthesizerHarnessId?: string;
+  advisorHarnessId?: string;
 };
 
 type McpTextContent = {
@@ -129,7 +129,7 @@ async function runLiveBenchmark(
         compare: true,
         timeoutMs: options.timeoutMs,
         judgeHarnessId: options.judgeHarnessId,
-        synthesizerHarnessId: options.synthesizerHarnessId,
+        advisorHarnessId: options.advisorHarnessId,
         maxOutputChars: 16_000,
       });
       outputs.push(runToOutput(
@@ -284,8 +284,16 @@ function parseArgs(args: string[]): CliOptions {
       options.outDir = requireValue(args, ++index, arg);
     } else if (arg === "--judge-harness") {
       options.judgeHarnessId = requireValue(args, ++index, arg);
-    } else if (arg === "--synthesizer-harness") {
-      options.synthesizerHarnessId = requireValue(args, ++index, arg);
+    } else if (
+      arg === "--advisor-harness" || arg === "--synthesizer-harness"
+    ) {
+      const value = requireValue(args, ++index, arg);
+      if (options.advisorHarnessId && options.advisorHarnessId !== value) {
+        throw new Error(
+          "--advisor-harness and --synthesizer-harness must match.",
+        );
+      }
+      options.advisorHarnessId = value;
     } else {
       throw new Error(`Unknown option: ${arg}`);
     }

@@ -1,12 +1,12 @@
 ---
-title: MCP Tools
-description: The public MCP tool surface exposed by Ennodia.
+title: Model Context Protocol (MCP) Tools
+description: The public Model Context Protocol (MCP) tool surface exposed by Ennodia.
 ---
 
-This page describes the tools exposed by the Ennodia MCP server. The normal
-entrypoint is `ennodia_run`: it starts a visible orchestration and returns a run
-ID. Use `ennodia_get_run` to poll status, events, child task IDs, Compare state,
-and the final answer.
+This page describes the tools exposed by the Ennodia Model Context Protocol
+(MCP) server. The normal entrypoint is `ennodia_run`. It starts a visible
+orchestration and returns a run ID. Use `ennodia_get_run` to poll status,
+events, child task IDs, Judge + Result Advisor state, and the final answer.
 
 ## Common Workflows
 
@@ -15,10 +15,11 @@ and the final answer.
 | Check local setup | `ennodia_list_harnesses` |
 | Preview route and cost | `ennodia_estimate_budget` |
 | Preview compositional shard cost | `ennodia_estimate_compositional_budget` |
+| Request a tailored team, inspect it, then launch it | `ennodia_start_plan_advice` -> `ennodia_get_plan_advice` -> `ennodia_start_advised_plan` |
 | Start a visible end-to-end run | `ennodia_run` -> `ennodia_get_run` |
 | Start focused review shards | `ennodia_start_compositional` -> `ennodia_get_compositional_status` |
 | Debug raw child tasks | `ennodia_start` -> `ennodia_get_task` |
-| Compare completed outputs | `ennodia_start_compare` -> `ennodia_get_compare` |
+| Judge completed outputs and advise on the result | `ennodia_start_compare` -> `ennodia_get_compare` |
 | Install bundled skills | `ennodia_list_skills` -> `ennodia_install_skills` |
 | Inspect terminal receipts after restart | `ennodia_history` |
 
@@ -30,32 +31,34 @@ examples, see [Budgets and Limits](/docs/guides/budgets-and-limits/).
 
 `ennodia_plan`, `ennodia_estimate_budget`, `ennodia_start`, and `ennodia_run`
 use local harness discovery plus either a caller-provided `category` or a
-lightweight keyword fallback. Pass `category` when the agent caller already
-knows the task type, and pass `refresh: true` to re-scan installed commands
-before planning or starting work.
+lightweight keyword fallback. Pass `category` when the agent caller knows
+the task type. Pass `refresh: true` to re-scan installed commands before
+planning or starting work.
 
 `ennodia_start` and `ennodia_run` also accept `skillIds`. Ennodia treats skills
-as native Agent Skills: folders containing `SKILL.md`, installed in the paths
-each harness already understands. It does not inline full skill content into the
+as native Agent Skills: folders containing `SKILL.md`, installed in paths
+supported by each harness. It does not inline full skill content into the
 delegated prompt. Task and run views include selected skill metadata in
 `appliedSkills`.
 
 `ennodia_estimate_budget`, `ennodia_estimate_compositional_budget`,
-`ennodia_start`, `ennodia_run`, and `ennodia_start_compare` support a `budget`
-object for local preflight enforcement. Budgeting is an input-token estimate plus
-child-task count guard. It does not claim to know provider billing, output
-tokens, cache behavior, harness-internal context, or private subscription
-quota.
+`ennodia_start`, `ennodia_run`, `ennodia_start_compare`,
+`ennodia_start_plan_advice`, and `ennodia_start_advised_plan` support a `budget`
+object for local preflight enforcement. Budgeting is an input-token estimate
+plus child-task count guard. It does not claim to know provider billing, output
+tokens, cache behavior, harness-internal context, or private subscription quota.
 
 ### Routing hints
 
 Ennodia uses `category` before keyword classification. Valid categories are
 `code`, `research`, `browser`, `image`, and `general`. The fallback classifier
-uses strong browser, image, code, and research signals; bare words such as
-`review` or `page` are not enough on their own. Pass `harnessId` to skip
+uses strong browser, image, code, and research signals. Bare words such as
+`review` or `page` do not route on their own. Pass `harnessId` to skip
 adapter choice and target a specific adapter.
 
 `harnessId` forces a specific adapter. Current adapter IDs are:
+
+Each adapter starts a supported command-line interface (CLI).
 
 | ID | Tool |
 | --- | --- |
@@ -76,8 +79,9 @@ and character counts.
 
 ### `ennodia_list_harnesses`
 
-Detects supported local AI tools and reports availability, runnable state,
-command path, version, capabilities, and adapter notes.
+Detects supported local artificial intelligence (AI) tools and reports
+availability, runnable state, command path, version, capabilities, and adapter
+notes.
 
 | Input | Default | Meaning |
 | --- | --- | --- |
@@ -133,9 +137,112 @@ child process.
 | `includeMermaid` | `true` | Include a presentational Mermaid route diagram. Set `false` for compact machine reads. |
 
 Returns the category, routing reasons, ordered candidate harness IDs, selected
-harness, whether parallel execution is suggested, whether Compare is suggested,
-and, by default, a Mermaid route diagram. Run and polling views do not embed
-that diagram.
+harness, parallel execution guidance, Judge + Result Advisor guidance, and, by
+default, a Mermaid route diagram. Run and
+polling views do not embed that diagram.
+
+## Plan Advisor
+
+Plan Advisor turns a natural-language task into a suggested team without making
+that suggestion executable by itself. Plan Advisor sees a frozen inventory of
+allowed harnesses, caller-approved models, installed skills, and hard size
+limits. It can propose only explicit worker slices containing a prompt, harness,
+optional model, and skill IDs. It cannot choose `cwd`, environment variables,
+arguments, permissions, isolation, timeouts, retries, or budgets.
+
+The lifecycle is deliberately two-phase: request and inspect advice first, then
+launch the exact validated plan in a separate call. Ennodia rejects invalid
+Plan Advisor output as a whole and revalidates the plan digest and current inventory
+before starting any worker.
+
+### `ennodia_start_plan_advice`
+
+Starts one Plan Advisor task. It starts no proposed worker task and returns an
+advice `id` for polling with `ennodia_get_plan_advice`.
+
+| Input | Default | Meaning |
+| --- | --- | --- |
+| `prompt` | required | Work for which Plan Advisor proposes a team. |
+| `cwd` | server process cwd | Target directory used only to inventory project skills. The Plan Advisor task runs in a separate empty temporary directory. |
+| `refresh` | `false` | Re-scan harnesses before freezing the inventory snapshot. |
+| `advisorHarnessId` | harness priority | Harness used for the single Plan Advisor task. |
+| `advisorModel` | Plan Advisor harness default | Optional model override for the Plan Advisor task. |
+| `allowedHarnessIds` | all runnable public adapters | Worker harness IDs the proposal may select. |
+| `allowedModels` | `{}` | Exact caller-approved worker model IDs grouped by harness. An omitted worker model means the harness default. |
+| `maxSlices` | `8` | Maximum explicit worker slices. Capped at 64 and by `budget.maxChildTasks` when supplied. |
+| `maxSkillsPerSlice` | `8` | Maximum native skills on one slice. Capped at 64. |
+| `maxTotalSkillAssignments` | `32` | Maximum skill assignments across the plan. Capped at 1024. |
+| `timeoutMs` | `300000` | Timeout for the one Plan Advisor task, capped at 1 hour. |
+| `budget.maxEstimatedInputTokens` | none | Fail before Plan Advisor starts, or reject its proposal, if the estimate exceeds this value. |
+| `budget.maxChildTasks` | none | Bound both the Plan Advisor start and proposed worker count. |
+
+The returned view begins in `advising`. Terminal states are `ready`, `consumed`,
+`invalid`, `failed`, and `cancelled`. Only `ready` advice can be authorized.
+Authorization changes the status to `consumed`. A consumed plan cannot run
+again. A ready view has a validated `plan` and `planDigest`.
+
+### `ennodia_get_plan_advice`
+
+Returns Plan Advisor status, validation issues, inventory snapshot ID, proposal,
+validated inert plan, and plan digest. It also returns budget checks, events,
+timing, and estimated time of arrival (ETA). A consumed view also returns
+`consumedAt`.
+
+| Input | Default | Meaning |
+| --- | --- | --- |
+| `adviceId` | required | ID returned by `ennodia_start_plan_advice`. |
+| `includeProposal` | `true` | Include the untrusted model-authored proposal when available. |
+| `includePlan` | `true` | Include the validated inert plan when ready. |
+| `includeEvents` | `true` | Include bounded lifecycle events. |
+| `maxEvents` | `100` | Maximum events to return. Capped at 300. Use 0 to omit them. |
+
+### `ennodia_start_advised_plan`
+
+Explicitly launches the exact plan from a `ready` advice result. Before the first
+worker starts, Ennodia checks the supplied digest and refreshes the inventory.
+It validates every harness and skill again. It confirms that explicit models
+remain in the unchanged caller allowlist and enforces the caller-owned runtime budget.
+
+Provider model availability remains unverified until its harness runs. Digest
+mismatch, inventory drift, or deterministic validation failure starts zero
+workers. Successful authorization consumes the advice before task launch. The
+same advice cannot authorize a second launch.
+
+| Input | Default | Meaning |
+| --- | --- | --- |
+| `adviceId` | required | Ready advice ID returned by `ennodia_start_plan_advice`. |
+| `expectedPlanDigest` | required | Exact `planDigest` returned by `ennodia_get_plan_advice`. |
+| `cwd` | inventoried directory | Working directory for worker tasks. |
+| `isolateCwd` | `false` | Run each worker against an ephemeral isolated copy of `cwd`. Isolation fails before task spawn if the copied tree contains a symbolic link. The reported task `cwd` is an execution trace. Ennodia deletes the temporary copy after the task becomes terminal. |
+| `timeoutMs` | `300000` | Per-worker timeout, capped at 1 hour. |
+| `budget.maxEstimatedInputTokens` | none | Fail before any worker starts if the exact plan estimate exceeds this value. |
+| `budget.maxChildTasks` | none | Fail before any worker starts if the exact slice count exceeds this value. |
+
+The response reports the frozen plan and digest, task IDs mapped to slice IDs,
+execution controls, and the budget check. It also reports unrequested installed
+skills observed on the selected harnesses. This operation does not automatically run the Judge
+and Result Advisor comparison.
+
+### `ennodia_cancel_plan_advice`
+
+Cancels an `advising` request and its single Plan Advisor task. Pass `adviceId` from
+`ennodia_start_plan_advice`. Calling it for a terminal request returns
+the existing terminal view.
+
+| Input | Default | Meaning |
+| --- | --- | --- |
+| `adviceId` | required | ID returned by `ennodia_start_plan_advice`. |
+
+### `ennodia_list_plan_advice`
+
+Lists recent Plan Advisor requests from the current MCP server process.
+
+| Input | Default | Meaning |
+| --- | --- | --- |
+| `includeProposal` | `false` | Include model-authored proposals. |
+| `includePlan` | `false` | Include validated inert plans. |
+| `includeEvents` | `false` | Include bounded event history. |
+| `maxEvents` | `25` | Maximum events per item when included. Capped at 300. |
 
 ### `ennodia_estimate_budget`
 
@@ -148,9 +255,9 @@ and checks optional limits.
 | `category` | fallback classifier | Optional caller-provided category. |
 | `harnessId` | planner choice | Force one adapter by ID. |
 | `mode` | `auto` | `auto`, `single`, or `parallel`. |
-| `compare` | `auto` | Include Compare in the estimate. |
+| `compare` | `auto` | Include the Judge + Result Advisor pass in the estimate. |
 | `refresh` | `false` | Re-scan harness discovery before planning. |
-| `maxOutputChars` | effective 24000 | Characters per successful task assumed for Compare; values above the judge prompt cap are estimated at 24000. |
+| `maxOutputChars` | effective 24000 | Characters assumed for each successful task in Compare. Ennodia estimates values above the Judge prompt cap at 24000. |
 | `budget.maxEstimatedInputTokens` | none | Mark the estimate exceeded above this input-token count. |
 | `budget.maxChildTasks` | none | Mark the estimate exceeded above this child-task count. |
 
@@ -164,18 +271,19 @@ input tokens and child task count without starting child processes.
 
 | Input | Default | Meaning |
 | --- | --- | --- |
-| `prompt` | required | Overall question or synthesis goal that every slice belongs to. |
+| `prompt` | required | Overall task or question that every slice belongs to. |
 | `slices[].id` | generated | Optional stable slice ID. Supplied IDs must be unique. |
 | `slices[].title` | none | Optional short label for the slice. |
 | `slices[].prompt` | required | Focused task prompt for the slice. |
 | `slices[].category` | fallback classifier | Optional caller-provided route category for this slice. |
 | `slices[].harnessId` | slice planner choice | Optional adapter ID for this slice. |
 | `slices[].model` | adapter default | Optional model override retained in the resolved slice summary. |
+| `slices[].skillIds` | inherited | Slice-specific native skill IDs. An explicit list, including `[]`, replaces batch `skillIds`. |
 | `cwd` | server process cwd | Optional working directory used to validate requested native skills. |
 | `refresh` | `false` | Re-scan harness discovery before resolving slice routes. |
-| `skillIds` | `[]` | Optional installed native skill IDs to validate against every selected slice harness. |
-| `includeCompareEstimate` | `true` | Include a later Compare pass in the returned budget estimate. |
-| `maxOutputChars` | effective 24000 | Characters per successful slice output assumed for Compare; values above the judge prompt cap are estimated at 24000. |
+| `skillIds` | `[]` | Default installed native skill IDs for slices that omit `slices[].skillIds`. |
+| `includeCompareEstimate` | `true` | Include a later Judge + Result Advisor pass in the returned budget estimate. |
+| `maxOutputChars` | effective 24000 | Characters assumed for each successful slice in Compare. Ennodia estimates values above the Judge prompt cap at 24000. |
 | `budget.maxEstimatedInputTokens` | none | Mark the estimate exceeded above this input-token count. |
 | `budget.maxChildTasks` | none | Mark the estimate exceeded above this child-task count. |
 
@@ -186,11 +294,12 @@ assumptions, subscription-limit check status, and exceeded issues.
 
 ### `ennodia_run`
 
-Starts the full orchestration: plan, execute one or more child tasks, optionally
-Compare successful outputs, and expose the final answer through `ennodia_get_run`.
-Runs usually take minutes; callers should poll `ennodia_get_run` with sensible
-spacing and trust `remainingMs`/`etaConfidence` instead of giving up after a few
-seconds.
+Starts the full orchestration. It plans and executes one or more child tasks.
+It can run the Judge + Result Advisor over successful outputs. It exposes the
+final answer through `ennodia_get_run`.
+
+Runs usually take minutes. Poll `ennodia_get_run` at sensible intervals. Trust
+`remainingMs` and `etaConfidence`. Do not give up after a few seconds.
 
 | Input | Default | Meaning |
 | --- | --- | --- |
@@ -199,22 +308,26 @@ seconds.
 | `harnessId` | planner choice | Force one adapter by ID. |
 | `mode` | `auto` | `auto`, `single`, or `parallel`. |
 | `cwd` | server process cwd | Working directory for child commands. |
+| `isolateCwd` | `false` | Run each selected harness against an ephemeral isolated copy of `cwd`. Isolation fails before task spawn if the copied tree contains a symbolic link. The reported task `cwd` is an execution trace. Ennodia deletes the temporary copy after the task becomes terminal. |
 | `model` | adapter default | Optional model override passed to task harnesses. |
 | `timeoutMs` | `300000` | Timeout for each child task, capped at 1 hour. |
 | `compare` | `auto` | `auto`, `true`, or `false`. |
 | `refresh` | `false` | Re-scan harness discovery before planning. |
-| `judgeHarnessId` | Compare priority | Harness used for the judge pass. |
-| `judgeModel` | judge default | Optional judge model override. |
-| `synthesizerHarnessId` | judge harness | Harness used for final synthesis. |
-| `synthesizerModel` | judge model | Optional synthesizer model override. |
-| `maxOutputChars` | `80000` | Characters per successful task loaded for Compare before the 24000-character judge-prompt cap. |
-| `skillIds` | `[]` | Optional list of installed native skill IDs to ask selected harnesses to use. |
+| `judgeHarnessId` | Compare priority | Harness used for the Judge pass. |
+| `judgeModel` | Judge default | Optional Judge model override. |
+| `advisorHarnessId` | Judge harness | Harness used for the Result Advisor pass. |
+| `advisorModel` | Result Advisor harness default | Optional Result Advisor model override. |
+| `synthesizerHarnessId` | deprecated | Compatibility alias for `advisorHarnessId`. Ennodia rejects conflicting values. |
+| `synthesizerModel` | deprecated | Compatibility alias for `advisorModel`. Ennodia rejects conflicting values. |
+| `maxOutputChars` | `80000` | Characters per successful task loaded for Compare before the 24000-character Judge prompt cap. |
+| `skillIds` | `[]` | Optional installed native skill IDs for selected harnesses. |
 | `budget.maxEstimatedInputTokens` | none | Fail before starting if estimated input tokens exceed this value. |
 | `budget.maxChildTasks` | none | Fail before starting if selected child tasks exceed this value. |
 
-Returns a run view with `id`, status, selected harnesses, child task IDs, Compare
-ID when one exists, events, timing, ETA, budget estimate/check, and final answer
-when already available. The important value is `id`; poll it with
+Returns a run view with `id`, status, selected harnesses, child task IDs,
+comparison ID when one exists, events, timing, ETA, and budget estimate/check.
+It also returns the final answer when available. The important value is `id`.
+Poll it with
 `ennodia_get_run`.
 
 ### `ennodia_get_run`
@@ -228,19 +341,19 @@ Returns the current run state.
 | `maxEvents` | `100` | Maximum run events to return. Capped at 300. |
 | `maxAnswerChars` | `80000` | Maximum final-answer characters. Capped at 200000. |
 
-Terminal run states are `succeeded`, `failed`, and `cancelled`. A run should not
-be considered complete before it reaches one of those states.
+Terminal run states are `succeeded`, `failed`, and `cancelled`. A run is not
+complete before it reaches one of those states.
 
 ### `ennodia_cancel_run`
 
-Cancels a high-level run and any active child task or Compare.
+Cancels a high-level run and any active child task, Judge, or Result Advisor.
 
 | Input | Default | Meaning |
 | --- | --- | --- |
 | `runId` | required | ID returned by `ennodia_run`. |
 
-Cancellation is explicit. A cancelled run should not be presented as a normal
-model failure.
+Cancellation is explicit. Do not present a run with `cancelled` status as a
+normal model failure.
 
 ### `ennodia_list_runs`
 
@@ -253,13 +366,13 @@ Lists runs started by the current MCP server process.
 | `maxAnswerChars` | `2000` | Maximum answer characters per run. Capped at 200000. |
 
 Live run history is bounded and in-memory. Restarting the MCP server clears
-in-progress state; terminal receipts can still be read through
+in-progress state. Terminal receipts remain available through
 `ennodia_history` when history is enabled.
 
 ### `ennodia_history`
 
 Lists terminal run snapshots persisted under the local history directory. Use it
-after a restart to inspect previous final answers and Compare disagreement
+after a restart to inspect previous final answers and Judge disagreement
 analysis.
 
 | Input | Default | Meaning |
@@ -274,8 +387,8 @@ runs. Set `ENNODIA_HISTORY=0` to opt out.
 
 ### `ennodia_start`
 
-Starts one or more raw child tasks without run-level Compare or final synthesis.
-Use it for debugging adapters or for manual Compare workflows.
+Starts one or more raw child tasks without a run-level Judge + Result Advisor
+pass. Use it for debugging adapters or manual comparison workflows.
 
 | Input | Default | Meaning |
 | --- | --- | --- |
@@ -284,10 +397,11 @@ Use it for debugging adapters or for manual Compare workflows.
 | `harnessId` | planner choice | Force one adapter by ID. |
 | `mode` | `single` | `single` or `parallel`. |
 | `cwd` | server process cwd | Working directory for child commands. |
+| `isolateCwd` | `false` | Run each task against an ephemeral isolated copy of `cwd`. Isolation fails before task spawn if the copied tree contains a symbolic link. The reported task `cwd` is an execution trace. Ennodia deletes the temporary copy after the task becomes terminal. |
 | `model` | adapter default | Optional model override. |
 | `timeoutMs` | `300000` | Timeout for each child task, capped at 1 hour. |
 | `refresh` | `false` | Re-scan harness discovery before planning. |
-| `skillIds` | `[]` | Optional list of installed native skill IDs to ask selected harnesses to use. |
+| `skillIds` | `[]` | Optional installed native skill IDs for selected harnesses. |
 | `budget.maxEstimatedInputTokens` | none | Fail before starting if estimated input tokens exceed this value. |
 | `budget.maxChildTasks` | none | Fail before starting if selected child tasks exceed this value. |
 
@@ -296,25 +410,27 @@ Returns started task IDs, the route plan, and the budget estimate/check.
 ### `ennodia_start_compositional`
 
 Starts one focused child task per slice. Use it for large reviews where each
-agent should inspect a smaller part of the problem. The tool returns task IDs;
+agent can inspect a smaller part of the problem. The tool returns task IDs.
 poll them with `ennodia_get_task`, then pass the useful completed task IDs to
 `ennodia_start_compare`.
 
 | Input | Default | Meaning |
 | --- | --- | --- |
-| `prompt` | required | Overall question or synthesis goal that every slice belongs to. |
+| `prompt` | required | Overall task or question that every slice belongs to. |
 | `slices[].id` | generated | Optional stable slice ID. Supplied IDs must be unique. |
 | `slices[].title` | none | Optional short label for the slice. |
 | `slices[].prompt` | required | Focused task prompt for the slice. |
 | `slices[].category` | fallback classifier | Optional caller-provided route category for this slice. |
 | `slices[].harnessId` | slice planner choice | Optional adapter ID for this slice. |
 | `slices[].model` | adapter default | Optional model override for this slice. |
+| `slices[].skillIds` | inherited | Slice-specific native skill IDs. An explicit list, including `[]`, replaces batch `skillIds`. |
 | `cwd` | server process cwd | Working directory for child commands. |
+| `isolateCwd` | `false` | Run each slice against an ephemeral isolated copy of `cwd`. Isolation fails before task spawn if the copied tree contains a symbolic link. The reported task `cwd` is an execution trace. Ennodia deletes the temporary copy after the task becomes terminal. |
 | `timeoutMs` | `300000` | Timeout for each slice task, capped at 1 hour. |
 | `refresh` | `false` | Re-scan harness discovery before resolving slice routes. |
-| `skillIds` | `[]` | Optional installed native skill IDs to ask every selected slice harness to use. |
-| `includeCompareEstimate` | `true` | Include a later Compare pass in the returned budget estimate. |
-| `maxOutputChars` | effective 24000 | Characters per successful slice output assumed for Compare; values above the judge prompt cap are estimated at 24000. |
+| `skillIds` | `[]` | Default installed native skill IDs for slices that omit `slices[].skillIds`. |
+| `includeCompareEstimate` | `true` | Include a later Judge + Result Advisor pass in the returned budget estimate. |
+| `maxOutputChars` | effective 24000 | Characters assumed for each successful slice in Compare. Ennodia estimates values above the Judge prompt cap at 24000. |
 | `budget.maxEstimatedInputTokens` | none | Fail before starting if estimated input tokens exceed this value. |
 | `budget.maxChildTasks` | none | Fail before starting if slice child tasks exceed this value. |
 
@@ -323,21 +439,21 @@ ready-to-use `compareNext` object for the later `ennodia_start_compare` call.
 
 ### `ennodia_get_compositional_status`
 
-Inspects several shard task IDs at once, groups their states, and returns the
-successful non-empty task IDs that are ready for Compare.
+Inspects multiple shard task IDs at once, groups their states, and returns the
+successful non-empty task IDs ready for a Judge + Result Advisor comparison.
 
 | Input | Default | Meaning |
 | --- | --- | --- |
 | `taskIds` | required | Shard task IDs returned by `ennodia_start_compositional`. |
-| `prompt` | none | Optional synthesis prompt included in `compareNext` when enough outputs are ready. |
+| `prompt` | none | Optional comparison prompt included in `compareNext` when the minimum outputs are ready. |
 | `minSuccessfulTasksForCompare` | `2` | Minimum successful non-empty outputs required for `compareReady`. |
 | `includeOutput` | `false` | Include bounded stdout and stderr previews for known tasks. |
 | `maxOutputChars` | `2000` | Maximum stdout and stderr characters per task when output is included. |
 
 The response includes `readyTaskIds`, `runningTaskIds`, `failedTaskIds`,
-`cancelledTaskIds`, `emptySucceededTaskIds`, `missingTaskIds`, grouped counts,
-compact task summaries, and `compareNext` when a synthesis prompt was supplied
-and enough task outputs are ready.
+`cancelledTaskIds`, `emptySucceededTaskIds`, and `missingTaskIds`. It includes
+grouped counts, compact task summaries, and `compareNext` when a comparison
+prompt was supplied and the minimum task outputs are ready.
 
 ### `ennodia_get_task`
 
@@ -345,11 +461,11 @@ Returns task status, captured output, events, timing, and ETA.
 
 | Input | Default | Meaning |
 | --- | --- | --- |
-| `taskId` | required | ID returned by `ennodia_start`, `ennodia_run`, or Compare. |
+| `taskId` | required | ID returned by a raw, compositional, advised-plan, run, Plan Advisor, or Compare start. |
 | `includeOutput` | `true` | Include bounded stdout and stderr. |
 | `includeEvents` | `true` | Include bounded task events. |
-| `maxOutputChars` | `200000` | Maximum stdout and stderr characters. Capped at 200000. |
-| `maxEvents` | `300` | Maximum task events. Capped at 300. |
+| `maxOutputChars` | `20000` | Maximum stdout and stderr characters. Capped at 200000. |
+| `maxEvents` | `100` | Maximum task events. Capped at 300. |
 
 A task is terminal only after the child process exits and stdout/stderr have
 drained or timed out visibly.
@@ -358,16 +474,32 @@ drained or timed out visibly.
 
 Cancels a running task by task ID.
 
+| Input | Default | Meaning |
+| --- | --- | --- |
+| `taskId` | required | ID returned by a task start. |
+
 ### `ennodia_list_tasks`
 
 Lists recent tasks started by the current MCP server process. By default it
-returns a compact view; request output or events only when you need them.
+returns a compact view. Request output or events only when you need them.
 
-## Compare
+| Input | Default | Meaning |
+| --- | --- | --- |
+| `includeOutput` | `false` | Include bounded stdout and stderr previews for each task. |
+| `includeEvents` | `false` | Include bounded task events for each task. |
+| `maxOutputChars` | `4000` | Maximum stdout and stderr characters per task. Capped at 200000. |
+| `maxEvents` | `25` | Maximum events per task. Capped at 300. |
+
+## Judge + Result Advisor
+
+The existing `ennodia_*_compare` tool names remain for compatibility. Their
+public workflow is Judge + Result Advisor: the Judge analyzes the candidates,
+then Result Advisor produces the final recommendation. Result Advisor can degrade
+visibly to candidate-only advice when Judge analysis is unavailable.
 
 ### `ennodia_start_compare`
 
-Runs a judge pass and then a synthesizer pass over completed Ennodia tasks or
+Runs a Judge pass and then a Result Advisor pass over completed Ennodia tasks or
 caller-supplied responses.
 
 | Input | Default | Meaning |
@@ -375,28 +507,53 @@ caller-supplied responses.
 | `prompt` | required | Original user task or question the candidates answer. |
 | `taskIds` | `[]` | Completed Ennodia task IDs to compare. |
 | `responses` | `[]` | Caller-supplied responses with IDs, labels, and text. |
-| `judgeHarnessId` | Compare priority | Harness used for the judge pass. |
-| `judgeModel` | judge default | Optional judge model override. |
-| `synthesizerHarnessId` | judge harness | Harness used for final synthesis. |
-| `synthesizerModel` | judge model | Optional synthesizer model override. |
-| `maxOutputChars` | `80000` | Characters per task candidate loaded for Compare before the 24000-character judge-prompt cap. |
-| `budget.maxEstimatedInputTokens` | none | Fail before starting if estimated judge/synthesizer input tokens exceed this value. |
-| `budget.maxChildTasks` | none | Fail before starting if the judge plus synthesizer task count exceeds this value. |
+| `judgeHarnessId` | Compare priority | Harness used for the Judge pass. |
+| `judgeModel` | Judge default | Optional Judge model override. |
+| `advisorHarnessId` | Judge harness | Harness used for the Result Advisor pass. |
+| `advisorModel` | Result Advisor harness default | Optional Result Advisor model override. |
+| `synthesizerHarnessId` | deprecated | Compatibility alias for `advisorHarnessId`. Ennodia rejects conflicting values. |
+| `synthesizerModel` | deprecated | Compatibility alias for `advisorModel`. Ennodia rejects conflicting values. |
+| `cwd` | server process cwd | Working directory for the Judge and Result Advisor tasks. |
+| `timeoutMs` | `300000` | Timeout for each child task. Capped at 1 hour. |
+| `maxOutputChars` | `80000` | Characters per task candidate loaded for Compare before the 24000-character Judge prompt cap. |
+| `budget.maxEstimatedInputTokens` | none | Fail before starting if estimated Judge/Result Advisor input tokens exceed this value. |
+| `budget.maxChildTasks` | none | Fail before starting if the Judge plus Result Advisor task count exceeds this value. |
 
-Compare asks the judge for agreements, contradictions, unique insights, blind
-spots, and risks. The synthesizer uses that analysis plus the original
-candidates to produce one answer. This is model-led comparison, not formal
-voting.
+Compare requests that the Judge map agreements, contradictions, unique insights,
+blind spots, and risks. The Result Advisor uses that analysis plus the original
+candidates to return a typed answer, basis, confidence, and open questions.
+This is model-led comparison, not formal voting.
 
 ### `ennodia_get_compare`
 
-Returns Compare status, candidate inputs, judge analysis, synthesis, child task
-IDs, timing, and ETA.
+Returns comparison status, candidate inputs, Judge analysis, and typed Result
+Advisor output, child task IDs, degradation events, timing, and ETA. Deprecated
+`synthesis` fields remain available for compatibility.
+
+| Input | Default | Meaning |
+| --- | --- | --- |
+| `compareId` | required | ID returned by `ennodia_start_compare` or `ennodia_run`. |
+| `includeCandidates` | `true` | Include bounded candidate response previews. |
+| `includeEvents` | `true` | Include bounded Judge and Result Advisor events. |
+| `maxCandidateChars` | `8000` | Maximum characters per candidate. Capped at 200000. |
+| `maxEvents` | `100` | Maximum comparison events. Capped at 300. |
 
 ### `ennodia_cancel_compare`
 
-Cancels a running Compare and its active child task.
+Cancels a running Judge + Result Advisor comparison and its active child task.
+
+| Input | Default | Meaning |
+| --- | --- | --- |
+| `compareId` | required | ID returned by `ennodia_start_compare` or `ennodia_run`. |
 
 ### `ennodia_list_compares`
 
-Lists recent Compare runs started by the current MCP server process.
+Lists recent Judge + Result Advisor comparisons started by the current MCP
+server process.
+
+| Input | Default | Meaning |
+| --- | --- | --- |
+| `includeCandidates` | `false` | Include bounded candidate response previews for each comparison. |
+| `includeEvents` | `false` | Include bounded Judge and Result Advisor events. |
+| `maxCandidateChars` | `2000` | Maximum characters per candidate. Capped at 200000. |
+| `maxEvents` | `25` | Maximum events per comparison. Capped at 300. |

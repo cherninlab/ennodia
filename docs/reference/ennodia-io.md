@@ -1,17 +1,22 @@
 ---
 title: Ennodia IO
-description: The local interface for app-facing AI provider options and chat calls.
+description: The local interface for app-facing artificial intelligence (AI) provider options and chat calls.
 ---
 
-Ennodia IO is a local HTTP server over the same Ennodia Core used
-by the MCP tools. It is useful when an app wants BYOK-style settings without
-asking the user for a provider API key first. The app can ask Ennodia what local
-agents are installed and runnable, show those options in its own settings UI,
-then send chat-style requests to the selected local option.
+Ennodia IO is a local Hypertext Transfer Protocol (HTTP) server for artificial
+intelligence (AI) provider options. It uses the same Ennodia Core as the Model
+Context Protocol (MCP) tools. It supports a bring your own key (BYOK) setup
+without requiring a provider application programming interface (API) key.
+The app can show runnable local agents in its user interface (UI). It can then
+send chat-style requests to one option.
 
 It is not a hosted model router. Ennodia does not sell model access, proxy
 provider billing, or hide which local agents ran. IO ships as the separate
 `@cherninlab/ennodia-io` package.
+
+When Compare is enabled, Ennodia keeps the roles explicit. The Judge evaluates
+candidate results. The Result Advisor combines the Judge analysis and candidate
+evidence into the final answer.
 
 ## Start IO
 
@@ -57,10 +62,10 @@ Environment variables:
 IO binds to loopback by default and refuses non-loopback hosts unless an API key
 is configured. Bearer tokens are compared with a timing-safe comparison.
 
-IO intentionally sends no CORS headers by default. Browser-based local apps are
-therefore blocked by the browser unless they proxy through their own local
-origin. There is no `--cors-origin` flag yet; add one only when a real app needs
-that trust boundary.
+IO intentionally sends no Cross-Origin Resource Sharing (CORS) headers by
+default. The browser blocks local apps unless they use their own local proxy.
+There is no `--cors-origin` flag. Add one only when an app needs that trust
+boundary.
 
 ## Routes
 
@@ -108,7 +113,7 @@ Option statuses:
 | Status | Meaning |
 | --- | --- |
 | `ready` | The local agent is runnable now. |
-| `installed` | An app or partial install was detected, but Ennodia cannot run it through a supported CLI surface yet. |
+| `installed` | An app or partial install was detected, but Ennodia cannot run it through a supported command-line interface (CLI) surface yet. |
 | `missing` | The supported local agent was not found. |
 
 Add `?includeUnavailable=false` to return only ready options.
@@ -120,11 +125,11 @@ Add `?includeUnavailable=false` to return only ready options.
 | Model | Meaning |
 | --- | --- |
 | `local/auto` | Let Ennodia choose the local harness. |
-| `local/compare` | Run parallel local harnesses and synthesize with Compare. |
+| `local/compare` | Run parallel local harnesses, evaluate them with the Judge, and combine the result with the Result Advisor. |
 | `local/<harness-id>` | Force a specific harness, such as `local/codex` or `local/claude-code`. |
 
 Older aliases `ennodia-auto`, `ennodia/auto`, and `ennodia/compare` are accepted
-for compatibility, but new app integrations should prefer `local/*` IDs.
+for compatibility. Prefer `local/*` IDs in new app integrations.
 
 ## Chat Completions
 
@@ -183,31 +188,32 @@ Supported `ennodia` fields:
 | `timeoutMs` | Per-child timeout, capped at one hour. |
 | `refresh` | Re-scan harnesses before planning. |
 | `judgeHarnessId`, `judgeModel` | Compare judge overrides. |
-| `synthesizerHarnessId`, `synthesizerModel` | Compare synthesizer overrides. |
+| `advisorHarnessId`, `advisorModel` | Compare Result Advisor overrides. |
+| `synthesizerHarnessId`, `synthesizerModel` | Deprecated aliases for `advisorHarnessId` and `advisorModel`. If both forms are supplied, their values must match. |
 | `maxOutputChars` | Candidate output cap for Compare. |
 | `maxWaitMs` | HTTP request wait cap, capped at one hour. |
 
 Chat completions are non-streaming. A request waits until the Ennodia run
-finishes or `maxWaitMs` elapses; the default is 10 minutes. Disable streaming in
+finishes or `maxWaitMs` elapses. The default is 10 minutes. Disable streaming in
 OpenAI-compatible clients and set `ennodia.maxWaitMs` when the client or proxy
 needs a shorter or longer hold time.
 
 The response includes the normal OpenAI-style `choices[0].message.content` plus
-an `ennodia` object with the run ID, status, selected harnesses, task IDs,
-Compare ID when present, and budget estimate.
+an `ennodia` object. The object contains the run ID, status, selected harnesses,
+task IDs, Compare ID when present, and budget estimate.
 
 Limits and failures are returned as JSON with `cache-control: no-store`:
 
 - request body above the configured cap -> `413 request_too_large`
 - saturated chat completions -> `429 rate_limit_error` with `retry-after: 1`
-- client abort after the run starts -> `499 client_closed_request`; IO cancels
+- client abort after the run starts -> `499 client_closed_request`. IO cancels
   the Ennodia run when Core exposes cancellation
 - timeout, disappeared run, or start failure -> `502 ennodia_run_error`
-- failed or cancelled terminal run -> `502 ennodia_run_failed` plus run metadata
+- failed run or run with `cancelled` status -> `502 ennodia_run_failed` plus run metadata
 
 ## Library Use
 
-Apps can import the same primitives instead of running the HTTP server:
+Apps can import the same primitives without running the HTTP server:
 
 ```ts
 import { createDefaultEnnodiaCore } from "ennodia";
@@ -244,5 +250,5 @@ IO deliberately rejects or omits:
 - IO-specific history endpoints. Terminal run history is written by Core when
   history is enabled, but IO does not expose a read API for it.
 
-Use MCP when an agent should inspect detailed run, task, and Compare state while
-work is still in progress. Use IO when a local app needs a small HTTP bridge.
+Use MCP to inspect detailed run, task, Judge, Result Advisor, and Compare state
+while work is in progress. Use IO when a local app needs a small HTTP bridge.

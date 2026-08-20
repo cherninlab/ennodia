@@ -53,6 +53,8 @@ export type EstimateCompareBudgetInput = {
   taskCandidateCount: number;
   responseCandidateChars: number;
   judgeHarnessId?: string;
+  advisorHarnessId?: string;
+  /** @deprecated Use advisorHarnessId. */
   synthesizerHarnessId?: string;
   maxOutputChars?: number;
 };
@@ -60,7 +62,7 @@ export type EstimateCompareBudgetInput = {
 const CHARS_PER_TOKEN = 4;
 export const DEFAULT_COMPARE_MAX_OUTPUT_CHARS = 80_000;
 const COMPARE_JUDGE_OVERHEAD_CHARS = 2_400;
-const COMPARE_SYNTHESIZER_OVERHEAD_CHARS = 1_600;
+const COMPARE_ADVISOR_OVERHEAD_CHARS = 1_600;
 const NATIVE_SKILL_PROMPT_OVERHEAD_CHARS = 220;
 
 export function estimateRunBudget(
@@ -155,10 +157,11 @@ export function estimateTaskBatchBudget(
 export function estimateCompareBudget(
   input: EstimateCompareBudgetInput,
 ): BudgetEstimate {
+  const advisorHarnessId = resolveCompareAdvisorHarnessId(input);
   const maxOutputCharsPerCandidate = compareCandidateChars(input.maxOutputChars);
   const selectedHarnessIds = [
     ...new Set(
-      [input.judgeHarnessId, input.synthesizerHarnessId ?? input.judgeHarnessId]
+      [input.judgeHarnessId, advisorHarnessId ?? input.judgeHarnessId]
         .filter((id): id is string => Boolean(id)),
     ),
   ];
@@ -184,7 +187,7 @@ export function estimateCompareBudget(
     tokenEstimateRatio: `1 token ~= ${CHARS_PER_TOKEN} characters`,
     assumptions: [
       "Budgeting is a preflight input-token estimate, not a provider bill.",
-      "Direct Compare starts a judge task and a synthesizer task.",
+      "Direct Compare starts one Judge task and one Result Advisor task.",
       `Task candidates are estimated at the lower of maxOutputChars and ${MAX_PROMPT_CANDIDATE_CHARS} characters; direct response candidates use their provided text length.`,
       "Output tokens, tool calls, cache behavior, and provider pricing are not known before a run starts.",
       "Subscription quota checks use supported CLI/API surfaces only; Ennodia does not inspect private account pages or provider-private APIs.",
@@ -237,11 +240,27 @@ function estimateCompareInputTokens(input: {
 }): number {
   const judgeChars =
     input.promptChars + input.candidateChars + COMPARE_JUDGE_OVERHEAD_CHARS;
-  const synthesizerChars =
-    input.promptChars + input.candidateChars + COMPARE_SYNTHESIZER_OVERHEAD_CHARS;
+  const advisorChars =
+    input.promptChars + input.candidateChars + COMPARE_ADVISOR_OVERHEAD_CHARS;
 
   return estimateTokensFromChars(judgeChars) +
-    estimateTokensFromChars(synthesizerChars);
+    estimateTokensFromChars(advisorChars);
+}
+
+function resolveCompareAdvisorHarnessId(
+  input: EstimateCompareBudgetInput,
+): string | undefined {
+  if (
+    input.advisorHarnessId !== undefined &&
+    input.synthesizerHarnessId !== undefined &&
+    input.advisorHarnessId !== input.synthesizerHarnessId
+  ) {
+    throw new Error(
+      "Conflicting Compare fields: advisorHarnessId and deprecated synthesizerHarnessId.",
+    );
+  }
+
+  return input.advisorHarnessId ?? input.synthesizerHarnessId;
 }
 
 function estimateTokensFromChars(chars: number): number {

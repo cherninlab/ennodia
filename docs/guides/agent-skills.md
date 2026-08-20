@@ -1,14 +1,16 @@
 ---
-title: Using Agent Skills
-description: Install bundled Ennodia skills into native harness locations and ask child agents to use them during a run.
+title: Agent Skills
+description: Install bundled Ennodia skills in native harness locations and tell child agents to use them during a run.
 ---
 
-Ennodia uses native Agent Skills. A skill is a folder containing `SKILL.md`
-installed where each harness already knows how to find skills.
+Ennodia uses native Agent Skills. A skill is a folder that contains `SKILL.md`.
+Install it where each harness can find skills.
 
-Ennodia does not invent a private skill format and does not inline full skill
-instructions into every delegated prompt. It installs or discovers the native
-skill folder, then passes the selected `skillIds` into the run.
+Ennodia does not use a private skill format. It does not put the full skill
+instructions in each delegated prompt.
+
+Ennodia installs or discovers the native skill folder. It then passes the
+selected `skillIds` into the run.
 
 ## List Available Skills
 
@@ -26,8 +28,8 @@ directories, and load warnings.
 
 ## Preview Installation
 
-Bundled skills default to dry-run installation so the caller can inspect planned
-writes before anything changes:
+Bundled skills use dry-run installation by default. The caller can inspect the
+planned writes before any change:
 
 ```json
 {
@@ -50,7 +52,7 @@ Review the planned paths. If they are correct, repeat with `dryRun: false`.
 {
   "tool": "ennodia_run",
   "arguments": {
-    "prompt": "Audit these docs against the linked sources and recommend exact edits.",
+    "prompt": "Audit this documentation against the linked sources and recommend exact edits.",
     "mode": "parallel",
     "compare": true,
     "skillIds": ["source-grounded-audit"]
@@ -65,8 +67,8 @@ Bundled skills include:
 
 | Skill | Use it for |
 | --- | --- |
-| `source-grounded-audit` | Checking claims against repository files, standards, or product docs. |
-| `compositional-audit` | Keeping one shard of a larger review focused and easy to synthesize. |
+| `source-grounded-audit` | Check claims against repository files, standards, or product documentation. |
+| `compositional-audit` | Limit one shard of a large review to one clear scope. |
 | `rigorous-review` | General correctness and risk review. |
 | `release-readiness` | Public release candidate checks. |
 | `benchmark-critic` | Benchmark credibility and reproducibility review. |
@@ -80,4 +82,5 @@ Bundled skills include:
 | OpenCode | `.opencode/skills` | `~/.config/opencode/skills` |
 | Antigravity | `.agent/skills` | `~/.gemini/antigravity/skills` |
 
-See [MCP Tools](/docs/reference/mcp-tools/) for the exact tool parameters.
+See [Model Context Protocol (MCP) Tools](/docs/reference/mcp-tools/) for the
+exact tool parameters.

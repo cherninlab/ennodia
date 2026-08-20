@@ -6,7 +6,7 @@ review.
 ## Prerequisites
 
 - Bun `1.3.14` or newer
-- Local AI tools only when you are changing or testing their adapters
+- Local artificial intelligence (AI) tools only when you change or test their adapters
 
 ## Local workflow
 
@@ -21,8 +21,9 @@ bun run verify
 - Oxlint
 - Bun tests
 - website build
+- controlled-English deterministic checks
 - task smoke test
-- MCP smoke test
+- Model Context Protocol (MCP) smoke test
 
 Before changing release metadata, package contents, or registry config, also run:
 
@@ -35,7 +36,8 @@ bun run release:check
 - Keep adapters thin. Put shared routing, tracing, task lifecycle, recovery, and
   Compare behavior in core modules.
 - Do not add permission-bypass flags to harness commands by default.
-- Do not call provider-private APIs. Use supported CLI or API surfaces.
+- Do not call provider-private application programming interfaces (APIs).
+  Use supported command-line interface (CLI) or API surfaces.
 - Keep progress and status output compact and factual.
 - Keep docs, website copy, package metadata, and MCP behavior aligned in the
   same change when public behavior changes.
@@ -46,10 +48,11 @@ bun run release:check
 
 `bin/ennodia` is the executable used by npm, `bunx`, and `npx`.
 `src/cli.ts` starts the stdio MCP server only.
-`src/index.ts` is the side-effect-free TypeScript export surface for JSR and
-imports.
-`packages/ennodia-io` is the experimental local HTTP package. It owns the
-`ennodia-io` binary and imports Core from the `ennodia` package surface; the
+`src/index.ts` is the side-effect-free TypeScript export surface for the
+JavaScript Registry (JSR) and imports.
+`packages/ennodia-io` is the experimental local Hypertext Transfer Protocol
+(HTTP) package. It owns the
+`ennodia-io` binary and imports Core from the `ennodia` package surface. The
 root package must not ship the HTTP server.
 
 ## Releasing
@@ -57,13 +60,16 @@ root package must not ship the HTTP server.
 Releases are cut by a maintainer, not part of a normal contribution. This
 section exists so the process is written down.
 
-**Versioning.** Prerelease versions use SemVer suffixes such as `0.1.0-rc.1`;
+**Versioning.** Prerelease versions use SemVer suffixes such as `0.1.0-rc.1`.
 stable versions omit the suffix, such as `0.1.0`. The source of truth is the
-root `package.json` version; `bun run version:sync` derives `jsr.json`,
-`src/version.ts`, and the IO package version/peer dependency from it. `bun test`
-verifies they match.
+root `package.json` version.
 
-**Dist-tags.** Tags containing a hyphen publish to npm's `next` dist-tag;
+`bun run version:sync` derives `jsr.json`,
+`src/version.ts`, `server.json`, `manifest.json`, and the IO package version.
+It also derives the IO dependency on the core version. `bun test` verifies
+that the versions match.
+
+**Dist-tags.** Tags containing a hyphen publish to npm's `next` dist-tag.
 tags without a hyphen publish to `latest`:
 
 ```bash
@@ -73,7 +79,7 @@ git tag v0.1.0 && git push origin v0.1.0             # publishes to latest
 
 Since `v0.1.0`, docs recommend the unqualified `ennodia` install, which npm
 resolves to the `latest` dist-tag. Prerelease work between stable releases
-still publishes to `next`; recommend `ennodia@next` in docs only while a fix
+still publishes to `next`. Recommend `ennodia@next` in docs only while a fix
 exists solely on that channel.
 
 **Release checklist.**
@@ -89,44 +95,62 @@ exists solely on that channel.
 3. Commit the version change.
 4. Push a matching tag, for example `v0.1.0-rc.1`.
 5. The `Release` GitHub Actions workflow publishes the core `ennodia` package
-   to npm and JSR, plus the GitHub release asset. Until the workflow is updated
-   to publish both packages, `@cherninlab/ennodia-io` is published manually by a
-   maintainer after the core package version it peers against is available.
+   to npm and JSR, then `@cherninlab/ennodia-io` to npm, the MCP Registry
+   listing, and the GitHub release asset. Re-running a release is safe when a
+   prior attempt published one of these immutable versions.
 
-**Package contents.** The core npm package must include `bin/ennodia`, the source
-files the Bun runtime needs, README/LICENSE/CONTRIBUTING/docs, and benchmark
-fixtures — and must not include `.github/`, `AGENTS.md`, `CLAUDE.md`,
-`bun.lock`, `src/dev/`, `src/io.ts`, `*.test.ts`, `packages/`, or `website/`.
+**Package contents.** The core npm package must include these items:
+
+- `bin/ennodia`
+- source files that the Bun runtime needs
+- README, LICENSE, CONTRIBUTING, and documentation files
+- benchmark fixtures
+
+The core npm package must not include these items:
+
+- `.github/`, `AGENTS.md`, or `CLAUDE.md`
+- `bun.lock`, `src/dev/`, or `src/io.ts`
+- `*.test.ts`, `packages/`, or `website/`
+
 JSR publishes the TypeScript source and docs, but not benchmark fixtures.
 The IO npm package must include `bin/ennodia-io`, its `src/` files, and its
-README, and keeps `ennodia` as a peer dependency. `bun run release:check`
-enforces these lists.
+README. It has an exact runtime dependency on the matching `ennodia` version.
+The release workflow publishes the core package first. The IO package stays
+outside the root Bun workspace so an unpublished next version does not block
+the root install. `bun run release:check` enforces these rules.
 
-**Registry publishing.** Both npm and JSR publish from GitHub Actions using
-OIDC — there is no long-lived `NPM_TOKEN`. To reconfigure a trusted
-publisher: npm needs provider "GitHub Actions", org/user `cherninlab`,
-repository `ennodia`, workflow filename `release.yml`, allowed action
-`npm publish`; JSR needs scope `@cherninlab`, package `ennodia`, linked
-repository `cherninlab/ennodia`.
+**Registry publishing.** npm publishes use the repository `NPM_TOKEN` secret.
+The workflow passes it to npm as `NODE_AUTH_TOKEN`. JSR uses GitHub Actions
+OpenID Connect (OIDC) without a JSR token.
+
+Link scope `@cherninlab`, package `ennodia`, to
+`cherninlab/ennodia` in JSR package settings. The workflow's `id-token: write`
+permission enables that authentication. To reconfigure npm, ensure the token
+can publish both `ennodia` and `@cherninlab/ennodia-io` with public access.
 
 **MCP registry listing.** The official MCP Registry
-(`registry.modelcontextprotocol.io`) hosts metadata only; npm remains the
+(`registry.modelcontextprotocol.io`) hosts metadata only. npm remains the
 artifact source. The listing is defined by `server.json` at the repo root,
 and npm-side ownership is verified through the `mcpName` field in
-`package.json` (`io.github.cherninlab/ennodia`) — the two names must match.
+`package.json`. Its value must match `io.github.cherninlab/ennodia` in
+`server.json`.
 To publish or update the listing after the npm package is live:
 
 ```sh
 brew install mcp-publisher        # or download from the registry's releases
-mcp-publisher login github        # device-code flow; grants io.github.cherninlab/*
+mcp-publisher login github        # interactive local login; grants io.github.cherninlab/*
 mcp-publisher publish             # validates and submits server.json
 ```
 
-Keep the `version` fields in `server.json` in step with releases; the
-listing is per-version, so re-run `mcp-publisher publish` after each stable
-release. Community aggregators (Glama, PulseMCP, mcp.so, Smithery) index
+The release workflow uses the non-interactive GitHub Actions OIDC equivalent:
+`mcp-publisher login github-oidc --registry=https://registry.modelcontextprotocol.io`.
+This also requires the workflow's `id-token: write` permission.
+
+Keep the `version` fields in `server.json` in step with releases. The
+listing is per-version, so re-run `mcp-publisher publish` after each release.
+Community aggregators (Glama, PulseMCP, mcp.so, Smithery) index
 GitHub and the official registry automatically or accept one-time
-submissions; they do not need per-release updates.
+submissions. They do not need per-release updates.
 
 ## Benchmarks
 

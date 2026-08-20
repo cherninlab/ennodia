@@ -99,12 +99,41 @@ const ennodiaOptionsSchema = z
     refresh: z.boolean().optional(),
     judgeHarnessId: z.string().min(1).optional(),
     judgeModel: z.string().min(1).optional(),
+    advisorHarnessId: z.string().min(1).optional(),
+    advisorModel: z.string().min(1).optional(),
     synthesizerHarnessId: z.string().min(1).optional(),
     synthesizerModel: z.string().min(1).optional(),
     maxOutputChars: z.number().int().nonnegative().max(MAX_OUTPUT_CHARS).optional(),
     maxWaitMs: z.number().int().positive().max(MAX_WAIT_MS).optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((options, context) => {
+    if (
+      options.advisorHarnessId !== undefined &&
+      options.synthesizerHarnessId !== undefined &&
+      options.advisorHarnessId !== options.synthesizerHarnessId
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["synthesizerHarnessId"],
+        message:
+          "synthesizerHarnessId must match advisorHarnessId when both are provided.",
+      });
+    }
+
+    if (
+      options.advisorModel !== undefined &&
+      options.synthesizerModel !== undefined &&
+      options.advisorModel !== options.synthesizerModel
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["synthesizerModel"],
+        message:
+          "synthesizerModel must match advisorModel when both are provided.",
+      });
+    }
+  });
 
 const chatMessageSchema = z
   .object({
@@ -361,8 +390,10 @@ async function handleChatCompletionsInner(
       refresh: parsed.data.ennodia?.refresh,
       judgeHarnessId: parsed.data.ennodia?.judgeHarnessId,
       judgeModel: parsed.data.ennodia?.judgeModel,
-      synthesizerHarnessId: parsed.data.ennodia?.synthesizerHarnessId,
-      synthesizerModel: parsed.data.ennodia?.synthesizerModel,
+      advisorHarnessId: parsed.data.ennodia?.advisorHarnessId ??
+        parsed.data.ennodia?.synthesizerHarnessId,
+      advisorModel: parsed.data.ennodia?.advisorModel ??
+        parsed.data.ennodia?.synthesizerModel,
       maxOutputChars: parsed.data.ennodia?.maxOutputChars,
     });
     finalRun = await waitForRun(core, run.id, {

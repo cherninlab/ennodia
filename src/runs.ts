@@ -77,7 +77,11 @@ export type RunStartInput = {
   refresh?: boolean;
   judgeHarnessId?: string;
   judgeModel?: string;
+  advisorHarnessId?: string;
+  advisorModel?: string;
+  /** @deprecated Use advisorHarnessId. */
   synthesizerHarnessId?: string;
+  /** @deprecated Use advisorModel. */
   synthesizerModel?: string;
   maxOutputChars?: number;
   skills?: Skill[];
@@ -215,6 +219,8 @@ export class RunManager {
     if (this.shuttingDown) {
       throw new Error("RunManager is shutting down.");
     }
+
+    validateRunAdvisorAliases(input);
 
     const harnesses = await this.dependencies.discoverHarnesses({
       refresh: input.refresh,
@@ -480,6 +486,8 @@ export class RunManager {
       taskIds,
       judgeHarnessId: input.judgeHarnessId,
       judgeModel: input.judgeModel,
+      advisorHarnessId: input.advisorHarnessId,
+      advisorModel: input.advisorModel,
       synthesizerHarnessId: input.synthesizerHarnessId,
       synthesizerModel: input.synthesizerModel,
       cwd: input.cwd,
@@ -499,13 +507,15 @@ export class RunManager {
       return;
     }
 
-    if (result.status === "succeeded" && result.synthesis?.text.trim()) {
+    const finalAnswer = result.advisor?.answer.trim() ||
+      result.synthesis?.text.trim();
+    if (result.status === "succeeded" && finalAnswer) {
       this.pushEvent(run, {
         type: "compare-succeeded",
         compareId: compare.id,
-        message: "Compare returned the final answer.",
+        message: "Compare returned the Advisor recommendation.",
       });
-      this.succeedRun(run, result.synthesis.text.trim());
+      this.succeedRun(run, finalAnswer);
       return;
     }
 
@@ -930,9 +940,45 @@ function compareTaskIds(compare: CompareView | undefined): string[] {
     return [];
   }
 
-  return [compare.judgeTaskId, compare.synthesizerTaskId].filter(
-    (taskId): taskId is string => Boolean(taskId),
+  return [
+    ...new Set([
+      compare.judgeTaskId,
+      compare.advisorTaskId,
+      compare.synthesizerTaskId,
+    ].filter((taskId): taskId is string => Boolean(taskId))),
+  ];
+}
+
+function validateRunAdvisorAliases(input: RunStartInput): void {
+  validateRunAliasPair(
+    "advisorHarnessId",
+    input.advisorHarnessId,
+    "synthesizerHarnessId",
+    input.synthesizerHarnessId,
   );
+  validateRunAliasPair(
+    "advisorModel",
+    input.advisorModel,
+    "synthesizerModel",
+    input.synthesizerModel,
+  );
+}
+
+function validateRunAliasPair(
+  preferredName: string,
+  preferredValue: string | undefined,
+  legacyName: string,
+  legacyValue: string | undefined,
+): void {
+  if (
+    preferredValue !== undefined &&
+    legacyValue !== undefined &&
+    preferredValue !== legacyValue
+  ) {
+    throw new Error(
+      `Conflicting Run fields: ${preferredName} and deprecated ${legacyName}.`,
+    );
+  }
 }
 
 function isTerminalRun(run: InternalRun): boolean {

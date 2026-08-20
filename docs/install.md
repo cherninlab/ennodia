@@ -1,11 +1,10 @@
 ---
 title: Installation for Agents
-description: A copy-paste setup page for agents installing Ennodia into Codex, Claude Code, OpenCode, Antigravity, and other MCP clients.
+description: A copy-paste installation page for agents that install Ennodia in Codex, Claude Code, OpenCode, Antigravity, and other Model Context Protocol (MCP) clients.
 ---
 
-This page is for the agent doing the setup. If the user gave you this link, the
-goal is to install Ennodia as a local MCP server and turn it on in the MCP
-client they use.
+This page is for the agent that does the installation. Install Ennodia as a local Model
+Context Protocol (MCP) server. Then enable it in the user's MCP client.
 
 ## Copy-Paste Prompt
 
@@ -15,18 +14,18 @@ try-ennodia.cherninlab.com
 
 ## Install Command
 
-Use the npm package for normal MCP client setup:
+Use the npm package for normal MCP client installation:
 
 ```sh
 npx -y ennodia
 ```
 
-Requires Bun `1.3.14` or newer. `npx` downloads Ennodia; Bun runs it. If the
-client supports Bun directly, `bunx ennodia` is also fine.
+Ennodia requires Bun `1.3.14` or newer. `npx` downloads Ennodia. Bun runs it.
+If the client supports Bun directly, use `bunx ennodia`.
 
-## MCP Config
+## MCP Configuration
 
-Add this server to the user's MCP client config:
+Add this server to the user's MCP client configuration:
 
 ```json
 {
@@ -54,7 +53,7 @@ For a local Ennodia checkout, use:
 
 ## First Agent Checks
 
-After configuring MCP, call these tools:
+After MCP configuration, call these tools:
 
 1. `ennodia_list_harnesses`
 2. `ennodia_estimate_budget`
@@ -62,35 +61,44 @@ After configuring MCP, call these tools:
 4. `ennodia_run`
 5. `ennodia_get_run`
 
-`ennodia_list_harnesses` should show which local tools are available — see the
-current adapter list and IDs in
+`ennodia_list_harnesses` shows the available local tools. See the current
+adapter list and identifiers (IDs) in
 [Supported Harnesses](/docs/reference/supported-harnesses/).
 
-## What You Are Installing
+## Installed Components
 
-Ennodia is a local MCP server. It lets the user's main agent ask other installed
-agent CLIs for help during the same task.
+Ennodia is a local MCP server. It lets the user's main agent request help from
+other installed agent command-line interface (CLI) programs during the same task.
 
-The important part is not "many agents" by itself. Ennodia works with existing
-local installs, subscriptions, and model choices. It discovers supported CLIs,
-starts child tasks, tracks status and output, estimates the input-token budget,
-and can ask a model to compare the answers before returning one result.
+The number of agents is not the primary benefit. Ennodia uses current local
+installs, subscriptions, and model choices. It discovers supported CLI programs and
+starts child tasks. It also tracks status and output.
 
-Ennodia is asynchronous by design. A primary agent can start a run, keep working,
-and later poll `ennodia_get_run` for exact status, ETA, child task IDs, Compare
-state, failures, and the final answer.
+Ennodia estimates the input-token budget. A Judge can compare the answers. A
+Result Advisor can then recommend one result.
+
+An optional Plan Advisor can propose harness, model, and skill assignments. It
+cannot start them. A separate explicit call must start the validated plan.
+
+Ennodia is asynchronous by design. A primary agent can start a run and continue
+its main task. It can later poll `ennodia_get_run` for status and estimated
+completion time.
+
+The result also contains child task IDs, Compare state, failures, and the final
+answer.
 
 Tell the user a real run can take minutes. Compare adds two serial model passes
 after the selected child agents finish.
 
 ## Example Requests
 
-Use Ennodia when the user is intentionally spending more model work to get a
-better answer than one agent usually gives.
+Use Ennodia when the user permits more model work to get a better answer than
+one agent usually gives.
 
 ```text
-Use Ennodia to ask several available agents to review this bug fix. Compare the
-answers, name disagreements, and return the highest-risk issue first.
+Use Ennodia to request a review from multiple available agents.
+Compare the answers for this bug fix.
+Name the disagreements and return the highest-risk issue first.
 ```
 
 ```text
@@ -99,19 +107,20 @@ Compare the plans and tell me which assumptions each model made.
 ```
 
 ```text
-Use Ennodia twice: once with source-grounded-audit and once without it. Compare
-what the skill changed before recommending the final docs edit.
+Use Ennodia twice.
+Use source-grounded-audit for the first run, but not for the second run.
+Compare the results before you recommend the final documentation edit.
 ```
 
-Compare is model-led. The user should not have to manually judge parallel
-answers unless they want to inspect the trace.
+Compare is model-led. The user does not normally need to judge the parallel
+answers. The trace remains available for inspection.
 
 ## Optional Next Steps
 
 - Use [Budgets and Limits](/docs/guides/budgets-and-limits/) before costly
   parallel runs.
-- Use [Using Agent Skills](/docs/guides/agent-skills/) before passing
+- Use [Agent Skills](/docs/guides/agent-skills/) before you pass
   `skillIds` such as `source-grounded-audit`.
 - Use [Supported Harnesses](/docs/reference/supported-harnesses/) when a local
-  CLI is missing, unrunnable, or using the wrong model ID.
+  CLI is missing, not runnable, or has the wrong model ID.
 - Use [MCP Tools](/docs/reference/mcp-tools/) for exact parameter shapes.

@@ -77,7 +77,7 @@ function parseCommand(args: string[]): CliCommand {
   const [first] = args;
   if (first === "io" || first === "--io") {
     throw new Error(
-      "Ennodia IO is the separate package `cherninlab/ennodia-io`.",
+      "Ennodia IO is the separate package `@cherninlab/ennodia-io`.",
     );
   }
 

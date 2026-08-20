@@ -1,8 +1,8 @@
 {
   "name": "ennodia",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "mcpName": "io.github.cherninlab/ennodia",
-  "description": "MCP server for multi-agent review with Compare and traceable receipts",
+  "description": "Local MCP server for AI team advice, multi-agent review, Compare, and traceable receipts",
   "license": "MIT",
   "type": "module",
   "packageManager": "bun@1.3.14",
@@ -36,6 +36,7 @@
     "bench/fixtures/**/*",
     "bench/results/.gitkeep",
     "src/cli.ts",
+    "src/advisor.ts",
     "src/budget.ts",
     "src/compare.ts",
     "src/compositional.ts",
@@ -46,6 +47,7 @@
     "src/index.ts",
     "src/internal.ts",
     "src/planner.ts",
+    "src/plan-advice.ts",
     "src/priority.ts",
     "src/runs.ts",
     "src/server.ts",
@@ -63,8 +65,7 @@
     ".": "./src/index.ts"
   },
   "workspaces": [
-    "website",
-    "packages/ennodia-io"
+    "website"
   ],
   "bin": {
     "ennodia": "bin/ennodia"
@@ -80,6 +81,7 @@
     "smoke": "bun run src/dev/smoke.ts",
     "agent-font:build": "bun run src/dev/build-agent-font.ts",
     "mcp:smoke": "bun run src/dev/mcp-smoke.ts",
+    "controlled-english:check": "bun run src/dev/check-controlled-english.ts",
     "io:smoke": "bun run --cwd packages/ennodia-io smoke",
     "task:smoke": "bun run src/dev/task-smoke.ts",
     "bench:bug-recall": "bun run bench/bug-recall/run.ts",
@@ -93,7 +95,7 @@
     "website:dev": "bun run --cwd website dev",
     "website:build": "bun run --cwd website build",
     "website:deploy": "bun run --cwd website deploy",
-    "verify": "bun run check && bun run lint && bun run test && bun run website:build && bun run task:smoke && bun run mcp:smoke && bun run io:smoke"
+    "verify": "bun run check && bun run lint && bun run test && bun run website:build && bun run controlled-english:check && bun run task:smoke && bun run mcp:smoke && bun run io:smoke"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",

@@ -100,7 +100,7 @@ describe("harness adapters", () => {
     expect(command?.args).not.toContain("--zen");
   });
 
-  it("sends Antigravity prompts through stdin instead of argv", () => {
+  it("passes Antigravity prompts as the --print value", () => {
     const adapter = harnessAdapters.find((candidate) =>
       candidate.id === "antigravity"
     );
@@ -108,18 +108,24 @@ describe("harness adapters", () => {
     expect(adapter?.buildCommand).toBeDefined();
 
     const command = adapter?.buildCommand?.("/bin/agy", {
-      prompt: "do not put this prompt in argv",
+      prompt: "review this repo",
       cwd: "/tmp/ennodia-fixture",
+      model: "gemini-3.7-flash-high",
       timeoutMs: 12_345,
     });
 
-    expect(command?.args).toContain("--print");
-    expect(command?.args).toContain("--print-timeout");
-    expect(command?.args).toContain("13s");
-    expect(command?.args).toContain("--add-dir");
-    expect(command?.args).toContain("/tmp/ennodia-fixture");
-    expect(command?.args).not.toContain("do not put this prompt in argv");
-    expect(command?.stdin).toBe("do not put this prompt in argv");
+    expect(command?.args).toEqual([
+      "--sandbox",
+      "--print",
+      "review this repo",
+      "--print-timeout",
+      "13s",
+      "--add-dir",
+      "/tmp/ennodia-fixture",
+      "--model",
+      "gemini-3.7-flash-high",
+    ]);
+    expect(command?.stdin).toBeUndefined();
   });
 
   it("keeps every priority-list harness backed by a real adapter", () => {

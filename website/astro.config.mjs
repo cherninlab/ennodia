@@ -71,14 +71,19 @@ export default defineConfig({
           items: [
             { label: "How Ennodia Works", slug: "docs/concepts/how-ennodia-works" },
             { label: "Interfaces and Core", slug: "docs/concepts/interfaces-and-core" },
-            { label: "Compositional Audits", slug: "docs/concepts/compositional-audits" }
+            { label: "Compositional Audits", slug: "docs/concepts/compositional-audits" },
+            { label: "Second Opinions", slug: "docs/concepts/second-opinions" },
+            { label: "Data Governance", slug: "docs/concepts/data-governance" }
           ]
         },
         {
           label: "Reference",
           items: [
             { label: "MCP Tools", slug: "docs/reference/mcp-tools" },
-            { label: "Supported Harnesses", slug: "docs/reference/supported-harnesses" }
+            { label: "Supported Harnesses", slug: "docs/reference/supported-harnesses" },
+            { label: "Ennodia IO", slug: "docs/reference/ennodia-io" },
+            { label: "Benchmarks", slug: "docs/reference/benchmarks" },
+            { label: "Controlled English", slug: "docs/reference/controlled-english" }
           ]
         },
         {

@@ -426,6 +426,7 @@ function legacySkillDirectory(path: string, scope: "project" | "user"): SkillDir
 async function loadAvailableSkills(cwd?: string): Promise<LoadedSkillDiscovery> {
   const directories = getSkillDirectories(cwd);
   const skillsMap = new Map<string, Skill>();
+  const ambiguousHarnessIds = new Map<string, Set<string>>();
   const warnings: string[] = [];
 
   for (const directory of directories) {
@@ -439,10 +440,42 @@ async function loadAvailableSkills(cwd?: string): Promise<LoadedSkillDiscovery> 
         );
         const withInstallation = addInstallation(skill, directory);
         const existing = skillsMap.get(withInstallation.id);
-        skillsMap.set(
-          withInstallation.id,
-          existing ? mergeSkills(existing, withInstallation) : withInstallation,
-        );
+        if (!existing) {
+          skillsMap.set(withInstallation.id, withInstallation);
+          continue;
+        }
+
+        if (existing.hash !== withInstallation.hash) {
+          const ambiguous = ambiguousHarnessIds.get(withInstallation.id) ??
+            new Set<string>();
+          for (const harnessId of withInstallation.harnessIds) {
+            if (existing.harnessIds.includes(harnessId)) {
+              ambiguous.add(harnessId);
+            }
+          }
+          ambiguousHarnessIds.set(withInstallation.id, ambiguous);
+          skillsMap.set(withInstallation.id, {
+            ...existing,
+            harnessIds: existing.harnessIds.filter((harnessId) =>
+              !ambiguous.has(harnessId)
+            ),
+          });
+          warnings.push(
+            `${filePath}: Conflicting skill content for ${existing.id}: ${existing.path} and ${withInstallation.path}. Ennodia kept the higher-priority installation and removed ambiguous harness support.`,
+          );
+          continue;
+        }
+
+        const merged = mergeSkills(existing, withInstallation);
+        const ambiguous = ambiguousHarnessIds.get(withInstallation.id);
+        skillsMap.set(withInstallation.id, ambiguous
+          ? {
+            ...merged,
+            harnessIds: merged.harnessIds.filter((harnessId) =>
+              !ambiguous.has(harnessId)
+            ),
+          }
+          : merged);
       } catch (error) {
         warnings.push(`${filePath}: ${errorMessage(error)}`);
       }
@@ -589,6 +622,12 @@ function addInstallation(skill: Skill, directory: SkillDirectory): Skill {
 }
 
 function mergeSkills(primary: Skill, secondary: Skill): Skill {
+  if (primary.hash !== secondary.hash) {
+    throw new Error(
+      `Conflicting skill content for ${primary.id}: ${primary.path} and ${secondary.path}. Ennodia will keep the higher-priority installation without claiming support from the conflicting installation.`,
+    );
+  }
+
   return {
     ...primary,
     harnessIds: [...new Set([...primary.harnessIds, ...secondary.harnessIds])].sort(),
@@ -884,10 +923,12 @@ function firstParagraph(content: string): string | undefined {
 }
 
 function skillSupportsHarness(skill: Skill, harnessId: string): boolean {
-  return (
-    skill.harnessIds.includes(harnessId) ||
-    skill.harnessIds.includes("legacy")
-  );
+  if (skill.native) {
+    return skill.harnessIds.includes(harnessId);
+  }
+
+  return skill.harnessIds.includes(harnessId) ||
+    skill.harnessIds.includes("legacy");
 }
 
 function unquote(value: string): string {

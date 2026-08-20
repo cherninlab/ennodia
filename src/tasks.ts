@@ -1,9 +1,10 @@
-import { cpSync, existsSync, mkdtempSync, rmSync } from "node:fs";
+import { cpSync, existsSync, lstatSync, mkdtempSync, rmSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
 import type {
+  CommandSpec,
   HarnessAdapter,
   HarnessDiscovery,
   HarnessRunInput,
@@ -105,6 +106,9 @@ type InternalTask = Omit<
   streamReaders: Set<ReadableStreamDefaultReader<Uint8Array>>;
   timeout?: Timer;
   finalMessagePath?: string;
+  /** Exact temporary directory allocated by TaskManager. Keep this separate
+   * from cwd because an adapter can override the command working directory. */
+  isolatedCwd?: string;
   extractUsage?: HarnessAdapter["extractUsage"];
 };
 
@@ -116,6 +120,7 @@ export type TaskManagerOptions = {
   drainTimeoutMs?: number;
   maxTasks?: number;
   spawn?: TaskSpawn;
+  removeIsolatedCwd?: (path: string) => void;
 };
 
 export type TaskManagerShutdownOptions = {
@@ -135,6 +140,7 @@ export class TaskManager {
   private readonly drainTimeoutMs: number;
   private readonly maxTasks: number;
   private readonly spawn: TaskSpawn;
+  private readonly removeIsolatedCwd: (path: string) => void;
   private shuttingDown = false;
   private shutdownPromise?: Promise<void>;
 
@@ -142,6 +148,9 @@ export class TaskManager {
     this.drainTimeoutMs = options.drainTimeoutMs ?? DEFAULT_DRAIN_TIMEOUT_MS;
     this.maxTasks = Math.max(1, options.maxTasks ?? DEFAULT_MAX_TASKS);
     this.spawn = options.spawn ?? ((input) => Bun.spawn(input));
+    this.removeIsolatedCwd = options.removeIsolatedCwd ?? ((path) => {
+      rmSync(path, { recursive: true, force: true });
+    });
   }
 
   start(
@@ -157,15 +166,18 @@ export class TaskManager {
       throw new Error(`${adapter.name} is not runnable through Ennodia yet.`);
     }
 
-    if (input.cwd && !existsSync(input.cwd)) {
-      throw new Error(`Working directory does not exist: ${input.cwd}`);
+    const sourceCwd = input.cwd ?? process.cwd();
+    if (!existsSync(sourceCwd)) {
+      throw new Error(`Working directory does not exist: ${sourceCwd}`);
     }
 
+    let isolatedCwd: string | undefined;
     let isolatedFrom: string | undefined;
     let resolvedInputCwd = input.cwd;
-    if (input.isolateCwd && input.cwd) {
-      resolvedInputCwd = isolateDirectory(input.cwd);
-      isolatedFrom = input.cwd;
+    if (input.isolateCwd) {
+      isolatedCwd = isolateDirectory(sourceCwd);
+      resolvedInputCwd = isolatedCwd;
+      isolatedFrom = sourceCwd;
     }
 
     // Always allocate a scratch path; adapters that support writing a clean
@@ -179,16 +191,36 @@ export class TaskManager {
     const augmentedPrompt = input.skills && input.skills.length > 0
       ? augmentPrompt(input.prompt, input.skills, adapter.id)
       : input.prompt;
-    const commandSpec = adapter.buildCommand(discovery.commandPath, {
-      ...input,
-      cwd: resolvedInputCwd,
-      prompt: augmentedPrompt,
-      finalMessagePath,
-    });
-    const cwd = commandSpec.cwd ?? process.cwd();
+    let commandSpec: CommandSpec;
+    let cwd: string;
+    let child: TaskProcess;
+    try {
+      commandSpec = adapter.buildCommand(discovery.commandPath, {
+        ...input,
+        cwd: resolvedInputCwd,
+        prompt: augmentedPrompt,
+        finalMessagePath,
+      });
+      cwd = commandSpec.cwd ?? process.cwd();
 
-    if (!existsSync(cwd)) {
-      throw new Error(`Working directory does not exist: ${cwd}`);
+      if (!existsSync(cwd)) {
+        throw new Error(`Working directory does not exist: ${cwd}`);
+      }
+
+      child = this.spawn({
+        cmd: [commandSpec.command, ...commandSpec.args],
+        cwd,
+        env: { ...process.env, ...commandSpec.env },
+        stdin: commandSpec.stdin === undefined ? "ignore" : "pipe",
+        stdout: "pipe",
+        stderr: "pipe",
+      });
+    } catch (error) {
+      cleanupFailedStartArtifacts(
+        finalMessagePath,
+        isolatedCwd,
+      );
+      throw error;
     }
 
     const now = Date.now();
@@ -217,24 +249,18 @@ export class TaskManager {
       streamReaders: new Set(),
       appliedSkills: input.skills?.map(toAppliedSkillInfo),
       finalMessagePath,
+      isolatedCwd,
       extractUsage: adapter.extractUsage,
     };
 
+    task.process = child;
+    task.pid = child.pid;
+
+    // Publish a task only after the process exists. A synchronous spawn
+    // failure must not leave a phantom running task that cannot settle.
     this.tasks.set(task.id, task);
     this.pruneTasks(task.id);
     this.pushEvent(task, { type: "started", message: "Task started." });
-
-    const child = this.spawn({
-      cmd: [commandSpec.command, ...commandSpec.args],
-      cwd,
-      env: { ...process.env, ...commandSpec.env },
-      stdin: commandSpec.stdin === undefined ? "ignore" : "pipe",
-      stdout: "pipe",
-      stderr: "pipe",
-    });
-
-    task.process = child;
-    task.pid = child.pid;
 
     task.streamsDone = Promise.all([
       this.pipeStreamSafely(task, "stdout", child.stdout),
@@ -363,6 +389,7 @@ export class TaskManager {
 
     for (const task of this.tasks.values()) {
       this.clearTimers(task);
+      this.cleanupIsolatedCwd(task);
     }
   }
 
@@ -406,6 +433,7 @@ export class TaskManager {
     } finally {
       await this.collectFinalMessage(task);
       this.collectUsage(task);
+      this.cleanupIsolatedCwd(task);
       this.clearTimers(task);
       this.touch(task);
       this.pruneTasks(task.id);
@@ -447,6 +475,26 @@ export class TaskManager {
     }
   }
 
+  private cleanupIsolatedCwd(task: InternalTask): boolean {
+    if (!task.isolatedCwd) {
+      return true;
+    }
+
+    try {
+      this.removeIsolatedCwd(task.isolatedCwd);
+      task.isolatedCwd = undefined;
+      return true;
+    } catch (error) {
+      this.pushEvent(task, {
+        type: "error",
+        message: `Failed to remove isolated working directory: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      });
+      return false;
+    }
+  }
+
   private pruneTasks(protectedTaskId?: string): void {
     const overflow = this.tasks.size - this.maxTasks;
     if (overflow <= 0) {
@@ -457,8 +505,16 @@ export class TaskManager {
       .filter((task) => task.id !== protectedTaskId && task.status !== "running")
       .sort((a, b) => a.createdAtMs - b.createdAtMs);
 
-    for (const task of removable.slice(0, overflow)) {
+    let removed = 0;
+    for (const task of removable) {
+      if (removed >= overflow) {
+        break;
+      }
+      if (!this.cleanupIsolatedCwd(task)) {
+        continue;
+      }
       this.tasks.delete(task.id);
+      removed += 1;
     }
   }
 
@@ -710,9 +766,34 @@ const ISOLATION_EXCLUDED_DIRS = new Set(["node_modules", ".git"]);
 
 function isolateDirectory(source: string): string {
   const target = mkdtempSync(join(tmpdir(), "ennodia-cwd-"));
-  cpSync(source, target, {
-    recursive: true,
-    filter: (candidate) => !ISOLATION_EXCLUDED_DIRS.has(basename(candidate)),
-  });
-  return target;
+  try {
+    cpSync(source, target, {
+      recursive: true,
+      filter: (candidate) => {
+        if (ISOLATION_EXCLUDED_DIRS.has(basename(candidate))) {
+          return false;
+        }
+        if (lstatSync(candidate).isSymbolicLink()) {
+          throw new Error(
+            `Cannot isolate working directory containing symbolic link: ${candidate}`,
+          );
+        }
+        return true;
+      },
+    });
+    return target;
+  } catch (error) {
+    rmSync(target, { recursive: true, force: true });
+    throw error;
+  }
+}
+
+function cleanupFailedStartArtifacts(
+  finalMessagePath: string,
+  isolatedCwd?: string,
+): void {
+  rmSync(finalMessagePath, { force: true });
+  if (isolatedCwd) {
+    rmSync(isolatedCwd, { recursive: true, force: true });
+  }
 }

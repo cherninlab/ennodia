@@ -1,6 +1,6 @@
 ---
 title: Compositional Audits
-description: Split large reviews into focused slices, route them to local agents, and synthesize the results without losing traceability.
+description: Split large reviews into focused slices, route them to local agents, and combine the results without losing traceability.
 ---
 
 Large reviews work better when each agent gets a small, explicit slice. Ennodia
@@ -10,7 +10,7 @@ consistent rubric.
 
 ## When To Use It
 
-Use a compositional audit when the request mixes several risk types, such as:
+Use a compositional audit when the request mixes multiple risk types, such as:
 
 - product positioning and implementation architecture
 - website copy and protocol compatibility
@@ -18,17 +18,17 @@ Use a compositional audit when the request mixes several risk types, such as:
 - release readiness and future roadmap
 
 One broad prompt can make every reviewer repeat the same surface-level answer.
-Slices make each response easier to verify and easier to synthesize.
+Slices make each response easier to verify and combine.
 
 ## Good Slice Shape
 
 A useful slice includes:
 
 - one narrow question
-- the files or sources the reviewer should inspect
+- the files or sources for the reviewer to inspect
 - the harness or model to use, when that matters
 - the maximum answer length
-- the output shape expected by the synthesis pass
+- the output shape expected by the Result Advisor pass
 
 Example slice prompt:
 
@@ -71,7 +71,7 @@ Estimate the slice fan-out before starting child agents:
 {
   "tool": "ennodia_estimate_compositional_budget",
   "arguments": {
-    "prompt": "Synthesize these audit shards into the smallest safe next action.",
+    "prompt": "Combine these audit shards into the smallest safe next action.",
     "slices": [
       {
         "id": "docs-truth",
@@ -100,7 +100,7 @@ Then start the focused tasks:
 {
   "tool": "ennodia_start_compositional",
   "arguments": {
-    "prompt": "Synthesize these audit shards into the smallest safe next action.",
+    "prompt": "Combine these audit shards into the smallest safe next action.",
     "slices": [
       {
         "id": "docs-truth",
@@ -130,7 +130,7 @@ Each slice starts one task. Poll the returned task IDs with
 {
   "tool": "ennodia_get_compositional_status",
   "arguments": {
-    "prompt": "Synthesize these compositional audit shards into the smallest safe next action. Preserve disagreements and ignore non-signal shards.",
+    "prompt": "Combine these compositional audit shards into the smallest safe next action. Preserve disagreements and ignore non-signal shards.",
     "taskIds": ["task-id-1", "task-id-2", "task-id-3"]
   }
 }
@@ -143,7 +143,7 @@ When `compareReady` is true, pass the returned `readyTaskIds` to
 {
   "tool": "ennodia_start_compare",
   "arguments": {
-    "prompt": "Synthesize these compositional audit shards into the smallest safe next action. Preserve disagreements and ignore non-signal shards.",
+    "prompt": "Combine these compositional audit shards into the smallest safe next action. Preserve disagreements and ignore non-signal shards.",
     "taskIds": ["task-id-1", "task-id-2", "task-id-3"],
     "maxOutputChars": 12000
   }
@@ -155,13 +155,16 @@ When `compareReady` is true, pass the returned `readyTaskIds` to
 - Do not send the entire plan to every shard if the goal is faster, deeper review.
 - Do not mix unrelated evidence in one slice.
 - Do not treat failed, empty, or access-limited shard output as a normal review.
-- Do not claim that a synthesis is consensus when the shards disagree.
+- Do not claim consensus when the slices disagree.
 
 ## Current Boundary
 
 `ennodia_estimate_compositional_budget` resolves and budgets slices without
 starting child agents. `ennodia_start_compositional` starts and budgets the shard
 tasks. `ennodia_get_compositional_status` groups shard task states and identifies
-Compare-ready outputs. Synthesis stays explicit through `ennodia_start_compare`
-so long-running shard status, failed shards, and the final Compare step remain
-visible to the primary agent.
+Compare-ready outputs. The final recommendation stays explicit through
+`ennodia_start_compare`. This keeps task status, failed slices, and the final
+Compare step visible to the primary agent.
+
+During Compare, the Judge maps agreements and conflicts. The Result Advisor then
+recommends an answer.

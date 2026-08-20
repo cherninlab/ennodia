@@ -9,8 +9,10 @@ export type HarnessRunInput = {
   model?: string;
   timeoutMs?: number;
   skills?: Skill[];
-  /** Run the task against an isolated copy of cwd instead of cwd itself, so
-   * concurrent tasks sharing a cwd cannot clobber each other's file writes. */
+  /** Run the task against an ephemeral isolated copy of cwd instead of cwd
+   * itself, so concurrent tasks sharing a cwd cannot clobber each other's
+   * file writes. TaskManager refuses symbolic links in the copied tree and
+   * deletes the copy when the task becomes terminal. */
   isolateCwd?: boolean;
   /** Scratch file path an adapter can write its clean final message to,
    * separate from the harness's raw stdout (which may include a full
@@ -297,12 +299,13 @@ export const harnessAdapters: HarnessAdapter[] = [
     notes: [
       "Runs through the supported `agy` CLI surface.",
       "Defaults to Antigravity sandbox mode for Ennodia-launched tasks.",
-      "Sends prompts through stdin because `agy --print` does not consume positional prompts.",
+      "Passes the prompt as the value of Antigravity's non-interactive `--print` option.",
     ],
     buildCommand: (commandPath, input) => {
       const args = [
         "--sandbox",
         "--print",
+        input.prompt,
         "--print-timeout",
         toGoDuration(input.timeoutMs),
       ];
@@ -315,7 +318,7 @@ export const harnessAdapters: HarnessAdapter[] = [
         args.push("--model", input.model);
       }
 
-      return { command: commandPath, args, cwd: input.cwd, stdin: input.prompt };
+      return { command: commandPath, args, cwd: input.cwd };
     },
   },
 ];

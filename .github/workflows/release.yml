@@ -15,7 +15,7 @@ on:
           - next
           - latest
       dry_run:
-        description: "Run all gates but skip npm publish"
+        description: "Run all gates but skip publication"
         type: boolean
         required: true
         default: true
@@ -56,7 +56,22 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Run release checks
-        run: bun run release:check
+        run: |
+          bun run release:check
+          git diff --exit-code
+
+      - name: Validate release tag
+        if: github.ref_type == 'tag'
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          package_version="$(node -p "require('./package.json').version")"
+          expected_tag="v${package_version}"
+
+          if [[ "${RELEASE_TAG}" != "${expected_tag}" ]]; then
+            echo "Release tag ${RELEASE_TAG} does not match package version ${package_version} (expected ${expected_tag})."
+            exit 1
+          fi
 
       - name: Resolve release mode
         id: release_mode
@@ -79,10 +94,17 @@ jobs:
           echo "dist_tag=${dist_tag}" >> "$GITHUB_OUTPUT"
           echo "dry_run=${dry_run}" >> "$GITHUB_OUTPUT"
 
-      - name: Dry-run publish
+      - name: Dry-run publish core to npm
         if: steps.release_mode.outputs.dry_run == 'true'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --dry-run --tag "${{ steps.release_mode.outputs.dist_tag }}"
+
+      - name: Dry-run publish IO to npm
+        if: steps.release_mode.outputs.dry_run == 'true'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        working-directory: packages/ennodia-io
         run: npm publish --dry-run --tag "${{ steps.release_mode.outputs.dist_tag }}"
 
       - name: Dry-run publish to JSR
@@ -95,15 +117,75 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm whoami
 
-      - name: Publish to npm
+      - name: Publish core to npm
         if: steps.release_mode.outputs.dry_run != 'true'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish --tag "${{ steps.release_mode.outputs.dist_tag }}"
+        run: |
+          package_name="$(node -p "require('./package.json').name")"
+          package_version="$(node -p "require('./package.json').version")"
+
+          if npm view "${package_name}@${package_version}" version >/dev/null 2>&1; then
+            echo "${package_name}@${package_version} already exists; ensuring the ${{ steps.release_mode.outputs.dist_tag }} dist-tag."
+            npm dist-tag add "${package_name}@${package_version}" "${{ steps.release_mode.outputs.dist_tag }}"
+          else
+            npm publish --tag "${{ steps.release_mode.outputs.dist_tag }}"
+          fi
 
       - name: Publish to JSR
         if: steps.release_mode.outputs.dry_run != 'true'
         run: npx jsr publish
+
+      - name: Publish IO to npm
+        if: steps.release_mode.outputs.dry_run != 'true'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        working-directory: packages/ennodia-io
+        run: |
+          package_name="$(node -p "require('./package.json').name")"
+          package_version="$(node -p "require('./package.json').version")"
+
+          if npm view "${package_name}@${package_version}" version >/dev/null 2>&1; then
+            echo "${package_name}@${package_version} already exists; ensuring the ${{ steps.release_mode.outputs.dist_tag }} dist-tag."
+            npm dist-tag add "${package_name}@${package_version}" "${{ steps.release_mode.outputs.dist_tag }}"
+          else
+            npm publish --tag "${{ steps.release_mode.outputs.dist_tag }}"
+          fi
+
+      - name: Install MCP publisher
+        if: steps.release_mode.outputs.dry_run != 'true'
+        run: |
+          publisher_version="1.8.1"
+          publisher_archive="mcp-publisher_linux_amd64.tar.gz"
+          publisher_url="https://github.com/modelcontextprotocol/registry/releases/download/v${publisher_version}/${publisher_archive}"
+
+          curl -fsSLo "${publisher_archive}" "${publisher_url}"
+          echo "a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc  ${publisher_archive}" | sha256sum --check
+          tar xzf "${publisher_archive}" mcp-publisher
+          sudo install -m 0755 mcp-publisher /usr/local/bin/mcp-publisher
+
+      - name: Publish to MCP Registry
+        if: steps.release_mode.outputs.dry_run != 'true'
+        run: |
+          server_name="$(node -p "encodeURIComponent(JSON.parse(require('fs').readFileSync('server.json', 'utf8')).name)")"
+          server_version="$(node -p "encodeURIComponent(JSON.parse(require('fs').readFileSync('server.json', 'utf8')).version)")"
+          registry_url="https://registry.modelcontextprotocol.io"
+          version_url="${registry_url}/v0.1/servers/${server_name}/versions/${server_version}"
+          status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' "${version_url}")"
+
+          case "${status}" in
+            200)
+              echo "${server_name}@${server_version} is already in the MCP Registry; skipping publish."
+              ;;
+            404)
+              mcp-publisher login github-oidc --registry="${registry_url}"
+              mcp-publisher publish server.json
+              ;;
+            *)
+              echo "MCP Registry existence check returned HTTP ${status}."
+              exit 1
+              ;;
+          esac
 
       - name: Pack release artifact
         if: steps.release_mode.outputs.dry_run != 'true'

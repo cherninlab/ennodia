@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1100" height="500" viewBox="0 0 1100 500" role="img" aria-labelledby="title desc">
   <title id="title">Ennodia orchestration pipeline</title>
-  <desc id="desc">A code-review request is classified, routed through project rules to Claude Code and Codex CLI, compared, resolved, and returned as a final review.</desc>
+  <desc id="desc">Ennodia classifies a code-review request. It routes the request to Claude Code and Codex. The Judge and Result Advisor return a review.</desc>
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M 0 0 L 10 5 L 0 10 z" fill="#7aa7ff" />
@@ -61,7 +61,8 @@
   <g>
     <rect class="hub" x="890" y="207" width="130" height="86" rx="14" />
     <text class="label" x="955" y="242" text-anchor="middle">Compare</text>
-    <text class="small" x="955" y="267" text-anchor="middle">judge + synth</text>
+    <text class="small" x="955" y="262" text-anchor="middle">Judge</text>
+    <text class="small" x="955" y="280" text-anchor="middle">Result Advisor</text>
   </g>
 
   <path class="line" d="M 955 293 V 342" />
@@ -70,5 +71,5 @@
     <text class="label" x="955" y="394" text-anchor="middle">Review</text>
   </g>
 
-  <text class="small" x="550" y="454" text-anchor="middle">Every child task remains visible: status, logs, ETA, failure state, and final synthesis.</text>
+  <text class="small" x="550" y="454" text-anchor="middle">Every child task remains visible: status, logs, ETA, failure state, Judge findings, and recommended answer.</text>
 </svg>

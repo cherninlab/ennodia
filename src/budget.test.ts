@@ -25,7 +25,7 @@ describe("budget estimates", () => {
     );
   });
 
-  it("treats direct Compare as judge plus synthesizer child tasks", () => {
+  it("treats direct Compare as Judge plus Result Advisor child tasks", () => {
     const estimate = estimateCompareBudget({
       prompt: "Pick the best answer.",
       taskCandidateCount: 1,
@@ -41,6 +41,42 @@ describe("budget estimates", () => {
     expect(estimate.estimatedTotalInputTokens).toBeGreaterThan(0);
     expect(check.exceeded).toBe(true);
     expect(check.issues.join(" ")).toContain("maxChildTasks 1");
+    expect(estimate.assumptions.join(" ")).toContain(
+      "one Judge task and one Result Advisor task",
+    );
+  });
+
+  it("prefers advisorHarnessId while accepting the deprecated alias", () => {
+    const preferred = estimateCompareBudget({
+      prompt: "Pick the best answer.",
+      taskCandidateCount: 1,
+      responseCandidateChars: 100,
+      judgeHarnessId: "claude-code",
+      advisorHarnessId: "codex",
+    });
+    const legacy = estimateCompareBudget({
+      prompt: "Pick the best answer.",
+      taskCandidateCount: 1,
+      responseCandidateChars: 100,
+      judgeHarnessId: "claude-code",
+      synthesizerHarnessId: "codex",
+    });
+
+    expect(preferred.selectedHarnessCount).toBe(2);
+    expect(preferred.selectedHarnessIds).toEqual(["claude-code", "codex"]);
+    expect(legacy.selectedHarnessIds).toEqual(preferred.selectedHarnessIds);
+  });
+
+  it("rejects conflicting Result Advisor harness aliases", () => {
+    expect(() => estimateCompareBudget({
+      prompt: "Pick the best answer.",
+      taskCandidateCount: 1,
+      responseCandidateChars: 100,
+      advisorHarnessId: "codex",
+      synthesizerHarnessId: "claude-code",
+    })).toThrow(
+      "Conflicting Compare fields: advisorHarnessId and deprecated synthesizerHarnessId.",
+    );
   });
 
   it("counts compositional batch slices as child tasks even when harnesses repeat", () => {

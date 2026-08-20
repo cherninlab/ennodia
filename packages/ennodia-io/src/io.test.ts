@@ -67,6 +67,78 @@ describe("Ennodia IO", () => {
     expect(core.waitTimeouts[0]).toBe(1_234);
   });
 
+  it("forwards Result Advisor options canonically and accepts matching legacy aliases", async () => {
+    const core = new FakeIoCore();
+    const handler = createEnnodiaIoHandler(core);
+
+    const response = await handler(jsonRequest("/v1/chat/completions", {
+      model: "local/compare",
+      messages: [{ role: "user", content: "Compare and advise." }],
+      ennodia: {
+        advisorHarnessId: "claude-code",
+        advisorModel: "opus-advisor",
+        synthesizerHarnessId: "claude-code",
+        synthesizerModel: "opus-advisor",
+      },
+    }));
+
+    expect(response.status).toBe(200);
+    expect(core.started[0]?.advisorHarnessId).toBe("claude-code");
+    expect(core.started[0]?.advisorModel).toBe("opus-advisor");
+    expect(core.started[0]?.synthesizerHarnessId).toBeUndefined();
+    expect(core.started[0]?.synthesizerModel).toBeUndefined();
+  });
+
+  it("canonicalizes deprecated synthesizer options before starting a run", async () => {
+    const core = new FakeIoCore();
+    const handler = createEnnodiaIoHandler(core);
+
+    const response = await handler(jsonRequest("/v1/chat/completions", {
+      model: "local/compare",
+      messages: [{ role: "user", content: "Use the compatibility aliases." }],
+      ennodia: {
+        synthesizerHarnessId: "codex",
+        synthesizerModel: "gpt-advisor",
+      },
+    }));
+
+    expect(response.status).toBe(200);
+    expect(core.started[0]?.advisorHarnessId).toBe("codex");
+    expect(core.started[0]?.advisorModel).toBe("gpt-advisor");
+    expect(core.started[0]?.synthesizerHarnessId).toBeUndefined();
+    expect(core.started[0]?.synthesizerModel).toBeUndefined();
+  });
+
+  it("rejects conflicting Result Advisor aliases before starting a run", async () => {
+    const core = new FakeIoCore();
+    const handler = createEnnodiaIoHandler(core);
+
+    const harnessConflict = await handler(jsonRequest("/v1/chat/completions", {
+      model: "local/compare",
+      messages: [{ role: "user", content: "Conflicting harnesses." }],
+      ennodia: {
+        advisorHarnessId: "codex",
+        synthesizerHarnessId: "claude-code",
+      },
+    }));
+    const modelConflict = await handler(jsonRequest("/v1/chat/completions", {
+      model: "local/compare",
+      messages: [{ role: "user", content: "Conflicting models." }],
+      ennodia: {
+        advisorModel: "gpt-advisor",
+        synthesizerModel: "opus-advisor",
+      },
+    }));
+    const harnessBody = await harnessConflict.json() as ErrorResponse;
+    const modelBody = await modelConflict.json() as ErrorResponse;
+
+    expect(harnessConflict.status).toBe(400);
+    expect(modelConflict.status).toBe(400);
+    expect(harnessBody.error.message).toContain("must match advisorHarnessId");
+    expect(modelBody.error.message).toContain("must match advisorModel");
+    expect(core.started).toHaveLength(0);
+  });
+
   it("lists app-facing provider options for BYOK-style settings", async () => {
     const core = new FakeIoCore();
 

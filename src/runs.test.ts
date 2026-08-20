@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { CompareManager } from "./compare";
+import { CompareManager, type CompareView } from "./compare";
 import type { HarnessAdapter, HarnessDiscovery } from "./harnesses";
 import { planRoute } from "./planner";
 import { RunManager } from "./runs";
@@ -114,6 +114,117 @@ describe("RunManager", () => {
     expect(result.finalAnswer).toContain("Final answer from synthesizer");
     expect(result.events.map((event) => event.type)).toContain("compare-started");
     expect(result.events.map((event) => event.type)).toContain("compare-succeeded");
+  });
+
+  it("prefers the Result Advisor answer over the deprecated synthesis view", async () => {
+    const taskManager = new TaskManager();
+    const compareView: CompareView = {
+      id: "compare-result-advisor",
+      status: "succeeded",
+      promptPreview: "Compare several code approaches.",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      endedAt: new Date().toISOString(),
+      elapsedMs: 1,
+      candidateCount: 2,
+      candidates: [],
+      remainingMs: 0,
+      etaConfidence: "complete",
+      analysisAvailable: true,
+      advisor: {
+        answer: "Preferred Advisor answer.",
+        basis: "judge-analysis",
+        confidence: "high",
+        openQuestions: [],
+        taskId: "advisor-task",
+      },
+      synthesis: {
+        text: "Deprecated synthesis answer.",
+        taskId: "advisor-task",
+      },
+      events: [],
+    };
+    const compareManager = {
+      start: async () => compareView,
+      waitForTerminal: async () => compareView,
+      get: () => compareView,
+      cancel: () => compareView,
+    } as unknown as CompareManager;
+    const adapters = new Map([
+      ["agent-a", echoAdapter("agent-a", "Agent A")],
+      ["agent-b", echoAdapter("agent-b", "Agent B")],
+    ]);
+    const manager = new RunManager({
+      taskManager,
+      compareManager,
+      discoverHarnesses: async () => [
+        echoDiscovery("agent-a", "Agent A"),
+        echoDiscovery("agent-b", "Agent B"),
+      ],
+      findHarnessAdapter: (id) => adapters.get(id),
+      planRoute,
+    });
+
+    const started = await manager.start({
+      prompt: "Compare several code approaches.",
+      mode: "parallel",
+      compare: true,
+      timeoutMs: 5_000,
+    });
+    const result = await waitForRun(manager, started.id);
+
+    expect(result.status).toBe("succeeded");
+    expect(result.finalAnswer).toBe("Preferred Advisor answer.");
+  });
+
+  it("rejects conflicting Result Advisor aliases before starting child tasks", async () => {
+    const fixture = createFixture([
+      echoDiscovery("agent-a", "Agent A"),
+      echoDiscovery("agent-b", "Agent B"),
+    ]);
+
+    await expect(fixture.manager.start({
+      prompt: "Compare several code approaches.",
+      mode: "parallel",
+      compare: true,
+      advisorHarnessId: "codex",
+      synthesizerHarnessId: "claude-code",
+    })).rejects.toThrow(
+      "Conflicting Run fields: advisorHarnessId and deprecated synthesizerHarnessId.",
+    );
+    await expect(fixture.manager.start({
+      prompt: "Compare several code approaches.",
+      mode: "parallel",
+      compare: true,
+      advisorModel: "new-model",
+      synthesizerModel: "old-model",
+    })).rejects.toThrow(
+      "Conflicting Run fields: advisorModel and deprecated synthesizerModel.",
+    );
+
+    expect(fixture.taskManager.list()).toHaveLength(0);
+  });
+
+  it("accepts matching Result Advisor aliases", async () => {
+    const fixture = createFixture([
+      echoDiscovery("agent-a", "Agent A"),
+      echoDiscovery("agent-b", "Agent B"),
+    ]);
+
+    const started = await fixture.manager.start({
+      prompt: "Compare several code approaches.",
+      mode: "parallel",
+      compare: true,
+      advisorHarnessId: "compare-agent",
+      synthesizerHarnessId: "compare-agent",
+      advisorModel: "same-model",
+      synthesizerModel: "same-model",
+      timeoutMs: 5_000,
+    });
+    const result = await waitForRun(fixture.manager, started.id);
+
+    expect(result.status).toBe("succeeded");
+    expect(result.finalAnswer).toContain("Final answer from synthesizer");
   });
 
   it("includes run budget estimates and budget-checked events", async () => {

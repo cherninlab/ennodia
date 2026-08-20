@@ -13,11 +13,46 @@ describe("MCP server tool surface", () => {
         "ennodia_start_compositional",
         "ennodia_run",
         "ennodia_start_compare",
+        "ennodia_start_plan_advice",
+        "ennodia_start_advised_plan",
       ]) {
         const tool = tools.tools.find((entry) => entry.name === name);
         expect(tool).toBeDefined();
         expect(inputProperties(tool).budget).toBeDefined();
       }
+    });
+  });
+
+  it("publishes the complete Plan Advisor lifecycle and model allowlist schema", async () => {
+    await withClient(async (client) => {
+      const tools = await client.listTools();
+      const names = new Set(tools.tools.map((tool) => tool.name));
+
+      for (const name of [
+        "ennodia_start_plan_advice",
+        "ennodia_list_plan_advice",
+        "ennodia_get_plan_advice",
+        "ennodia_cancel_plan_advice",
+        "ennodia_start_advised_plan",
+      ]) {
+        expect(names.has(name)).toBe(true);
+        expect(
+          tools.tools.find((tool) => tool.name === name)?.description?.trim()
+            .length,
+        ).toBeGreaterThan(0);
+      }
+
+      const start = tools.tools.find((tool) =>
+        tool.name === "ennodia_start_plan_advice"
+      );
+      const allowedModels = inputProperties(start).allowedModels;
+      expect(allowedModels).toMatchObject({
+        type: "object",
+        additionalProperties: {
+          type: "array",
+          items: { type: "string" },
+        },
+      });
     });
   });
 
@@ -106,6 +141,33 @@ describe("MCP server tool surface", () => {
     await withClient(async (client) => {
       const tools = await client.listTools();
       expect(documented).toEqual(tools.tools.map((tool) => tool.name).sort());
+    });
+  });
+
+  it("keeps packaged manifest tool schemas aligned with the live server", async () => {
+    const manifest = await Bun.file(
+      new URL("../manifest.json", import.meta.url),
+    ).json() as {
+      tools: Array<{
+        name: string;
+        description?: string;
+        inputSchema: unknown;
+      }>;
+    };
+
+    await withClient(async (client) => {
+      const live = await client.listTools();
+      const project = (tool: {
+        name: string;
+        description?: string;
+        inputSchema: unknown;
+      }) => ({
+        name: tool.name,
+        description: tool.description,
+        inputSchema: tool.inputSchema,
+      });
+
+      expect(manifest.tools.map(project)).toEqual(live.tools.map(project));
     });
   });
 });

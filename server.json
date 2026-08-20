@@ -1,18 +1,18 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.cherninlab/ennodia",
-  "description": "MCP server for multi-agent review with Compare and traceable receipts",
+  "description": "Local MCP server for AI team advice, multi-agent review, Compare, and traceable receipts",
   "repository": {
     "url": "https://github.com/cherninlab/ennodia",
     "source": "github"
   },
-  "version": "0.1.1",
+  "version": "0.2.0",
   "websiteUrl": "https://ennodia.cherninlab.com",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "ennodia",
-      "version": "0.1.1",
+      "version": "0.2.0",
       "transport": {
         "type": "stdio"
       }

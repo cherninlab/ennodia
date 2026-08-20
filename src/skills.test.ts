@@ -280,6 +280,85 @@ describe("Agent Skills", () => {
       expect(discovery.warnings.some((warning) => warning.includes("bad-skill"))).toBe(true);
     });
 
+    it("does not merge harness support across divergent same-ID skill content", async () => {
+      const agentsDir = join(
+        testDir,
+        ".agents",
+        "skills",
+        "shared-review",
+      );
+      const claudeDir = join(
+        testDir,
+        ".claude",
+        "skills",
+        "shared-review",
+      );
+      mkdirSync(agentsDir, { recursive: true });
+      mkdirSync(claudeDir, { recursive: true });
+      writeFileSync(join(agentsDir, "SKILL.md"), [
+        "---",
+        "name: shared-review",
+        "description: Shared review skill.",
+        "---",
+        "Codex-side instructions.",
+      ].join("\n"));
+      writeFileSync(join(claudeDir, "SKILL.md"), [
+        "---",
+        "name: shared-review",
+        "description: Shared review skill.",
+        "---",
+        "Different Claude-side instructions.",
+      ].join("\n"));
+
+      const discovery = await discoverSkillsWithWarnings(testDir);
+      const skill = discovery.skills.find((candidate) =>
+        candidate.id === "shared-review"
+      );
+
+      expect(skill?.harnessIds).toContain("codex");
+      expect(skill?.harnessIds).not.toContain("claude-code");
+      expect(skill?.harnessIds).not.toContain("opencode");
+      expect(skill?.installations).toHaveLength(1);
+      expect(discovery.warnings.some((warning) =>
+        warning.includes("Conflicting skill content for shared-review")
+      )).toBe(true);
+    });
+
+    it("does not let a legacy duplicate wildcard native skill support", async () => {
+      const nativeDir = join(
+        testDir,
+        ".agents",
+        "skills",
+        "shared-review",
+      );
+      const legacyDir = join(testDir, ".ennodia", "skills");
+      mkdirSync(nativeDir, { recursive: true });
+      mkdirSync(legacyDir, { recursive: true });
+      writeFileSync(join(nativeDir, "SKILL.md"), [
+        "---",
+        "name: shared-review",
+        "description: Shared review skill.",
+        "---",
+        "Use the shared instructions.",
+      ].join("\n"));
+      writeFileSync(join(legacyDir, "shared-review.json"), JSON.stringify({
+        id: "shared-review",
+        name: "shared-review",
+        version: "local",
+        description: "Legacy duplicate.",
+        instructions: "Use the shared instructions.",
+      }));
+
+      const skills = await loadRunnableSkillsByIds(["shared-review"], testDir);
+
+      expect(augmentPrompt("Review.", skills, "codex")).toContain(
+        "shared-review",
+      );
+      expect(() => augmentPrompt("Review.", skills, "claude-code")).toThrow(
+        "Skill is not installed for claude-code: shared-review",
+      );
+    });
+
     it("lists bundled Ennodia skills as installable Agent Skills", async () => {
       const discovery = await discoverSkillsWithWarnings(testDir);
       const benchmarkCritic = discovery.skills.find((skill) =>

@@ -14,12 +14,13 @@ response within a few days.
 
 ## Scope Notes
 
-Ennodia starts local agent CLIs as child processes and never adds
-permission-bypass flags by default. Reports are especially welcome for:
+Ennodia starts local agent command-line interface (CLI) programs as child
+processes. It never adds permission-bypass flags by default. Reports are
+especially welcome for:
 
 - any path that causes a child harness to run with broader permissions
   than its adapter declares
-- prompt-injection paths through the Compare judge/synthesizer pipeline
+- prompt-injection paths through the Compare Judge/Result Advisor pipeline
 - data leaving the machine other than through a harness's own provider
   traffic
 - Ennodia IO authentication or binding weaknesses

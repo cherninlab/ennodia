@@ -1,21 +1,21 @@
 ---
 title: Second Opinions as Infrastructure
-description: How to use Ennodia for independent AI panels, decomposed reviews, and red-team prompts.
+description: How to use Ennodia for independent artificial intelligence (AI) panels, decomposed reviews, and red-team prompts.
 ---
 
-Ennodia convenes independent AI panels for judgments too important for one model
-and shows you exactly where they disagree.
+Ennodia convenes independent artificial intelligence (AI) panels for judgments
+that are too important for one model. It shows you exactly where they disagree.
 
 Code review is the first strong use case, not the category. The core pattern is
-delegating a question to installed local agents, keeping the trace visible, and
-using Compare to turn multiple answers into a disagreement map and one usable
-result.
+delegation to installed local agents with a visible trace. Compare turns
+multiple answers into a disagreement map and one usable result. The Judge maps
+the evidence, and the Result Advisor recommends the answer.
 
 ## Three Patterns
 
 ### Replicate
 
-Ask the same question of several agents, then compare the answers.
+Send the same question to multiple agents, then compare the answers.
 
 ```json
 {
@@ -37,7 +37,7 @@ issue is high.
 
 ### Decompose
 
-Split a broad review into focused slices, then synthesize the useful completed
+Split a broad review into focused slices, then combine the useful completed
 outputs.
 
 ```json
@@ -76,7 +76,7 @@ Fan out prompts that argue against a proposal from different angles.
 }
 ```
 
-Use this when the primary agent already has a plausible plan and you want
+Use this when the primary agent has a plausible plan and you want
 independent pressure before committing.
 
 ## Staging Pattern
@@ -84,7 +84,7 @@ independent pressure before committing.
 For larger reviews, have the primary agent stage a folder containing the case
 file: relevant paths, screenshots, dataset summaries, contracts, or decision
 criteria. Then pass `cwd` to Ennodia so child agents can inspect the same local
-context independently. Keep staged material deliberate; do not hand every agent
+context independently. Keep staged material deliberate. Do not give every agent
 an unbounded workspace when a smaller evidence bundle will do.
 
 ## Skills Carry Expertise
@@ -92,7 +92,7 @@ an unbounded workspace when a smaller evidence bundle will do.
 Use Agent Skills as reusable rubrics. A skill can define the review standard,
 expected evidence, output shape, and escalation rules. Ennodia installs bundled
 skills as harness-visible `SKILL.md` folders, then passes skill IDs through a
-run instead of inlining the full instructions into every prompt.
+run without inlining the full instructions into every prompt.
 
 ## Examples
 
@@ -101,19 +101,19 @@ run instead of inlining the full instructions into every prompt.
 - Contract comparison: decompose obligations, termination, liability, and data
   handling into focused slices.
 - Pre-mortems: red-team a roadmap, launch, or migration plan before work starts.
-- Exam or rubric QA: ask several agents to grade an answer against the same
-  staged rubric, then compare where their grading differs.
+- Exam or rubric QA: send the same staged rubric to multiple agents. Compare
+  where their grading differs.
 
 ## Honest Constraints
 
-Ennodia is deliberation-class infrastructure. A run usually takes minutes, not
-seconds. Compare adds two serial model passes after the child agents finish, so
-parallel review with Compare costs roughly N child runs plus a judge and a
-synthesizer.
+Ennodia supports careful review. A run usually takes minutes, not seconds.
+Compare adds two serial model passes after the child agents finish.
+Parallel review with Compare costs roughly N child runs, a Judge, and a Result
+Advisor.
 
-The substrate is installed agent CLIs and local tools, not domain-tuned
-specialist models. Ennodia supports decision-making by surfacing evidence,
-disagreements, and uncertainty; it does not make regulated, legal, financial,
+Ennodia uses installed agent CLIs and local tools. It does not use specialist
+models for one domain. Ennodia supports decisions by showing evidence,
+disagreements, and uncertainty. It does not make regulated, legal, financial,
 medical, or operational decisions for the user.
 
 For storage and data movement boundaries, read

@@ -1,57 +1,100 @@
 # Changelog
 
-All notable changes to Ennodia will be documented in this file.
+This file records all notable Ennodia changes.
+
+## [0.2.0] - 2026-08-20
+
+### Added
+
+- Added a Plan Advisor lifecycle that proposes and validates an inert work plan.
+- Added digest-bound plan execution with inventory and skill checks before launch.
+- Added typed Result Advisor output after the Compare Judge.
+- Added skill selection for each compositional slice.
+- Added controlled-English policy, an Ennodia termbase, and deterministic checks.
+
+### Changed
+
+- Renamed the public Compare result role to Result Advisor.
+- Kept the old `synthesizer` fields as deprecated compatibility aliases.
+- Made isolated tasks reject symbolic links before process launch.
+- Made omitted `cwd` isolation use the server process directory.
+- Made Ennodia IO depend on the matching core package version.
+- Updated the release workflow to publish npm, JavaScript Registry (JSR),
+  Ennodia IO, and Model Context Protocol (MCP) Registry metadata.
+- Updated the README, documentation, website, package metadata, and release instructions.
+
+### Fixed
+
+- Prevented phantom running tasks after a synchronous process spawn failure.
+- Prevented ambiguous skill content from receiving incorrect harness support.
+- Bound advised-plan authorization and launch to one discovered runtime inventory.
+- Corrected Result Advisor model selection when the Judge uses another harness.
+- Prevented model-authored slice prompts from becoming harness command options.
+- Made each advised plan single-use after successful authorization.
+- Canceled earlier workers when a later advised-plan task cannot start.
 
 ## [0.1.1] - 2026-07-07
 
 ### Changed
-- Simplified copy-paste agent installation prompt on landing page and README to `try-ennodia.cherninlab.com`.
+
+- Simplified the agent installation prompt to `try-ennodia.cherninlab.com`.
 
 ## [0.1.0] - 2026-07-06
 
 ### Added
-- Official MCP Registry compatibility: Added `server.json` configuration and `mcpName` package metadata.
-- Improved docs and website landing page with structured data (`SoftwareApplication`), default social images, and recommended unqualified npm installation commands.
-- Documented package publishing steps in [CONTRIBUTING.md](file:///Users/theochernin/Projects/ennodia/CONTRIBUTING.md).
+
+- Added `server.json` and `mcpName` metadata for MCP Registry compatibility.
+- Added `SoftwareApplication` structured data and default social images to the website.
+- Added unqualified npm installation commands to the documentation.
+- Added package publication steps to [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ### Fixed
-- **Atomic Run History**: Made `FileHistorySink` write runs in an append-only JSONL format to prevent concurrent-write data loss and truncate issues. Deduplication and retention compaction now run atomically using a temporary file. Capped output logs in history snapshots to 20k characters/stream and 50 events.
+
+- Made `FileHistorySink` append run history in JSON Lines format.
+- Made retention compaction replace the history file atomically.
+- Limited each history output stream to 20,000 characters and 50 events.
 
 ---
 
 ## [0.1.0-rc.2] - 2026-07-06
 
 ### Added
-- **Ennodia IO**: Created the `@cherninlab/ennodia-io` subpackage, exposing a local HTTP/TS interface for BYOK-style integrations.
-- **Compositional Audits & Second-Opinions**: Implemented compositional workflows and multi-agent consensus synthesis.
-- **Preflight Budgets**: Added local budget limit checks and preflight estimation tools to prevent resource/token overrun.
-- **Agent Skills**: Added agent skill discoverer and loaders, introducing skills like `rigorous-review`, `benchmark-critic`, `compositional-audit`, `release-readiness`, and `source-grounded-audit`.
-- **Compare Synthesis**: Added `CompareManager` to run model-led synthesis across outputs.
-- Custom styling, logo SVGs, and an custom agent-font for the Astro/Starlight documentation website.
+
+- Added the `@cherninlab/ennodia-io` package for local Hypertext Transfer
+  Protocol (HTTP) and TypeScript integrations.
+- Added compositional workflows for focused multi-agent review.
+- Added local budget checks and preflight estimate tools.
+- Added Agent Skill discovery, loading, and bundled review skills.
+- Added `CompareManager` for model-led comparison of task output.
+- Added custom styles, logos, and an agent font to the Astro and Starlight website.
 
 ---
 
 ## [0.1.0-rc.1] - 2026-06-22
 
 ### Added
-- Expanded harness adapters to support Codex CLI, Claude Code, Cline, Kiro, OpenCode, and Hermes Agent.
-- Enhanced comparison interface and planning logic.
+
+- Added adapters for local command-line interface (CLI) programs, including
+  Codex CLI, Claude Code, Cline, Kiro CLI, OpenCode, and Hermes Agent.
+- Improved the comparison interface and route planning.
 - Expanded benchmark documentation and release procedures.
-- Integrated Starlight styling overrides and updated website layout.
+- Added Starlight style overrides and a new website layout.
 
 ---
 
 ## [0.1.0-rc.0] - 2026-06-22
 
 ### Added
-- Bug recall benchmark suite (`bench/bug-recall`) with 4 diagnostic fixtures (missing await, timeout drain, schema contract, cancel propagation).
-- Standardized CLI entry points and MCP connection handshake tests.
-- GitHub Action CI/CD and release build workflows.
+
+- Added the bug-recall benchmark with four diagnostic fixtures.
+- Standardized CLI entry points and MCP handshake tests.
+- Added GitHub Actions workflows for CI, release, and website deployment.
 
 ---
 
 ## [0.0.1] - 2026-06-19
 
 ### Added
-- Initial implementation containing the core orchestration classes (`TaskManager`, `CompareManager`, `RunManager`).
-- thin local harness adapters, task execution scheduler, history sinks, and stdio MCP server.
+
+- Added the core `TaskManager`, `CompareManager`, and `RunManager` classes.
+- Added thin local harness adapters, task scheduling, history storage, and the stdio MCP server.

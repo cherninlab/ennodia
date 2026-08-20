@@ -7,7 +7,7 @@
     "build:lottie": "bun run scripts/build-lottie.ts",
     "sync:docs": "bun run scripts/sync-docs.ts",
     "dev": "bun run sync:docs && astro dev",
-    "build": "bun run sync:docs && astro build",
+    "build": "bun run sync:docs && astro build --force",
     "preview": "astro preview",
     "ensure:cloudflare-project": "bun run scripts/ensure-cloudflare-pages-project.ts",
     "deploy": "bun run build && wrangler pages deploy dist --project-name ennodia --branch main"
