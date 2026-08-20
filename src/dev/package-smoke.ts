@@ -22,11 +22,7 @@ try {
     "--pack-destination",
     tempDir,
   ]);
-  const [packResult] = JSON.parse(pack.stdout) as PackResult[];
-
-  if (!packResult) {
-    throw new Error("npm pack did not return package metadata.");
-  }
+  const packResult = parsePackResult(pack.stdout, "ennodia");
 
   if (packResult.version !== ENNODIA_VERSION) {
     throw new Error(
@@ -59,10 +55,10 @@ try {
     ["npm", "pack", "--json", "--pack-destination", tempDir],
     { cwd: join(import.meta.dir, "../../packages/ennodia-io") },
   );
-  const [ioPackResult] = JSON.parse(ioPack.stdout) as PackResult[];
-  if (!ioPackResult) {
-    throw new Error("Ennodia IO npm pack did not return package metadata.");
-  }
+  const ioPackResult = parsePackResult(
+    ioPack.stdout,
+    "@cherninlab/ennodia-io",
+  );
   if (ioPackResult.version !== ENNODIA_VERSION) {
     throw new Error(
       `Packed IO version ${ioPackResult.version} did not match ${ENNODIA_VERSION}.`,
@@ -131,6 +127,36 @@ function assertIoPackedFiles(paths: string[]): void {
       `Packed Ennodia IO tarball contains forbidden files: ${forbidden.join(", ")}`,
     );
   }
+}
+
+function parsePackResult(stdout: string, expectedName: string): PackResult {
+  const parsed: unknown = JSON.parse(stdout);
+  const candidate = Array.isArray(parsed)
+    ? parsed[0]
+    : isRecord(parsed)
+      ? parsed[expectedName]
+      : undefined;
+
+  if (
+    !isRecord(candidate) ||
+    candidate.name !== expectedName ||
+    typeof candidate.version !== "string" ||
+    typeof candidate.filename !== "string" ||
+    !Array.isArray(candidate.files) ||
+    !candidate.files.every(
+      (file) => isRecord(file) && typeof file.path === "string",
+    )
+  ) {
+    throw new Error(
+      `npm pack did not return valid package metadata for ${expectedName}.`,
+    );
+  }
+
+  return candidate as PackResult;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
 
 function assertPackedFiles(paths: string[]): void {
