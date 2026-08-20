@@ -233,8 +233,9 @@ async function runCapture(
   command: string[],
   options: { cwd?: string; input?: string; timeoutMs?: number } = {},
 ): Promise<{ stdout: string; stderr: string }> {
-  const proc = Bun.spawn(command, {
-    cwd: options.cwd,
+  const proc = Bun.spawn({
+    cmd: command,
+    ...(options.cwd ? { cwd: options.cwd } : {}),
     stdin: options.input ? "pipe" : "ignore",
     stdout: "pipe",
     stderr: "pipe",
