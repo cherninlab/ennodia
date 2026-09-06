@@ -751,6 +751,9 @@ describe("TaskManager", () => {
 
     expect(result.status).toBe("succeeded");
     expect(result.finalMessage).toBe("clean answer");
+    expect(manager.get(task.id, { maxOutputChars: 5 })?.finalMessage).toHaveLength(5);
+    expect(manager.get(task.id, { maxOutputChars: 0 })?.finalMessage).toBe("");
+    expect(manager.get(task.id, { includeOutput: false })?.hasOutput).toBe(true);
     expect(result.stdout).toContain("noisy transcript");
     expect(result.stdout).not.toBe("clean answer");
   });

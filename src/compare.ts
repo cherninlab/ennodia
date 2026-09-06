@@ -165,7 +165,7 @@ type InternalCompare = {
 };
 
 export const CompareAnalysisSchema: z.ZodType<CompareAnalysis> = z.object({
-  consensus: z.array(z.string()).default([]),
+  consensus: z.array(z.string()),
   contradictions: z
     .array(
       z.object({
@@ -177,28 +177,25 @@ export const CompareAnalysisSchema: z.ZodType<CompareAnalysis> = z.object({
           }),
         ),
       }),
-    )
-    .default([]),
+    ),
   partial_coverage: z
     .array(
       z.object({
         source_ids: z.array(z.string()),
         point: z.string(),
       }),
-    )
-    .default([]),
+    ),
   unique_insights: z
     .array(
       z.object({
         source_id: z.string(),
         insight: z.string(),
       }),
-    )
-    .default([]),
-  blind_spots: z.array(z.string()).default([]),
-  risks: z.array(z.string()).default([]),
-  confidence: z.enum(["low", "medium", "high"]).default("medium"),
-});
+    ),
+  blind_spots: z.array(z.string()),
+  risks: z.array(z.string()),
+  confidence: z.enum(["low", "medium", "high"]),
+}).strict();
 
 const AdvisorModelOutputSchema = z.object({
   answer: z.string().min(1),
@@ -564,7 +561,9 @@ export class CompareManager {
       }
 
       seen.add(id);
-      candidates.push(candidateFromTask(task));
+      const candidate = candidateFromTask(task);
+      candidate.content = truncate(candidate.content, taskOptions.maxOutputChars ?? DEFAULT_MAX_OUTPUT_CHARS);
+      candidates.push(candidate);
     }
 
     for (const response of input.responses ?? []) {

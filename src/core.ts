@@ -612,25 +612,24 @@ export class EnnodiaCore {
       input.skillIds,
       input.cwd,
     );
-    const tasks = selectedHarnessIds.map((harnessId) => {
-      const { adapter, discovery } = this.requireRunnableHarness(
-        harnessId,
-        harnesses,
-      );
-
-      return this.taskManager.start(adapter, discovery, {
-        prompt: input.prompt,
-        cwd: input.cwd,
-        isolateCwd: input.isolateCwd,
-        model: input.model,
-        timeoutMs: input.timeoutMs,
-        skills,
-      }).task;
-    });
-    const unrequestedSkillsPresent = await this.findUnrequestedSkills(
-      input.cwd,
-      skills,
-    );
+    const unrequestedSkillsPresent = await this.findUnrequestedSkills(input.cwd, skills);
+    const tasks: TaskView[] = [];
+    try {
+      for (const harnessId of selectedHarnessIds) {
+        const { adapter, discovery } = this.requireRunnableHarness(harnessId, harnesses);
+        tasks.push(this.taskManager.start(adapter, discovery, {
+          prompt: input.prompt,
+          cwd: input.cwd,
+          isolateCwd: input.isolateCwd,
+          model: input.model,
+          timeoutMs: input.timeoutMs,
+          skills,
+        }).task);
+      }
+    } catch (error) {
+      for (const task of tasks) this.taskManager.cancel(task.id);
+      throw error;
+    }
 
     return { plan, tasks, budget, unrequestedSkillsPresent };
   }
@@ -666,31 +665,30 @@ export class EnnodiaCore {
     );
     assertBudgetWithinLimits(budget);
 
-    const tasks = resolvedSlices.map((slice, index) => {
-      const { adapter, discovery } = this.requireRunnableHarness(
-        slice.harnessId,
-        harnesses,
-      );
-
-      return {
-        sliceId: slice.id,
-        sliceTitle: slice.title,
-        harnessId: slice.harnessId,
-        routeCategory: slice.plan.category,
-        task: this.taskManager.start(adapter, discovery, {
-          prompt: slice.prompt,
-          cwd: input.cwd,
-          isolateCwd: input.isolateCwd,
-          model: slice.model,
-          timeoutMs: input.timeoutMs,
-          skills: sliceSkills[index] ?? [],
-        }).task,
-      };
-    });
-    const unrequestedSkillsPresent = await this.findUnrequestedSkills(
-      input.cwd,
-      requestedSkills,
-    );
+    const unrequestedSkillsPresent = await this.findUnrequestedSkills(input.cwd, requestedSkills);
+    const tasks: CompositionalStart["tasks"] = [];
+    try {
+      for (const [index, slice] of resolvedSlices.entries()) {
+        const { adapter, discovery } = this.requireRunnableHarness(slice.harnessId, harnesses);
+        tasks.push({
+          sliceId: slice.id,
+          sliceTitle: slice.title,
+          harnessId: slice.harnessId,
+          routeCategory: slice.plan.category,
+          task: this.taskManager.start(adapter, discovery, {
+            prompt: slice.prompt,
+            cwd: input.cwd,
+            isolateCwd: input.isolateCwd,
+            model: slice.model,
+            timeoutMs: input.timeoutMs,
+            skills: sliceSkills[index] ?? [],
+          }).task,
+        });
+      }
+    } catch (error) {
+      for (const started of tasks) this.taskManager.cancel(started.task.id);
+      throw error;
+    }
 
     return {
       tasks,

@@ -7,7 +7,7 @@ export default defineConfig({
   integrations: [
     starlight({
       title: "Ennodia",
-      description: "MCP server for multi-agent review with Compare and traceable receipts.",
+      description: "Try other agents and skills from your familiar workflow.",
       favicon: "/favicon.svg",
       head: [
         {
@@ -59,11 +59,25 @@ export default defineConfig({
           ]
         },
         {
-          label: "Guides",
+          label: "Use Ennodia",
           items: [
-            { label: "Budgets and Limits", slug: "docs/guides/budgets-and-limits" },
+            { label: "Recipes", slug: "docs/guides/recipes" },
+            { label: "Understand Results", slug: "docs/guides/understand-results" },
             { label: "Using Agent Skills", slug: "docs/guides/agent-skills" },
+            { label: "Troubleshooting", slug: "docs/guides/troubleshooting" },
+            { label: "Budgets and Limits", slug: "docs/guides/budgets-and-limits" },
             { label: "Running Better Audits", slug: "docs/guides/running-better-audits" }
+          ]
+        },
+        {
+          label: "Examples and Evidence",
+          items: [
+            { label: "Overview", slug: "docs/evidence" },
+            { label: "Building Ennodia with Ennodia", slug: "docs/evidence/building-ennodia" },
+            { label: "Find Stale Documentation", slug: "docs/evidence/docs-drift" },
+            { label: "Try a Skill Separately", slug: "docs/evidence/skill-trial" },
+            { label: "Measurement Plan", slug: "docs/evidence/measurement" },
+            { label: "Roadmap", slug: "docs/roadmap" }
           ]
         },
         {

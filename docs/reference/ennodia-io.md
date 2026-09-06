@@ -62,8 +62,25 @@ Environment variables:
 IO binds to loopback by default and refuses non-loopback hosts unless an API key
 is configured. Bearer tokens are compared with a timing-safe comparison.
 
+IO checks the `Host` header on every route. In the default loopback posture,
+the host must be `localhost`, `::1`, or an address in `127.0.0.0/8`. A forged
+`Host` header, such as one from Domain Name System (DNS) rebinding, gets a
+`403 invalid_host` error. An explicit non-loopback `--host` turns off this
+allowlist and requires the API key.
+
+IO checks the `Origin` header when a request carries one. Only loopback origins
+are accepted. A browser post from a non-loopback origin gets a `403 invalid_origin`
+error before any run starts. Clients that send no `Origin` header, such as
+local command-line tools, keep working.
+
+`POST /v1/chat/completions` requires a JSON media type such as
+`application/json`. Other media types get a `415 unsupported_media_type` error.
+This requirement stops simple-request browser posts, for example cross-site
+forms that send `text/plain`.
+
 IO intentionally sends no Cross-Origin Resource Sharing (CORS) headers by
-default. The browser blocks local apps unless they use their own local proxy.
+default. Browsers cannot read cross-origin responses or send cross-origin JSON posts
+unless their app uses an appropriate same-origin proxy.
 There is no `--cors-origin` flag. Add one only when an app needs that trust
 boundary.
 
@@ -75,7 +92,7 @@ boundary.
 | `GET /v1/provider-options` | Supported | Returns app-facing local provider options for settings screens. |
 | `GET /v1/byok-options` | Supported alias | Same response as provider options. |
 | `GET /v1/models` | Supported | Returns local virtual model IDs for compatible clients. |
-| `POST /v1/chat/completions` | Supported subset | Non-streaming text messages only. |
+| `POST /v1/chat/completions` | Supported subset | Non-streaming text messages only. Requires a JSON media type. |
 
 ## Provider Options
 
@@ -202,9 +219,15 @@ The response includes the normal OpenAI-style `choices[0].message.content` plus
 an `ennodia` object. The object contains the run ID, status, selected harnesses,
 task IDs, Compare ID when present, and budget estimate.
 
-Limits and failures are returned as JSON with `cache-control: no-store`:
+Handler errors use JSON with `cache-control: no-store`. The native server can
+reject a request before the handler runs, so clients must also handle an empty
+HTTP error response:
 
-- request body above the configured cap -> `413 request_too_large`
+- disallowed `Host` header or `Origin` header -> `403 invalid_host` or `403 invalid_origin`
+- non-JSON media type on chat completions -> `415 unsupported_media_type`
+- request body above the configured cap -> HTTP `413`. Bun can reject it with
+  an empty body before the handler runs. Requests rejected by the handler use
+  the JSON error `request_too_large`.
 - saturated chat completions -> `429 rate_limit_error` with `retry-after: 1`
 - client abort after the run starts -> `499 client_closed_request`. IO cancels
   the Ennodia run when Core exposes cancellation

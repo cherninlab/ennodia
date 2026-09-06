@@ -1,0 +1,16 @@
+{
+  "recordedAt": "2026-09-06",
+  "kind": "single development trial",
+  "harness": "antigravity",
+  "model": "Configured default; exact model not established",
+  "runId": "d3e36bf1-07dd-4912-af33-b5c904603b44",
+  "taskIds": [
+    "e822af92-4410-4ed8-9382-f62a6f36a505"
+  ],
+  "status": "succeeded",
+  "elapsedMs": 13272,
+  "output": "* **Default Port Conflict**: [README.md:L5](../docs-drift/README.md#L5) claims the default port is `3000`, but [config.ts:L1](../docs-drift/config.ts#L1) defines [`DEFAULT_PORT`](../docs-drift/config.ts#L1) as `4545`.\n* **Port Environment Variable Conflict**: [README.md:L5](../docs-drift/README.md#L5) instructs users to configure ports using `PORT`, whereas [`readPort`](../docs-drift/config.ts#L2-L5) in [config.ts:L3](../docs-drift/config.ts#L3) reads `APP_PORT`.\n* **Readiness Response Conflict**: [README.md:L6](../docs-drift/README.md#L6) states the readiness response is `{ \"status\": \"ok\" }`, but [`readiness`](../docs-drift/config.ts#L6-L8) in [config.ts:L6-L7](../docs-drift/config.ts#L6-L7) returns `{ ready: true }`.\n* **Archive Status**: [archive/migration.md](../docs-drift/archive/migration.md#L1-L5) does **not** need changes; as stated in [archive/migration.md:L3-L4](../docs-drift/archive/migration.md#L3-L4), it is explicitly labeled as a historical migration record of the previous release rather than active configuration documentation.",
+  "edits": "Local file URL prefixes normalized to fixture-relative paths.",
+  "verification": "Primary agent checked all three conflicts and the historical distinction against the fixture.",
+  "limitation": "Known-answer fixture. No control run or speed or cost advantage established."
+}

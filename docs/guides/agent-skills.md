@@ -3,14 +3,15 @@ title: Agent Skills
 description: Install bundled Ennodia skills in native harness locations and tell child agents to use them during a run.
 ---
 
-Ennodia uses native Agent Skills. A skill is a folder that contains `SKILL.md`.
-Install it where each harness can find skills.
+A new Agent Skill can help a task, add irrelevant advice, or make no difference.
+Try the skill in a separate Ennodia task and bring useful findings back to your main conversation.
 
-Ennodia does not use a private skill format. It does not put the full skill
-instructions in each delegated prompt.
+A skill is a folder containing `SKILL.md` in a native agent location.
+Ennodia discovers that folder and requests the selected skill by name.
+It does not inline the full instructions into each delegated prompt.
 
-Ennodia installs or discovers the native skill folder. It then passes the
-selected `skillIds` into the run.
+The primary agent can keep useful partial findings without adopting every recommendation.
+The [skill trial example](/docs/evidence/skill-trial/) shows a controlled small exercise.
 
 ## List Available Skills
 
@@ -53,8 +54,10 @@ Review the planned paths. If they are correct, repeat with `dryRun: false`.
   "tool": "ennodia_run",
   "arguments": {
     "prompt": "Audit this documentation against the linked sources and recommend exact edits.",
-    "mode": "parallel",
-    "compare": true,
+    "harnessId": "codex",
+    "mode": "single",
+    "compare": false,
+    "cwd": "/absolute/path/to/project",
     "skillIds": ["source-grounded-audit"]
   }
 }
@@ -62,6 +65,11 @@ Review the planned paths. If they are correct, repeat with `dryRun: false`.
 
 Task and run views include selected skill metadata in `appliedSkills`, so the
 primary agent can see which skills were requested.
+
+Native agents can self-select other skills from their environment.
+An empty requested skill list does not guarantee a skill-free control.
+`appliedSkills` records the request, not verified execution of the skill’s instructions.
+A permission denial can prevent the worker from loading the skill.
 
 Bundled skills include:
 

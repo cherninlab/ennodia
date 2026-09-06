@@ -60,10 +60,13 @@ export class FileHistorySink implements HistorySink {
 
   async recordRun(snapshot: RunHistorySnapshot): Promise<void> {
     await mkdir(this.dir, { recursive: true, mode: 0o700 });
+    // Frame each append with a leading newline so a previous truncated record
+    // cannot swallow the next receipt. Keep the delimiter and record in one
+    // append; never read/truncate the shared file to repair it.
     // Append-only hot path: an interrupted write can lose at most this
     // snapshot, and concurrent writers (MCP and IO processes share the
     // default directory) cannot clobber each other's lines.
-    await appendFile(this.path, `${serialize(snapshot)}\n`, { mode: 0o600 });
+    await appendFile(this.path, `\n${serialize(snapshot)}\n`, { mode: 0o600 });
     await this.compactIfNeeded();
   }
 

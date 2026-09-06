@@ -1,30 +1,23 @@
 ---
 import "../styles/landing.css";
 import logoSrc from "../../../docs/assets/logo.svg?url";
-import arrowIconSrc from "../../../docs/assets/icons/arrow.svg?url";
 import githubIconSrc from "../../../docs/assets/icons/github.svg?url";
 
 import codexLogoSrc from "../../../docs/assets/agents/codex-color.svg?url";
-import codexTransparentLogoSrc from "../../../docs/assets/agents/codex-transparent.svg?url";
 import claudecodeLogoSrc from "../../../docs/assets/agents/claudecode-color.svg?url";
 import opencodeLogoSrc from "../../../docs/assets/agents/opencode-light.svg?url";
-import opencodeDarkLogoSrc from "../../../docs/assets/agents/opencode-dark.svg?url";
 import kilocodeLogoSrc from "../../../docs/assets/agents/kilocode.svg?url";
 import kiroLogoSrc from "../../../docs/assets/agents/kiro-color.svg?url";
 import clineLogoSrc from "../../../docs/assets/agents/cline.svg?url";
 import hermesLogoSrc from "../../../docs/assets/agents/hermesagent.svg?url";
 import antigravityLogoSrc from "../../../docs/assets/agents/antigravity-color.svg?url";
-import mcpLogoSrc from "../../../docs/assets/agents/mcp.svg?url";
 
-const pageTitle =
-  "Ennodia - agent review with Plan Advisor, Judge, and Result Advisor";
-const pageDescription =
-  "Ennodia lets your primary agent use local artificial intelligence (AI) tools for second opinions, bounded team advice, and controlled comparisons.";
+const pageTitle = "Ennodia — keep your agent, get another way forward";
+const pageDescription = "Try other agents, models, and skills from your familiar AI workflow. Bring useful findings back to the same conversation.";
 const siteUrl = Astro.site ?? new URL("https://ennodia.cherninlab.com");
 const canonicalUrl = new URL(Astro.url.pathname, siteUrl).toString();
 const socialImageUrl = new URL("/og.png", siteUrl).toString();
 const socialImageAlt = "Ennodia wordmark.";
-
 const adapters = [
   { name: "Codex", logoSrc: codexLogoSrc },
   { name: "Claude Code", logoSrc: claudecodeLogoSrc },
@@ -36,170 +29,24 @@ const adapters = [
   { name: "Antigravity", logoSrc: antigravityLogoSrc },
 ];
 
-const installCommand = "npx -y ennodia";
-const agentInstallPrompt = "try-ennodia.cherninlab.com";
-const heroAgentInstallPrompt = "try-ennodia.cherninlab.com";
-const mcpConfigSnippet = `{
-  "mcpServers": {
-    "ennodia": {
-      "command": "npx",
-      "args": ["-y", "ennodia"]
-    }
-  }
-}`;
-const examplePrompt = `Use Ennodia to ask the best available local agents:
-"Review this change before I ship it. Find the highest-risk issue, docs drift, and install confusion. Compare disagreements with a model and give me the next action."`;
-const examples = [
-  {
-    title: "Persistent bug",
-    text: "Run some agents when one answer is not sufficient. Compare likely causes before you edit.",
-  },
-  {
-    title: "Planning tradeoff",
-    text: "Request migration plans from different models. Compare their assumptions before the project selects a plan.",
-  },
-  {
-    title: "Team suggestion",
-    text: "Use the Plan Advisor to propose a bounded mix of harnesses, models, and skills. Inspect the plan before you start it.",
-  },
-  {
-    title: "Skill comparison",
-    text: "Run one task with a skill such as source-grounded-audit. Run a second task without it. Compare the results.",
-  },
-  {
-    title: "Large plan review",
-    text: "Divide a broad proposal into focused audit slices. Send the slices to different local agents. Compare the useful results.",
-  },
-  {
-    title: "Benchmark receipts",
-    text: "Run deterministic bug-recall fixtures before you accept a claim. Repeat the test from the checkout.",
-  },
-];
-const interfaces = [
-  {
-    title: "Ennodia MCP",
-    logoSrc: mcpLogoSrc,
-    status: "Available",
-    text: "Agents use this shipped interface. It provides MCP tools for discovery, plan advice, runs, budgets, tasks, and Compare.",
-  },
-  {
-    title: "Ennodia Core",
-    status: "Available",
-    text: "Ennodia Core contains shared behavior for MCP and the IO package. It controls routes, advice, tasks, failures, and Compare.",
-  },
-];
-const advantages = [
-  "Ennodia uses your local agent command-line interface (CLI) programs, subscriptions, and model choices as a review panel",
-  "Ennodia finds supported harnesses automatically and keeps adapters thin",
-  "The Plan Advisor proposes a bounded team as inert data. A separate validated call starts the plan",
-  "Ennodia estimates preflight input tokens and applies hard local limits",
-  "Ennodia tracks task IDs, time estimates, output, failures, Compare state, and terminal run history",
-  "The Judge maps parallel answers. The Result Advisor recommends an answer",
-  "Model and skill preference memory remains on the roadmap",
+
+const recipes = [
+  { number: "01", title: "The task is stuck", text: "You have tried a fix twice. A focused second attempt can test a different cause before you start over.", prompt: "Use Ennodia to get a second opinion on this bug. Give one available agent the failing test and our attempted fixes. Request a different explanation and a way to test it. Bring the findings back here." },
+  { number: "02", title: "A skill might help", text: "Try a skill in a separate task. Keep its useful findings without loading the whole experiment into your main conversation.", prompt: "Use Ennodia to try an installed review skill on this change in a separate task. Keep the review read-only. Show the useful findings, irrelevant advice, and what remains unverified." },
+  { number: "03", title: "The answers disagree", text: "Find the assumption behind the disagreement. Decide what to verify next, with the attempted approaches in view.", prompt: "Use Ennodia to compare these two answers. Identify their different assumptions, the evidence for each, and the smallest check that can settle the disagreement." },
 ];
 const faqItems = [
-  {
-    question: "What is Ennodia?",
-    answer:
-      "Ennodia is a local Model Context Protocol (MCP) server for agent review. Your primary agent can request second opinions and compare the answers.",
-  },
-  {
-    question: "Why would one AI agent request help from other agents?",
-    answer:
-      "Different agents find different defects. Use additional model work when quality, risk, or plan uncertainty is important.",
-  },
-  {
-    question: "How long does a run take?",
-    answer:
-      "A run usually takes minutes. Ennodia starts local agent command-line interfaces (CLIs). Compare then adds a Judge task and a Result Advisor task.",
-  },
-  {
-    question: "Can Ennodia suggest a team for my task?",
-    answer:
-      "Yes. The Plan Advisor proposes explicit harness, model, and skill assignments. Ennodia validates the proposal as inert data. A separate call starts it.",
-  },
-  {
-    question: "Do I need to know Model Context Protocol (MCP)?",
-    answer:
-      "No. Paste the install line into Codex, Claude Code, Antigravity, or another agent. Tell the agent to install Ennodia.",
-  },
-  {
-    question: "Does Ennodia replace my main AI agent?",
-    answer:
-      "No. Your primary agent remains responsible. Ennodia routes a request to other local agents and returns their answers to the same workflow.",
-  },
-  {
-    question: "Which agents can Ennodia use?",
-    answer:
-      "Ennodia uses local harness adapters. Supported CLIs include Codex, Claude Code, OpenCode, Kilo Code, Kiro CLI, Cline, Hermes Agent, and Antigravity.",
-  },
-  {
-    question: "Does Ennodia expose an OpenAI-compatible application programming interface (API)?",
-    answer:
-      "The separate Ennodia IO package exposes experimental local provider options and a non-streaming chat-completions subset.",
-  },
-  {
-    question: "Does Ennodia send my code to Ennodia servers?",
-    answer:
-      "No. Ennodia runs locally and does not use an Ennodia-hosted service. A selected agent CLI can contact its configured model provider.",
-  },
-  {
-    question: "Why not manually copy prompts between tools?",
-    answer:
-      "Manual copies lose traceability and require you to compare the answers. Ennodia keeps agents, task IDs, failures, timing, findings, and results together.",
-  },
-  {
-    question: "Can Ennodia limit spend?",
-    answer:
-      "Ennodia estimates preflight input tokens. It can enforce maxChildTasks and maxEstimatedInputTokens. It cannot predict provider billing or internal harness context.",
-  },
-  {
-    question: "Is there a benchmark?",
-    answer:
-      "Yes. The documentation contains a dated bug-recall benchmark. Run bun run bench:bug-recall to repeat it from a checkout.",
-  },
-  {
-    question: "Does Ennodia support files and screenshots?",
-    answer:
-      "Available file and screenshot operations depend on each local harness. Provide file paths and short descriptions. Ennodia does not yet stage attachments.",
-  },
-  {
-    question: "Is Ennodia only for code review?",
-    answer:
-      "No. Ennodia also supports documentation audits, release checks, migrations, research checks, and design inspections.",
-  },
+  { question: "Where do I use Ennodia?", answer: "In your usual agent conversation. Ennodia connects through Model Context Protocol (MCP). You can use Codex or another compatible client." },
+  { question: "What do I need installed?", answer: "Bun and at least one supported agent command-line interface (CLI), with working provider access. Your agent can help configure Ennodia." },
+  { question: "Do I need another subscription?", answer: "Ennodia is free and open source. The agents use their configured model access. Provider subscriptions, quotas, and charges still apply." },
+  { question: "What if the other agent also fails?", answer: "That attempt remains useful context for your next decision. A failed login differs from an approach that did not help. Neither proves a task impossible." },
+  { question: "Will this save tokens or time?", answer: "It can reduce manual switching and repeated work. Additional attempts also consume resources. We have not established general time or token savings." },
+  { question: "Where does my code go?", answer: "Ennodia runs locally without an Ennodia-hosted service. Each selected agent can send material to its configured provider. Local run history can be disabled." },
+  { question: "Does it choose and update every model for me?", answer: "You can select models and skills or request a suggested team. Automatic updates and recommendations learned from past outcomes are future work." },
 ];
-const faqStructuredData = {
-  "@context": "https://schema.org",
-  "@type": "FAQPage",
-  mainEntity: faqItems.map((item) => ({
-    "@type": "Question",
-    name: item.question,
-    acceptedAnswer: {
-      "@type": "Answer",
-      text: item.answer,
-    },
-  })),
-};
-const softwareStructuredData = {
-  "@context": "https://schema.org",
-  "@type": "SoftwareApplication",
-  name: "Ennodia",
-  description: pageDescription,
-  url: siteUrl.toString(),
-  applicationCategory: "DeveloperApplication",
-  operatingSystem: "macOS, Linux",
-  offers: {
-    "@type": "Offer",
-    price: "0",
-    priceCurrency: "USD",
-  },
-  license: "https://opensource.org/license/mit/",
-  downloadUrl: "https://www.npmjs.com/package/ennodia",
-  sameAs: ["https://github.com/cherninlab/ennodia"],
-};
+const faqStructuredData = { "@context": "https://schema.org", "@type": "FAQPage", mainEntity: faqItems.map((item) => ({ "@type": "Question", name: item.question, acceptedAnswer: { "@type": "Answer", text: item.answer } })) };
+const applicationStructuredData = { "@context": "https://schema.org", "@type": "SoftwareApplication", name: "Ennodia", description: pageDescription, url: siteUrl.toString(), applicationCategory: "DeveloperApplication", operatingSystem: "macOS, Linux", isAccessibleForFree: true, license: "https://github.com/cherninlab/ennodia/blob/main/LICENSE", codeRepository: "https://github.com/cherninlab/ennodia" };
 ---
-
 <!doctype html>
 <html lang="en">
   <head>
@@ -222,507 +69,90 @@ const softwareStructuredData = {
     <meta name="twitter:title" content={pageTitle} />
     <meta name="twitter:description" content={pageDescription} />
     <meta name="twitter:image" content={socialImageUrl} />
-    <script
-      type="application/ld+json"
-      set:html={JSON.stringify(faqStructuredData)}
-    />
-    <script
-      type="application/ld+json"
-      set:html={JSON.stringify(softwareStructuredData)}
-    />
+
+
     <title>{pageTitle}</title>
   </head>
   <body>
     <a class="skip-link" href="#main-content">Skip to content</a>
-
+    <header class="site-header wrap">
+      <a href="/" aria-label="Ennodia home"><img class="wordmark" src={logoSrc} alt="Ennodia" /></a>
+      <nav aria-label="Main navigation">
+        <a href="/docs/getting-started/">Docs</a>
+        <a class="github-link" href="https://github.com/cherninlab/ennodia"><img src={githubIconSrc} alt="" /> GitHub</a>
+      </nav>
+    </header>
     <main id="main-content">
-      <section class="hero" aria-labelledby="hero-title">
-        <div class="hero-inner">
-          <h1 id="hero-title">
-            <span class="sr-only">Ennodia. </span>
-            <img class="hero-logo" src={logoSrc} alt="" aria-hidden="true" />
-            <span class="hero-title-text">AI makes mistakes</span>
-          </h1>
-          <p class="hero-subtitle">
-            But what&nbsp;one&nbsp;misses, another&nbsp;catches!
-          </p>
-          <div
-            class="hero-terminal"
-            role="img"
-            aria-label="Three AI tools inspect the same work. Compare returns one checked answer."
-          >
-            <div class="terminal-command">
-              <span class="terminal-muted">›</span>
-              <span class="terminal-typed">review this before I ship it</span>
-              <span class="terminal-cursor" aria-hidden="true"></span>
-            </div>
-            <div class="terminal-line terminal-delay-1">
-              <span class="terminal-muted"
-                >three AI agents inspect the work...</span
-              >
-            </div>
-            <div class="terminal-rows">
-              <div class="terminal-line terminal-row terminal-delay-2">
-                <img src={codexTransparentLogoSrc} alt="" aria-hidden="true" />
-                <span>Codex</span>
-                <span class="terminal-bar" aria-hidden="true">
-                  <span style="--bar-width: 54%; --bar-color: #2a78d6"></span>
-                </span>
-                <span class="terminal-status">✓ 2.1 min</span>
-              </div>
-              <div class="terminal-line terminal-row terminal-delay-3">
-                <img src={claudecodeLogoSrc} alt="" aria-hidden="true" />
-                <span>Claude Code</span>
-                <span class="terminal-bar" aria-hidden="true">
-                  <span style="--bar-width: 85%; --bar-color: #1baf7a"></span>
-                </span>
-                <span class="terminal-status">✓ 3.4 min</span>
-              </div>
-              <div class="terminal-line terminal-row terminal-delay-4">
-                <img src={opencodeDarkLogoSrc} alt="" aria-hidden="true" />
-                <span>OpenCode</span>
-                <span class="terminal-bar" aria-hidden="true">
-                  <span style="--bar-width: 31%; --bar-color: #eda100"></span>
-                </span>
-                <span class="terminal-status">✓ 1.2 min</span>
-              </div>
-            </div>
-            <div class="terminal-line terminal-delay-5">
-              <span class="terminal-muted">Compare examines the answers...</span>
-            </div>
-            <div class="terminal-line terminal-good terminal-delay-6">
-              ✓ all three agree on 2 issues
-            </div>
-            <div class="terminal-line terminal-warn terminal-delay-7">
-              ! Claude Code found issue 3. It has high risk.
-            </div>
-            <div class="terminal-line terminal-final terminal-delay-8">
-              one checked answer
-            </div>
+      <section class="hero wrap" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <p class="eyebrow">For the task you want to finish</p>
+          <h1 id="hero-title">Keep your agent.<br /><span>Get another<br class="wide-only" /> way forward.</span></h1>
+          <p class="hero-description">When a task stalls, try another agent, model, or skill without rebuilding the conversation. Bring useful findings back to the tool you know.</p>
+          <div class="actions">
+            <a class="button primary" href="/docs/getting-started/">Add Ennodia to your agent <span aria-hidden="true">↗</span></a>
+            <a class="text-link" href="#in-practice">See it in use <span aria-hidden="true">↓</span></a>
           </div>
-          <div class="hero-prompt">
-            <p class="snippet-label">Paste this into your agent</p>
-            <div class="code-copy">
-              <pre><code>try-ennodia.cherninlab.com</code></pre>
-              <button
-                class="copy-button"
-                type="button"
-                data-copy-code={heroAgentInstallPrompt}
-                aria-label="Copy agent install prompt"></button>
-              <span class="copy-status" data-copy-status aria-live="polite"
-              ></span>
-            </div>
-          </div>
-          <div class="hero-links" aria-label="More links">
-            <a href="/docs/getting-started/">Read docs</a>
-            <span aria-hidden="true">·</span>
-            <a class="github-link" href="https://github.com/cherninlab/ennodia">
-              <img src={githubIconSrc} alt="" aria-hidden="true" />
-              GitHub
-            </a>
-          </div>
+          <p class="hero-note">Open source. Runs locally. Uses your installed agents.</p>
         </div>
-      </section>
-
-      <section
-        class="section adapters-section"
-        aria-labelledby="adapters-title"
-      >
-        <div class="section-label">Agents</div>
-        <div class="section-body">
-          <h2 id="adapters-title">Compatible local agents</h2>
-          <p>
-            Ennodia works through supported local harnesses. It does not provide
-            a hosted model account or replace the subscriptions those tools use.
-          </p>
-          <ul class="adapter-list">
-            {
-              adapters.map((adapter) => (
-                <li>
-                  <img
-                    src={adapter.logoSrc}
-                    class="adapter-logo"
-                    alt=""
-                    aria-hidden="true"
-                  />
-                  <strong>{adapter.name}</strong>
-                </li>
-              ))
-            }
-          </ul>
-        </div>
-      </section>
-
-      <section class="section faq-section" aria-labelledby="faq-title">
-        <div class="section-label">FAQ</div>
-        <div class="section-body">
-          <h2 id="faq-title">Common questions</h2>
-          <div class="faq-list">
-            {
-              faqItems.map((item) => (
-                <details>
-                  <summary>{item.question}</summary>
-                  <p>{item.answer}</p>
-                </details>
-              ))
-            }
-          </div>
-        </div>
-      </section>
-
-      <section class="section code-section" aria-labelledby="install-title">
-        <div class="section-label">Getting Started</div>
-        <div class="section-body">
-          <h2 id="install-title">Install Ennodia</h2>
-          <div class="install-layout">
-            <div>
-              <p>
-                Send the install link to your primary agent, or add Ennodia to
-                an MCP client directly.
-              </p>
-            </div>
-            <div class="install-snippets">
-              <div>
-                <p class="snippet-label">Agent prompt</p>
-                <div class="code-copy">
-                  <pre><code>{agentInstallPrompt}</code></pre>
-                  <button
-                    class="copy-button"
-                    type="button"
-                    data-copy-code={agentInstallPrompt}
-                    aria-label="Copy agent install prompt"></button>
-                  <span class="copy-status" data-copy-status aria-live="polite"
-                  ></span>
-                </div>
-              </div>
-              <div>
-                <p class="snippet-label">Command</p>
-                <div class="code-copy">
-                  <pre><code>{installCommand}</code></pre>
-                  <button
-                    class="copy-button"
-                    type="button"
-                    data-copy-code={installCommand}
-                    aria-label="Copy install command"></button>
-                  <span class="copy-status" data-copy-status aria-live="polite"
-                  ></span>
-                </div>
-              </div>
-              <div>
-                <p class="snippet-label">MCP config</p>
-                <div class="code-copy">
-                  <pre><code>{mcpConfigSnippet}</code></pre>
-                  <button
-                    class="copy-button"
-                    type="button"
-                    data-copy-code={mcpConfigSnippet}
-                    aria-label="Copy MCP config"></button>
-                  <span class="copy-status" data-copy-status aria-live="polite"
-                  ></span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section class="section intro-section" aria-labelledby="intro-title">
-        <div class="section-label">Use cases</div>
-        <div class="section-body">
-          <h2 id="intro-title">Ennodia use cases</h2>
-          <ul class="example-list">
-            {
-              examples.map((example) => (
-                <li>
-                  <h3>{example.title}</h3>
-                  <p>{example.text}</p>
-                </li>
-              ))
-            }
-          </ul>
-        </div>
-      </section>
-
-      <section class="section example-section" aria-labelledby="example-title">
-        <div class="section-label">Example prompt</div>
-        <div class="section-body">
-          <h2 id="example-title">Try an agent review</h2>
-          <p>
-            This asks Ennodia to run other agents, compare disagreements, and
-            return one next action.
-          </p>
-          <div class="code-copy">
-            <pre><code>{examplePrompt}</code></pre>
-            <button
-              class="copy-button"
-              type="button"
-              data-copy-code={examplePrompt}
-              aria-label="Copy example prompt"></button>
-            <span class="copy-status" data-copy-status aria-live="polite"
-            ></span>
-          </div>
-        </div>
-      </section>
-
-      <section class="section process-section" aria-labelledby="loop-title">
-        <div class="section-label">Process</div>
-        <div class="section-body">
-          <h2 id="loop-title">How Ennodia runs</h2>
-          <ol class="process-diagram" aria-label="Ennodia request flow">
-            <li>
-              <div class="process-number">1</div>
-              <div class="process-copy">
-                <h3>Request</h3>
-                <p>Your primary agent sends one request.</p>
-              </div>
-              <div class="process-visual">
-                <span class="process-node">Agent</span>
-                <span class="process-line" aria-hidden="true"></span>
-                <span class="process-node process-node-dark">Ennodia</span>
-              </div>
-            </li>
-            <li>
-              <div class="process-number">2</div>
-              <div class="process-copy">
-                <h3>Route or advise</h3>
-                <p>Ennodia selects a route. The Plan Advisor can propose an inert plan.</p>
-              </div>
-              <div class="process-visual process-visual-cluster">
-                <span class="process-node process-node-dark">Ennodia</span>
-                <span class="process-line" aria-hidden="true"></span>
-                <span class="process-node process-node-dotted">Plan Advisor</span>
-                <span class="process-node process-node-small">Plan</span>
-              </div>
-            </li>
-            <li>
-              <div class="process-number">3</div>
-              <div class="process-copy">
-                <h3>Review</h3>
-                <p>Each worker completes its explicit slice.</p>
-              </div>
-              <div class="process-visual process-visual-cluster">
-                <span class="process-cluster" aria-label="Agent answers">
-                  <span class="process-node process-node-small">A</span>
-                  <span class="process-node process-node-small">B</span>
-                  <span class="process-node process-node-small">C</span>
-                </span>
-                <span class="process-line" aria-hidden="true"></span>
-                <span class="process-node process-node-dotted">Compare</span>
-              </div>
-            </li>
-            <li>
-              <div class="process-number">4</div>
-              <div class="process-copy">
-                <h3>Judge and advise</h3>
-                <p>The Judge maps evidence. The Result Advisor recommends an answer.</p>
-              </div>
-              <div class="process-visual">
-                <span class="process-node process-node-dotted">Judge</span>
-                <span class="process-line" aria-hidden="true"></span>
-                <span class="process-node process-node-dotted">Result Advisor</span>
-                <span class="process-node process-node-dark">Answer and trace</span>
-              </div>
-            </li>
+        <figure class="work-example" id="in-practice">
+          <figcaption><span class="status-dot" aria-hidden="true"></span> One task. The same conversation.</figcaption>
+          <div class="request"><span class="speaker">The task</span><p>Check Ennodia’s local server.<br />Can a browser start unauthorized work?</p></div>
+          <ol class="attempts">
+            <li><span class="attempt-mark muted" aria-hidden="true">×</span><div><strong>Claude Code</strong><span>Login expired. The task did not start.</span></div></li>
+            <li><span class="attempt-mark" aria-hidden="true">↗</span><div><strong>OpenCode</strong><span>Reproduced the problem. Wrote a fix and tests.</span></div></li>
+            <li><span class="attempt-mark done" aria-hidden="true">✓</span><div><strong>Back with the primary agent</strong><span>Reviewed the changes, tightened validation, and ran the tests.</span></div></li>
           </ol>
-        </div>
+          <div class="example-result"><span class="speaker">The result</span><p>A reviewed fix, with the failed attempt still visible.</p></div>
+          <a class="case-link" href="/docs/evidence/building-ennodia/">Development case · September 2026 <span aria-hidden="true">↗</span></a>
+        </figure>
       </section>
 
-      <section
-        class="section interfaces-section"
-        aria-labelledby="interfaces-title"
-      >
-        <div class="section-label">Interfaces</div>
-        <div class="section-body">
-          <h2 id="interfaces-title">Core and MCP</h2>
-          <ul class="example-list">
-            {
-              interfaces.map((item) => (
-                <li>
-                  <h3>
-                    {item.logoSrc && (
-                      <img
-                        src={item.logoSrc}
-                        class="interface-logo"
-                        alt=""
-                        aria-hidden="true"
-                      />
-                    )}
-                    {item.title}
-                  </h3>
-                  <p class="inline-note">{item.status}</p>
-                  <p>{item.text}</p>
-                </li>
-              ))
-            }
-          </ul>
-        </div>
+      <section class="section wrap" aria-labelledby="why-title">
+        <div><p class="eyebrow">Less to manage</p><h2 id="why-title">You came to solve a task.<br />The tool search can wait.</h2></div>
+        <div class="section-copy"><p>A new model appears. A skill looks promising. Your current agent is stuck. Trying something else can mean another interface and another explanation.</p><p>Ennodia gives your primary agent a way to try those alternatives and return the findings here. You keep the conversation and choose the next step.</p></div>
       </section>
 
-      <section class="section compare-section" aria-labelledby="compare-title">
-        <div class="section-label">Budget</div>
-        <div class="section-body">
-          <h2 id="compare-title">Spend extra model work on purpose</h2>
-          <ul class="use-list">
-            {advantages.map((advantage) => <li>{advantage}</li>)}
-          </ul>
-        </div>
+      <section class="recipes wrap" aria-labelledby="recipes-title">
+        <p class="eyebrow">Start with one useful attempt</p>
+        <div class="section-heading"><h2 id="recipes-title">Three reasons to reach<br />for Ennodia.</h2><a class="text-link" href="/docs/guides/recipes/">Read the recipes ↗</a></div>
+        <div class="recipe-grid">{recipes.map((recipe) => (
+          <article class="recipe"><span class="recipe-number">{recipe.number}</span><h3>{recipe.title}</h3><p>{recipe.text}</p><details><summary>Try this prompt</summary><div class="prompt-box"><p>{recipe.prompt}</p><button type="button" data-copy-code={recipe.prompt}>Copy prompt</button><span class="copy-status" aria-live="polite"></span></div></details></article>
+        ))}</div>
       </section>
 
-      <section
-        class="section compare-section"
-        aria-labelledby="model-compare-title"
-      >
-        <div class="section-label">Judge and Result Advisor</div>
-        <div class="section-body">
-          <h2 id="model-compare-title">Clear roles before and after work</h2>
-          <ol class="compare-flow" aria-label="Ennodia Plan Advisor, Judge, and Result Advisor roles">
-            <li>
-              <div class="concept-mark" aria-hidden="true">1</div>
-              <div>
-                <h3>Plan Advisor</h3>
-                <p>
-                  Before work, it proposes a bounded team as inert data. It
-                  never starts the plan. The caller must start it explicitly.
-                </p>
-              </div>
-            </li>
-            <li>
-              <div class="concept-mark" aria-hidden="true">2</div>
-              <div>
-                <h3>Judge</h3>
-                <p>
-                  During Compare, it identifies agreements, contradictions,
-                  missing context, unique value, and risk.
-                </p>
-              </div>
-            </li>
-            <li>
-              <div class="concept-mark" aria-hidden="true">3</div>
-              <div>
-                <h3>Result Advisor</h3>
-                <p>
-                  It combines the Judge findings into a recommended answer. If
-                  the Judge fails, Ennodia shows a candidates-only basis.
-                </p>
-              </div>
-            </li>
-          </ol>
-        </div>
+      <section class="section wrap" aria-labelledby="outcomes-title">
+        <div><p class="eyebrow">Useful beyond a second answer</p><h2 id="outcomes-title">Know what to try next.</h2></div>
+        <div class="section-copy"><ul class="outcomes"><li><strong>A different explanation.</strong> Test an assumption your first attempt missed.</li><li><strong>A useful part of a skill.</strong> Bring back the finding that helps this task.</li><li><strong>A tested dead end.</strong> Keep a record of an approach that did not help under these conditions.</li></ul><p class="small-note">Agreement is evidence to examine. Your primary agent still checks the result.</p></div>
       </section>
 
-      <section
-        class="section compare-section"
-        aria-labelledby="benchmark-title"
-      >
-        <div class="section-label">Receipts</div>
-        <div class="section-body">
-          <h2 id="benchmark-title">Bug-recall benchmark</h2>
-          <p>
-            The current deterministic snapshot contains four TypeScript review
-            fixtures. Ennodia parallel Compare scored 100% recall and 100%
-            precision in fixture mode. The benchmark page lists its limits.
-          </p>
-          <p>
-            <a href="/docs/reference/benchmarks/">Read the benchmark snapshot</a
-            >
-          </p>
-        </div>
+      <section class="section wrap" aria-labelledby="agents-title">
+        <div><p class="eyebrow">Your existing tools</p><h2 id="agents-title">More options.<br />One familiar workflow.</h2><a class="text-link" href="/docs/reference/supported-harnesses/">Check compatibility ↗</a></div>
+        <div class="section-copy"><ul class="agent-grid">{adapters.map((agent) => (<li><img src={agent.logoSrc} alt="" /><span>{agent.name}</span></li>))}</ul><p class="small-note">Model access and available skills depend on each installed agent and its provider configuration.</p></div>
       </section>
 
-      <section class="section credits-section" aria-labelledby="credits-title">
-        <div class="section-label">Credits</div>
-        <div class="section-body">
-          <article class="credits-card">
-            <h2 id="credits-title">
-              Inspired by <a href="https://github.com/karpathy/llm-council"
-                >karpathy/llm-council</a
-              >
-            </h2>
-            <p>
-              That project demonstrates this pattern. It requests independent
-              answers from some models. It then compares and combines the
-              answers. Ennodia applies the pattern to local agent workflows,
-              MCP, task traces, failure visibility, and harness adapters.
-            </p>
-          </article>
-        </div>
+      <section class="section wrap" aria-labelledby="faq-title">
+        <div><p class="eyebrow">Before you start</p><h2 id="faq-title">A few practical details.</h2></div>
+        <div class="faq-list">{faqItems.map((item) => (<details><summary>{item.question}</summary><p>{item.answer}</p></details>))}</div>
       </section>
 
-      <section class="section cta-section" aria-labelledby="cta-title">
-        <div class="section-label">Get started</div>
-        <div class="section-body">
-          <h2 id="cta-title">Request second opinions</h2>
-          <p>
-            Paste the install line into your primary agent. Tell it to use other
-            agents when one model is not sufficient.
-          </p>
-          <div class="hero-actions cta-actions" aria-label="Final actions">
-            <a class="button button-primary" href="/install">
-              Install
-              <img src={arrowIconSrc} alt="" aria-hidden="true" />
-            </a>
-            <a
-              class="button button-plain"
-              href="https://github.com/cherninlab/ennodia"
-            >
-              <img src={githubIconSrc} alt="" aria-hidden="true" />
-              GitHub
-            </a>
-          </div>
-        </div>
+      <section class="closing wrap" aria-labelledby="start-title">
+        <p class="eyebrow">Keep the conversation going</p><h2 id="start-title">Try it on a task<br />you care about.</h2><p>Start with one small question and one additional agent.</p><div class="actions"><a class="button primary" href="/docs/getting-started/">Get started <span aria-hidden="true">↗</span></a><a class="text-link" href="/docs/evidence/">Explore the examples ↗</a></div>
       </section>
     </main>
-
-    <footer class="site-footer">
-      <div class="footer-inner">
-        <img src={logoSrc} alt="Ennodia" />
-        <p>Ennodia is local-first software under the MIT license.</p>
-      </div>
-    </footer>
+    <footer class="site-footer wrap"><img class="wordmark" src={logoSrc} alt="Ennodia" /><p>Local software. MIT license.</p><a href="/docs/roadmap/">What comes next ↗</a></footer>
+    <script type="application/ld+json" set:html={JSON.stringify(faqStructuredData)} />
+    <script type="application/ld+json" set:html={JSON.stringify(applicationStructuredData)} />
     <script>
-      const copyButtons = document.querySelectorAll("[data-copy-code]");
-
-      async function copyText(text) {
-        if (navigator.clipboard?.writeText) {
-          await navigator.clipboard.writeText(text);
-          return;
-        }
-
-        const textarea = document.createElement("textarea");
-        textarea.value = text;
-        textarea.setAttribute("readonly", "");
-        textarea.style.position = "fixed";
-        textarea.style.opacity = "0";
-        document.body.append(textarea);
-        textarea.select();
-        document.execCommand("copy");
-        textarea.remove();
-      }
-
-      for (const button of copyButtons) {
+      for (const button of document.querySelectorAll<HTMLButtonElement>("[data-copy-code]")) {
         button.addEventListener("click", async () => {
-          const code = button.getAttribute("data-copy-code") ?? "";
-          const status =
-            button.parentElement?.querySelector("[data-copy-status]");
-
+          const text = button.dataset.copyCode ?? "";
+          const status = button.parentElement?.querySelector(".copy-status");
           try {
-            await copyText(code);
-            button.setAttribute("data-copied", "true");
-            if (status) {
-              status.textContent = "Copied";
-            }
+            await navigator.clipboard.writeText(text);
+            if (status) status.textContent = "Copied";
           } catch {
-            if (status) {
-              status.textContent = "Copy failed";
-            }
+            if (status) status.textContent = "Select the prompt above to copy it.";
           }
-
-          window.setTimeout(() => {
-            button.removeAttribute("data-copied");
-            if (status) {
-              status.textContent = "";
-            }
-          }, 1800);
         });
       }
     </script>

@@ -530,7 +530,7 @@ export function createEnnodiaServer(core: EnnodiaCore = defaultCore): McpServer 
           .array(z.string())
           .optional()
           .describe(
-            "Optional list of skill IDs to apply to the prompt before starting the task.",
+            "Installed native skill IDs to request from the selected harness. Returned metadata does not prove that the agent loaded the skill.",
           ),
         budget: budgetSchema.optional(),
       },
@@ -720,7 +720,7 @@ export function createEnnodiaServer(core: EnnodiaCore = defaultCore): McpServer 
           .array(z.string())
           .optional()
           .describe(
-            "Optional list of skill IDs to apply to the prompt before planning and running child tasks.",
+            "Installed native skill IDs to request from child harnesses. Returned metadata does not prove that an agent loaded the skill.",
           ),
         budget: budgetSchema.optional(),
       },
@@ -840,7 +840,7 @@ export function createEnnodiaServer(core: EnnodiaCore = defaultCore): McpServer 
         includeOutput: z
           .boolean()
           .default(false)
-          .describe("Include bounded stdout and stderr previews for each task."),
+          .describe("Include bounded stdout, stderr, and finalMessage previews for each task."),
         includeEvents: z
           .boolean()
           .default(false)
@@ -852,7 +852,7 @@ export function createEnnodiaServer(core: EnnodiaCore = defaultCore): McpServer 
           .max(200_000)
           .default(4_000)
           .describe(
-            "Maximum stdout and stderr characters to include per task. Use 0 to omit output text.",
+            "Maximum characters in each task output field: stdout, stderr, and finalMessage. Use 0 to omit output text.",
           ),
         maxEvents: z
           .number()
@@ -896,7 +896,7 @@ export function createEnnodiaServer(core: EnnodiaCore = defaultCore): McpServer 
         includeOutput: z
           .boolean()
           .default(false)
-          .describe("Include bounded stdout and stderr previews for each known task."),
+          .describe("Include bounded stdout, stderr, and finalMessage previews for each known task."),
         maxOutputChars: z
           .number()
           .int()
@@ -904,7 +904,7 @@ export function createEnnodiaServer(core: EnnodiaCore = defaultCore): McpServer 
           .max(200_000)
           .default(2_000)
           .describe(
-            "Maximum stdout and stderr characters to include per task when includeOutput is true.",
+            "Maximum characters in each task output field when includeOutput is true, including finalMessage.",
           ),
       },
     },
@@ -1138,7 +1138,7 @@ export function createEnnodiaServer(core: EnnodiaCore = defaultCore): McpServer 
         includeOutput: z
           .boolean()
           .default(true)
-          .describe("Include bounded stdout and stderr previews."),
+          .describe("Include bounded stdout, stderr, and finalMessage previews."),
         includeEvents: z
           .boolean()
           .default(true)
@@ -1150,7 +1150,7 @@ export function createEnnodiaServer(core: EnnodiaCore = defaultCore): McpServer 
           .max(200_000)
           .default(20_000)
           .describe(
-            "Maximum stdout and stderr characters to include. Use 0 to omit output text.",
+            "Maximum characters in each output field: stdout, stderr, and finalMessage. Use 0 to omit output text.",
           ),
         maxEvents: z
           .number()

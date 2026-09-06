@@ -149,6 +149,12 @@ describe("CompareManager", () => {
     expect(started.candidates[0]?.content).toBe("clean candidate answer");
     expect(started.candidates[0]?.content).not.toContain("noisy transcript");
     await waitForCompare(manager, started.id);
+    const bounded = await manager.start({
+      prompt: "Compare the task.", taskIds: [task.id], maxOutputChars: 5, timeoutMs: 5_000,
+    });
+    expect(bounded.candidates[0]?.content).toHaveLength(5);
+    await waitForCompare(manager, bounded.id);
+    await expect(manager.start({ prompt: "Compare", taskIds: [task.id], maxOutputChars: 0 })).rejects.toThrow();
   });
 
   it("cancels active child tasks during shutdown", async () => {
@@ -283,6 +289,12 @@ describe("Compare prompts and parsing", () => {
     );
   });
 
+  it("rejects empty, unrelated and incomplete Judge JSON", () => {
+    for (const text of ["{}", '{"error":"unable to evaluate"}', '{"consensus":[]}', "not json"]) {
+      expect(parseJudgeAnalysis(text).ok).toBe(false);
+    }
+  });
+
   it("parses judge JSON from a fenced response", () => {
     const parsed = parseJudgeAnalysis(`
       \`\`\`json
@@ -336,7 +348,7 @@ const invalidJudgeAdapter: HarnessAdapter = {
       "-c",
       [
         "if printf '%s' \"$1\" | grep -q ENNODIA_COMPARE_JUDGE; then",
-        "  printf '%s\\n' 'not json'",
+        "  printf '%s\\n' '{\"error\":\"unable to evaluate candidates\"}'",
         "else",
         "  printf '%s\\n' 'Final answer from synthesizer after degradation.'",
         "fi",

@@ -25,8 +25,8 @@ Keep this data exact, even when its text does not use controlled English.
 - Define a necessary abbreviation at its first use on each independent page.
 - Preserve exact product names, commands, paths, model IDs, and API fields.
 
-The landing page uses `AI makes mistakes` as an approved fixed tagline.
-Define `artificial intelligence (AI)` in the sentence directly below it.
+Marketing headlines can change with the product positioning.
+Keep supporting copy concrete and consistent with current product behavior.
 
 Automated checks can find some defects, but they cannot certify compliance.
 A human reviewer must confirm meaning, grammar, and correct technical use.
@@ -40,7 +40,6 @@ Use the listed meaning and part of speech.
 | --- | --- | --- |
 | Ennodia | technical noun | The software product in this repository. |
 | artificial intelligence (AI) | technical noun | Software that produces or evaluates model output. |
-| AI makes mistakes | approved tagline | The exact Ennodia landing-page headline. Keep this phrase unchanged. |
 | Model Context Protocol (MCP) | technical noun | The protocol that exposes Ennodia tools to a compatible client. |
 | command-line interface (CLI) | technical noun | A text interface that accepts commands. |
 | application programming interface (API) | technical noun | A defined interface that software uses to exchange data. |

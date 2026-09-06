@@ -11,6 +11,7 @@ import type {
   HarnessUsage,
 } from "./harnesses";
 import { preview, tailItems } from "./internal";
+import { signalOwnedProcess } from "./process";
 import {
   augmentPrompt,
   toAppliedSkillInfo,
@@ -58,6 +59,9 @@ export type TaskView = {
    * over stdout for cross-harness comparisons: some adapters' stdout is a
    * full session transcript, others' is just the final reply. */
   finalMessage?: string;
+  finalMessageChars?: number;
+  /** Availability of non-whitespace answer evidence, even in compact views. */
+  hasOutput?: boolean;
   /** Best-effort usage metrics parsed from the adapter's own output. */
   usage?: HarnessUsage;
   /** Set when this task ran against an isolated copy of the requested cwd
@@ -80,6 +84,7 @@ export type TaskSpawnInput = {
   stdin: "ignore" | "pipe";
   stdout: "pipe";
   stderr: "pipe";
+  detached: boolean;
 };
 export type TaskSpawn = (input: TaskSpawnInput) => TaskProcess;
 
@@ -95,6 +100,7 @@ type InternalTask = Omit<
   | "stdoutChars"
   | "stderrChars"
   | "eventCount"
+  | "finalMessageChars"
 > & {
   createdAtMs: number;
   updatedAtMs: number;
@@ -105,11 +111,14 @@ type InternalTask = Omit<
   settled?: Promise<void>;
   streamReaders: Set<ReadableStreamDefaultReader<Uint8Array>>;
   timeout?: Timer;
+  killTimeout?: Timer;
+  forceSignalled?: boolean;
   finalMessagePath?: string;
   /** Exact temporary directory allocated by TaskManager. Keep this separate
    * from cwd because an adapter can override the command working directory. */
   isolatedCwd?: string;
   extractUsage?: HarnessAdapter["extractUsage"];
+  failureReason?: HarnessAdapter["failureReason"];
 };
 
 export type StartTaskResult = {
@@ -141,6 +150,8 @@ export class TaskManager {
   private readonly maxTasks: number;
   private readonly spawn: TaskSpawn;
   private readonly removeIsolatedCwd: (path: string) => void;
+  private readonly ownsProcessGroups: boolean;
+  private readonly retainedTasks = new Map<string, number>();
   private shuttingDown = false;
   private shutdownPromise?: Promise<void>;
 
@@ -148,6 +159,7 @@ export class TaskManager {
     this.drainTimeoutMs = options.drainTimeoutMs ?? DEFAULT_DRAIN_TIMEOUT_MS;
     this.maxTasks = Math.max(1, options.maxTasks ?? DEFAULT_MAX_TASKS);
     this.spawn = options.spawn ?? ((input) => Bun.spawn(input));
+    this.ownsProcessGroups = !options.spawn && process.platform !== "win32";
     this.removeIsolatedCwd = options.removeIsolatedCwd ?? ((path) => {
       rmSync(path, { recursive: true, force: true });
     });
@@ -214,6 +226,7 @@ export class TaskManager {
         stdin: commandSpec.stdin === undefined ? "ignore" : "pipe",
         stdout: "pipe",
         stderr: "pipe",
+        detached: process.platform !== "win32",
       });
     } catch (error) {
       cleanupFailedStartArtifacts(
@@ -251,6 +264,7 @@ export class TaskManager {
       finalMessagePath,
       isolatedCwd,
       extractUsage: adapter.extractUsage,
+      failureReason: adapter.failureReason,
     };
 
     task.process = child;
@@ -269,7 +283,6 @@ export class TaskManager {
 
     task.timeout = setTimeout(() => {
       if (task.cancelRequested) {
-        child.kill();
         return;
       }
 
@@ -278,7 +291,7 @@ export class TaskManager {
         type: "error",
         message: `Timed out after ${timeoutMs}ms.`,
       });
-      child.kill();
+      this.terminate(task);
     }, timeoutMs);
 
     task.settled = this.watchExit(task, child);
@@ -298,7 +311,7 @@ export class TaskManager {
           type: "error",
           message: error instanceof Error ? error.message : String(error),
         });
-        child.kill();
+        this.terminate(task);
       }
     }
 
@@ -321,6 +334,19 @@ export class TaskManager {
   get(taskId: string, options: TaskViewOptions = {}): TaskView | undefined {
     const task = this.tasks.get(taskId);
     return task ? this.toView(task, options) : undefined;
+  }
+
+  /** Keep evidence alive until its owning operation has recorded its result. */
+  retain(taskId: string): void {
+    if (!this.tasks.has(taskId)) throw new Error(`Unknown task: ${taskId}`);
+    this.retainedTasks.set(taskId, (this.retainedTasks.get(taskId) ?? 0) + 1);
+  }
+
+  release(taskId: string): void {
+    const count = this.retainedTasks.get(taskId) ?? 0;
+    if (count > 1) this.retainedTasks.set(taskId, count - 1);
+    else this.retainedTasks.delete(taskId);
+    this.pruneTasks();
   }
 
   cancel(taskId: string): TaskView {
@@ -380,7 +406,7 @@ export class TaskManager {
         type: "error",
         message: `Shutdown deadline exceeded after ${deadlineMs}ms; force-killing task.`,
       });
-      task.process?.kill("SIGKILL");
+      this.signal(task, "SIGKILL");
     }
 
     await Promise.allSettled(
@@ -397,21 +423,22 @@ export class TaskManager {
     task: InternalTask,
     child: TaskProcess,
   ): Promise<void> {
+    let terminalStatus: TaskStatus = "failed";
     try {
       const exitCode = await child.exited;
+      if (task.killTimeout) this.signal(task, "SIGKILL");
       await this.waitForOutputDrain(task);
       task.exitCode = exitCode;
 
       if (task.cancelRequested) {
-        task.status = "cancelled";
-      } else if (task.status === "running") {
-        task.status =
+        terminalStatus = "cancelled";
+      } else {
+        terminalStatus =
           exitCode === 0 && !task.timedOut && !task.drainTimedOut
             ? "succeeded"
             : "failed";
       }
 
-      task.endedAtMs = Date.now();
       this.pushEvent(task, {
         type: "exit",
         message: `Process exited with code ${exitCode}.`,
@@ -420,21 +447,37 @@ export class TaskManager {
       await this.waitForOutputDrain(task);
 
       if (task.cancelRequested) {
-        task.status = "cancelled";
-      } else if (task.status === "running") {
-        task.status = "failed";
+        terminalStatus = "cancelled";
+      } else {
+        terminalStatus = "failed";
       }
 
-      task.endedAtMs = Date.now();
       this.pushEvent(task, {
         type: "error",
         message: error instanceof Error ? error.message : String(error),
       });
     } finally {
+      // A CLI can exit before its build/shell children. Clean up the owned
+      // group before deleting an isolated checkout or reporting completion.
+      this.signal(task, "SIGKILL");
       await this.collectFinalMessage(task);
+      if (terminalStatus === "succeeded" && task.failureReason) {
+        try {
+          const reason = task.failureReason(task.finalMessage || task.stdout, task.stderr);
+          if (reason) {
+            terminalStatus = "failed";
+            this.pushEvent(task, { type: "error", message: reason });
+          }
+        } catch (error) {
+          terminalStatus = "failed";
+          this.pushEvent(task, { type: "error", message: `Adapter result check failed: ${String(error)}` });
+        }
+      }
       this.collectUsage(task);
       this.cleanupIsolatedCwd(task);
       this.clearTimers(task);
+      task.status = task.cancelRequested ? "cancelled" : terminalStatus;
+      task.endedAtMs = Date.now();
       this.touch(task);
       this.pruneTasks(task.id);
     }
@@ -502,7 +545,8 @@ export class TaskManager {
     }
 
     const removable = [...this.tasks.values()]
-      .filter((task) => task.id !== protectedTaskId && task.status !== "running")
+      .filter((task) => task.id !== protectedTaskId && task.status !== "running" &&
+        !this.retainedTasks.has(task.id))
       .sort((a, b) => a.createdAtMs - b.createdAtMs);
 
     let removed = 0;
@@ -524,7 +568,26 @@ export class TaskManager {
       this.pushEvent(task, { type: "cancel", message });
     }
 
-    task.process?.kill();
+    this.terminate(task);
+  }
+
+  private signal(task: InternalTask, signal: "SIGTERM" | "SIGKILL"): void {
+    if (!task.process || task.forceSignalled) return;
+    try {
+      signalOwnedProcess(task.process, signal, this.ownsProcessGroups);
+      if (signal === "SIGKILL") task.forceSignalled = true;
+    } catch (error) {
+      this.pushEvent(task, { type: "error", message: `Process cleanup failed: ${String(error)}` });
+    }
+  }
+
+  private terminate(task: InternalTask): void {
+    if (task.killTimeout) return;
+    this.signal(task, "SIGTERM");
+    task.killTimeout = setTimeout(() => {
+      this.pushEvent(task, { type: "error", message: "Termination grace period exceeded; force-killing task." });
+      this.signal(task, "SIGKILL");
+    }, 300);
   }
 
   private async waitForSettled(
@@ -700,7 +763,10 @@ export class TaskManager {
       stderr: includeOutput ? tail(task.stderr, maxOutputChars) : "",
       events: includeEvents ? tailItems(task.events, maxEvents) : [],
       appliedSkills: task.appliedSkills,
-      finalMessage: includeOutput ? task.finalMessage : undefined,
+      finalMessage: includeOutput && task.finalMessage !== undefined
+        ? tail(task.finalMessage, maxOutputChars) : undefined,
+      finalMessageChars: task.finalMessage?.length ?? 0,
+      hasOutput: Boolean(task.finalMessage?.trim() || task.stdout.trim() || task.stderr.trim()),
       usage: task.usage,
       isolatedFrom: task.isolatedFrom,
     };
@@ -726,6 +792,10 @@ export class TaskManager {
   }
 
   private clearTimers(task: InternalTask): void {
+    if (task.killTimeout) {
+      clearTimeout(task.killTimeout);
+      task.killTimeout = undefined;
+    }
     if (task.timeout) {
       clearTimeout(task.timeout);
       task.timeout = undefined;

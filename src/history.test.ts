@@ -45,9 +45,11 @@ describe("run history", () => {
         '{"version":1,"kind":"run","recordedAt":"2026-',
       );
 
+      const restarted = new FileHistorySink({ dir, maxRuns: 10 });
+      await restarted.recordRun(snapshot("after-restart", "saved", 2));
       const runs = await sink.listRuns();
 
-      expect(runs.map((item) => item.run.id)).toEqual(["intact"]);
+      expect(runs.map((item) => item.run.id)).toEqual(["after-restart", "intact"]);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

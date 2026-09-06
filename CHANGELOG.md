@@ -2,6 +2,38 @@
 
 This file records all notable Ennodia changes.
 
+## [0.3.0-rc.1] - Unreleased
+
+### Added
+
+- Added three task recipes, two reproducible examples, and recorded development cases.
+- Added guides for interpreting results, recovering from failed attempts, and measuring usefulness.
+- Added `hasOutput` and `finalMessageChars` to task views, including compact views.
+
+### Changed
+
+- Rebuilt the homepage and README around trying alternatives from the same conversation.
+- Organized documentation around first use, practical tasks, evidence, and technical reference.
+- Made timeout advice suggest inspecting the attempt before choosing a retry strategy.
+- Kept failed attempts visible in published examples without claiming measured savings.
+
+### Fixed
+
+- Bounded task cancellation and cleaned up owned process groups on macOS and Linux.
+- Shut down active workers when the MCP input stream closes.
+- Canceled earlier workers when a later raw or compositional task cannot start.
+- Bounded version probes so one stalled CLI does not block discovery.
+- Protected positional prompts from being parsed as CLI options.
+- Retained active run evidence until comparison and receipt capture finish.
+- Rejected invalid Judge JSON and bounded all selected comparison candidates.
+- Recognized final-file answers in compact task and compositional views.
+- Applied output limits to final messages as well as captured streams.
+- Preserved new history receipts after a truncated previous line.
+- Rejected unintended browser origins, forged local hosts, and non-JSON chat requests in Ennodia IO.
+- Distinguished expired agent authentication from evidence about model quality.
+- Marked Antigravity's explicit no-output error as failed, even with exit code zero.
+- Isolated skill-discovery tests from developer home directories.
+
 ## [0.2.0] - 2026-08-20
 
 ### Added

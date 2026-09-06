@@ -394,6 +394,7 @@ export class RunManager {
       }).task;
 
       run.taskIds.push(started.id);
+      this.dependencies.taskManager.retain(started.id);
       this.pushEvent(run, {
         type: "task-started",
         taskId: started.id,
@@ -469,6 +470,7 @@ export class RunManager {
         this.failRun(run, errorMessage(error));
       }
     } finally {
+      for (const taskId of run.taskIds) this.dependencies.taskManager.release(taskId);
       this.touch(run);
     }
   }

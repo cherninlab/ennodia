@@ -69,28 +69,33 @@ For a local checkout, use the source file:
 
 Replace `/absolute/path/to/ennodia` with your local repository path.
 
-## First Checks
+## Your first useful result
 
-From the repository:
+After installation, give your primary agent a small request:
 
-```bash
-bun install
-bun run mcp:smoke
-bun run verify
+```text
+Use Ennodia to get one additional opinion on this function.
+Choose an available agent. Keep the review read-only.
+Return one concrete issue or explain that no issue was established.
+Bring the findings back to this conversation.
 ```
 
-From an MCP client, call `ennodia_list_harnesses`. Then call
-`ennodia_estimate_budget`. To inspect the route, call `ennodia_plan`.
+Start with one worker and a small set of files.
+Discovery checks installed commands, not authentication, model access, or provider quota.
+A live task establishes which configuration works in your environment.
 
-Start the work with `ennodia_run`. This tool plans the route and starts the
-selected tasks. It can also compare successful outputs. It returns a run
-identifier (ID).
+Your agent can call `ennodia_list_harnesses`, then `ennodia_run` with a selected `harnessId`, `mode: "single"`, and `compare: false`.
+Poll `ennodia_get_run` with the returned run identifier (ID).
+Stop when the status is `succeeded`, `failed`, or `cancelled`.
 
-Poll `ennodia_get_run` with that ID. Stop when the status is `succeeded`,
-`failed`, or `cancelled`.
+Inspect the result before starting more work.
+Use the [recipes](/docs/guides/recipes/) for a stuck task, a skill trial, or conflicting answers.
+See [Understand Results](/docs/guides/understand-results/) when the attempt is incomplete or unhelpful.
 
-Expect real runs to take minutes. Compare adds a Judge pass and a Result
-Advisor pass after child agents finish.
+Expect live runs to take time. A timeout budget is not a completion prediction.
+Compare adds a Judge pass and a Result Advisor pass after child agents finish.
+
+For a local development checkout, run `bun run verify` before relying on changes.
 
 ## Optional Team Advice
 

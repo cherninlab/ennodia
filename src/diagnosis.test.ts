@@ -15,7 +15,7 @@ describe("diagnoseTasks", () => {
     expect(diagnosis?.summary).toContain("OpenCode timed out");
     expect(diagnosis?.likelyCause).toContain("Provider timeout");
     expect(diagnosis?.suggestions).toContain(
-      "Retry the timed-out provider with a longer timeoutMs.",
+      "Inspect the attempt before retrying. Narrow the task, adjust its execution settings, or allow more time if justified.",
     );
   });
 
@@ -33,7 +33,7 @@ describe("diagnoseTasks", () => {
       }),
     ]);
 
-    expect(diagnosis?.likelyCause).toContain("Task needed more time");
+    expect(diagnosis?.likelyCause).toContain("produced output near its deadline");
     expect(diagnosis?.partialOutputPreviews?.[0]).toEqual({
       harnessId: "opencode",
       chars: "partial recommendation".length,
@@ -69,6 +69,14 @@ describe("diagnoseTasks", () => {
     ]);
 
     expect(diagnosis).toBeUndefined();
+  });
+
+  it("distinguishes an expired agent login from an unsuccessful model attempt", () => {
+    const diagnosis = diagnoseTasks([taskView({
+      stdout: "Failed to authenticate: OAuth session expired and could not be refreshed\n",
+    })]);
+    expect(diagnosis?.likelyCause).toContain("authentication failed");
+    expect(diagnosis?.suggestions.join(" ")).toContain("Sign in");
   });
 });
 

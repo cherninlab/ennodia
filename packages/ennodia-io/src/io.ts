@@ -31,10 +31,16 @@ export type EnnodiaIoHandlerOptions = {
   maxRequestBodySize?: number;
   maxConcurrentChatCompletions?: number;
   now?: () => number;
+  /**
+   * Bind host used to decide the request Host-header allowlist. Loopback and
+   * undefined hosts restrict requests to loopback Host headers. An explicit
+   * non-loopback host disables the allowlist and requires an API key at the
+   * server layer.
+   */
+  host?: string;
 };
 
 export type EnnodiaIoServerOptions = EnnodiaIoHandlerOptions & {
-  host?: string;
   port?: number;
 };
 
@@ -165,6 +171,11 @@ export function createEnnodiaIoHandler(
   };
 
   return async (request) => {
+    const untrusted = rejectUntrustedRequestTarget(request, options.host);
+    if (untrusted) {
+      return untrusted;
+    }
+
     const unauthorized = authorize(request, options.apiKey);
     if (unauthorized) {
       return unauthorized;
@@ -218,11 +229,13 @@ export function startEnnodiaIoServer(
     );
   }
 
+  const maxRequestBodySize = options.maxRequestBodySize ??
+    DEFAULT_MAX_REQUEST_BODY_SIZE;
+
   return Bun.serve({
     hostname: host,
     port,
-    maxRequestBodySize: options.maxRequestBodySize ??
-      DEFAULT_MAX_REQUEST_BODY_SIZE,
+    maxRequestBodySize,
     fetch: createEnnodiaIoHandler(core, options),
   });
 }
@@ -337,6 +350,14 @@ async function handleChatCompletionsInner(
   request: Request,
   options: EnnodiaIoHandlerOptions,
 ): Promise<Response> {
+  if (!isJsonMediaType(request.headers.get("content-type"))) {
+    return jsonError(
+      415,
+      "unsupported_media_type",
+      "Ennodia IO chat completions require a JSON Content-Type such as application/json.",
+    );
+  }
+
   let payload: unknown;
 
   try {
@@ -605,6 +626,107 @@ function authorize(request: Request, apiKey: string | undefined): Response | und
   }
 
   return jsonError(401, "authentication_error", "Missing or invalid Ennodia IO API key.");
+}
+
+function rejectUntrustedRequestTarget(
+  request: Request,
+  configuredHost: string | undefined,
+): Response | undefined {
+  if (!isAllowedRequestHost(request, configuredHost)) {
+    return jsonError(
+      403,
+      "invalid_host",
+      "Ennodia IO does not accept requests for this Host header.",
+    );
+  }
+
+  if (!isAllowedRequestOrigin(request)) {
+    return jsonError(
+      403,
+      "invalid_origin",
+      "Ennodia IO does not accept requests from this Origin.",
+    );
+  }
+
+  return undefined;
+}
+
+function isAllowedRequestHost(
+  request: Request,
+  configuredHost: string | undefined,
+): boolean {
+  if (configuredHost !== undefined && !isLoopbackHost(configuredHost)) {
+    // Explicit remote posture. The required API key guards the server, and
+    // clients can legitimately reach it through non-loopback names.
+    return true;
+  }
+
+  const hostHeader = request.headers.get("host");
+  const hostname = hostHeader !== null
+    ? parseHostHeaderHostname(hostHeader)
+    : new URL(request.url).hostname;
+
+  return hostname !== undefined && isLoopbackHostname(hostname);
+}
+
+function isAllowedRequestOrigin(request: Request): boolean {
+  const origin = request.headers.get("origin");
+  if (origin === null) {
+    // Non-browser clients do not send an Origin header.
+    return true;
+  }
+
+  if (origin === "null" || origin.includes(" ")) {
+    return false;
+  }
+
+  let url: URL;
+  try {
+    url = new URL(origin);
+  } catch {
+    return false;
+  }
+
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    return false;
+  }
+
+  return url.origin === origin && isLoopbackHostname(url.hostname);
+}
+
+function parseHostHeaderHostname(hostHeader: string): string | undefined {
+  try {
+    const url = new URL(`http://${hostHeader}`);
+    if (url.username || url.password || url.pathname !== "/" || url.search || url.hash) return undefined;
+    return url.hostname;
+  } catch {
+    return undefined;
+  }
+}
+
+function isLoopbackHostname(hostname: string): boolean {
+  let normalized = hostname.toLowerCase();
+  if (normalized.startsWith("[") && normalized.endsWith("]")) {
+    normalized = normalized.slice(1, -1);
+  }
+  if (normalized.endsWith(".")) {
+    normalized = normalized.slice(0, -1);
+  }
+
+  if (normalized === "localhost" || normalized === "::1") {
+    return true;
+  }
+
+  const octets = normalized.split(".");
+  return octets.length === 4 &&
+    octets[0] === "127" &&
+    octets.every((octet) => /^\d{1,3}$/.test(octet) && Number(octet) <= 255);
+}
+
+function isJsonMediaType(contentType: string | null): boolean {
+  const mediaType = contentType?.split(";")[0]?.trim().toLowerCase() ?? "";
+  return mediaType === "application/json" ||
+    (mediaType.startsWith("application/") && mediaType.endsWith("+json"));
 }
 
 async function readJsonBody(request: Request, maxBytes: number): Promise<unknown> {

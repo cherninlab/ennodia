@@ -1,4 +1,5 @@
 import { existsSync } from "node:fs";
+import { signalOwnedProcess } from "./process";
 import { type Skill } from "./skills";
 
 export type HarnessKind = "cli" | "app";
@@ -46,6 +47,8 @@ export type HarnessAdapter = {
   buildCommand?: (commandPath: string, input: HarnessRunInput) => CommandSpec;
   /** Best-effort usage extraction from a finished task's captured output. */
   extractUsage?: (stdout: string, stderr: string) => HarnessUsage | undefined;
+  /** Some public CLIs report a semantic failure with exit code zero. */
+  failureReason?: (stdout: string, stderr: string) => string | undefined;
 };
 
 export type HarnessDiscovery = {
@@ -102,7 +105,7 @@ export const harnessAdapters: HarnessAdapter[] = [
         args.push("--model", input.model);
       }
 
-      args.push(input.prompt);
+      args.push("--", input.prompt);
       return { command: commandPath, args, cwd: input.cwd };
     },
   },
@@ -137,7 +140,7 @@ export const harnessAdapters: HarnessAdapter[] = [
         args.push("-o", input.finalMessagePath);
       }
 
-      args.push(input.prompt);
+      args.push("--", input.prompt);
       return { command: commandPath, args, cwd: input.cwd };
     },
     extractUsage: (stdout) => {
@@ -169,7 +172,7 @@ export const harnessAdapters: HarnessAdapter[] = [
         args.push("--model", input.model);
       }
 
-      args.push(input.prompt);
+      args.push("--", input.prompt);
       return { command: commandPath, args, cwd: input.cwd };
     },
   },
@@ -201,7 +204,7 @@ export const harnessAdapters: HarnessAdapter[] = [
         args.push("--model", input.model);
       }
 
-      args.push(input.prompt);
+      args.push("--", input.prompt);
       return { command: commandPath, args, cwd: input.cwd };
     },
   },
@@ -256,7 +259,7 @@ export const harnessAdapters: HarnessAdapter[] = [
         args.push("--model", input.model);
       }
 
-      args.push(input.prompt);
+      args.push("--", input.prompt);
       return { command: commandPath, args, cwd: input.cwd };
     },
   },
@@ -281,7 +284,7 @@ export const harnessAdapters: HarnessAdapter[] = [
         args.push("--model", input.model);
       }
 
-      args.push(input.prompt);
+      args.push("--", input.prompt);
       return { command: commandPath, args, cwd: input.cwd };
     },
   },
@@ -301,6 +304,10 @@ export const harnessAdapters: HarnessAdapter[] = [
       "Defaults to Antigravity sandbox mode for Ennodia-launched tasks.",
       "Passes the prompt as the value of Antigravity's non-interactive `--print` option.",
     ],
+    failureReason: (stdout, stderr) => !stdout.trim() &&
+      /^jetski: no output produced\b/m.test(stderr)
+      ? "Antigravity returned no answer. Check the required tool access in its normal permission settings."
+      : undefined,
     buildCommand: (commandPath, input) => {
       const args = [
         "--sandbox",
@@ -367,7 +374,15 @@ async function discoverHarness(
     .find((match): match is string => Boolean(match));
 
   const appPath = adapter.appPaths?.find((path) => existsSync(path));
-  const version = commandPath ? await readVersion(commandPath, adapter) : undefined;
+  let version: string | undefined;
+  const notes = [...(adapter.notes ?? [])];
+  if (commandPath) {
+    try {
+      version = await readVersion(commandPath, adapter);
+    } catch (error) {
+      notes.push(`Version check failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
   const available = Boolean(commandPath || appPath);
   const runnable = Boolean(commandPath && adapter.buildCommand);
 
@@ -381,7 +396,7 @@ async function discoverHarness(
     appPath,
     version,
     capabilities: adapter.capabilities,
-    notes: adapter.notes ?? [],
+    notes,
   };
 }
 
@@ -396,6 +411,8 @@ async function readVersion(
   const result = await capture(commandPath, adapter.versionArgs, {
     timeoutMs: DEFAULT_VERSION_TIMEOUT_MS,
   });
+  if (result.timedOut) throw new Error("Version probe timed out.");
+  if (result.exitCode !== 0) throw new Error(`Version probe exited with code ${result.exitCode}.`);
 
   const text = `${result.stdout}\n${result.stderr}`.trim();
   return text.split(/\r?\n/).find((line) => line.trim())?.trim();
@@ -406,39 +423,47 @@ async function capture(
   args: string[],
   options: { timeoutMs: number },
 ): Promise<CaptureResult> {
-  const process = Bun.spawn({
+  const child = Bun.spawn({
     cmd: [command, ...args],
     stdout: "pipe",
     stderr: "pipe",
+    detached: process.platform !== "win32",
   });
 
   let timedOut = false;
-  const timeout = setTimeout(() => {
-    timedOut = true;
-    process.kill();
-  }, options.timeoutMs);
+  let timeout: Timer | undefined;
+  const readers = [child.stdout.getReader(), child.stderr.getReader()];
+  const output = ["", ""];
+  const drained = Promise.all(readers.map(async (reader, index) => {
+    const decoder = new TextDecoder();
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        output[index] = (output[index] + decoder.decode(value, { stream: true })).slice(0, 8_000);
+      }
+      output[index] += decoder.decode();
+    } catch { /* cancellation closes a stalled pipe */ }
+    finally { reader.releaseLock(); }
+  }));
 
   try {
-    const [stdout, stderr, exitCode] = await Promise.all([
-      streamToText(process.stdout),
-      streamToText(process.stderr),
-      process.exited,
+    const exitCode = await Promise.race([
+      Promise.all([drained, child.exited]).then(([, code]) => code),
+      new Promise<null>((resolve) => {
+        timeout = setTimeout(() => {
+          timedOut = true;
+          signalOwnedProcess(child, "SIGKILL");
+          for (const reader of readers) void reader.cancel().catch(() => undefined);
+          resolve(null);
+        }, options.timeoutMs);
+      }),
     ]);
-
-    return { stdout, stderr, exitCode, timedOut };
+    return { stdout: output[0], stderr: output[1], exitCode, timedOut };
   } finally {
     clearTimeout(timeout);
+    if (!timedOut) signalOwnedProcess(child, "SIGKILL");
   }
-}
-
-async function streamToText(
-  stream: ReadableStream<Uint8Array> | null,
-): Promise<string> {
-  if (!stream) {
-    return "";
-  }
-
-  return await new Response(stream).text();
 }
 
 function toGoDuration(timeoutMs = 5 * 60 * 1000): string {

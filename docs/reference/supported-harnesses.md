@@ -34,6 +34,10 @@ installed and runnable on the current machine.
 The response reports availability, runnable state, command path, version,
 capabilities, and adapter notes.
 
+Discovery checks installed commands, not active authentication or model access.
+A stalled version probe stops at its deadline and adds an adapter note.
+Use a small real task to check the selected agent before sending larger work.
+
 ## Claude Code Models
 
 Claude Code model aliases can change. When exact model selection matters, pass
@@ -56,6 +60,9 @@ OpenCode model IDs use the provider/model format reported by `opencode models`,
 such as `opencode-go/kimi-k2.7-code`.
 
 ## Antigravity
+
+An explicit `jetski: no output produced` error is treated as a failed task even if the command exits with code zero.
+Check the requested tool access in normal Antigravity settings. A denied read does not measure the model or skill's quality.
 
 Antigravity can fail setup when the `agy` CLI is not on `PATH`. Tell the user or
 primary agent to verify:

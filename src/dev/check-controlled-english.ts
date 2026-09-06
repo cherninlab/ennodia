@@ -4,7 +4,6 @@ const FORBIDDEN_GENERAL_WORDS =
   /\b(?:ask|whether|several|enough|should|already|instead)\b/i;
 const PROCEDURE_START =
   /^(?:Run|Use|Set|Add|Open|Call|Pass|Start|Poll|Select|Choose|Install|Create|Copy|Keep|Do|Request|Check|Read|See|Configure|Review|Repeat|Stop|Wait|Enter|Remove|Replace|Save|Verify)\b/;
-const FIXED_TAGLINE = "AI makes mistakes";
 
 type Finding = {
   source: string;
@@ -108,14 +107,6 @@ function checkRenderedLandingPage(file: string): void {
   const textNodes = [...html.matchAll(/>([^<>]+)</g)]
     .map((match) => decodeHtml(match[1] ?? "").replace(/\s+/g, " ").trim())
     .filter((text) => /[A-Za-z]/.test(text));
-
-  if (!textNodes.includes(FIXED_TAGLINE)) {
-    findings.push({
-      source: file,
-      message: "fixed tagline is missing or changed",
-      text: FIXED_TAGLINE,
-    });
-  }
 
   for (const text of textNodes) {
     checkRestrictedForms(file, text);

@@ -94,11 +94,11 @@ describe("RunManager", () => {
       .toHaveLength(3);
   });
 
-  it("compares successful parallel task outputs", async () => {
+  it("retains parallel task evidence through Compare even above the history cap", async () => {
     const fixture = createFixture([
       echoDiscovery("agent-a", "Agent A"),
       echoDiscovery("agent-b", "Agent B"),
-    ]);
+    ], { maxTasks: 1 });
 
     const started = await fixture.manager.start({
       prompt: "Compare several code approaches.",
@@ -354,7 +354,7 @@ describe("RunManager", () => {
     expect(result.status).toBe("failed");
     expect(result.diagnosis?.summary).toContain("Slow Agent timed out");
     expect(result.diagnosis?.suggestions).toContain(
-      "Retry the timed-out provider with a longer timeoutMs.",
+      "Inspect the attempt before retrying. Narrow the task, adjust its execution settings, or allow more time if justified.",
     );
   });
 
@@ -533,6 +533,7 @@ describe("RunManager", () => {
 
 function createFixture(discoveries: HarnessDiscovery[], options: {
   maxRuns?: number;
+  maxTasks?: number;
   compareAdapter?: HarnessAdapter;
   compareDiscovery?: HarnessDiscovery;
 } = {}): {
@@ -540,7 +541,7 @@ function createFixture(discoveries: HarnessDiscovery[], options: {
   taskManager: TaskManager;
   compareManager: CompareManager;
 } {
-  const taskManager = new TaskManager();
+  const taskManager = new TaskManager({ maxTasks: options.maxTasks });
   const adapters = new Map<string, HarnessAdapter>(
     [
       echoAdapter("agent-a", "Agent A"),

@@ -1,12 +1,15 @@
+import { connect } from "node:net";
 import { describe, expect, it } from "bun:test";
 import {
   chatMessagesToPrompt,
   createEnnodiaIoHandler,
   listAppProviderOptions,
   listVirtualModels,
+  startEnnodiaIoServer,
   type EnnodiaIoCore,
 } from "./io";
 import type {
+  EnnodiaCore,
   HarnessDiscovery,
   RunStartInput,
   RunView,
@@ -431,6 +434,225 @@ describe("Ennodia IO", () => {
   });
 });
 
+describe("Ennodia IO request validation", () => {
+  it("rejects cross-origin browser posts before starting a run", async () => {
+    const core = new FakeIoCore();
+    const handler = createEnnodiaIoHandler(core);
+
+    const response = await handler(jsonRequest("/v1/chat/completions", {
+      model: "ennodia-auto",
+      messages: [{ role: "user", content: "Hello." }],
+    }, { origin: "https://attacker.invalid" }));
+    const body = await response.json() as ErrorResponse;
+
+    expect(response.status).toBe(403);
+    expect(body.error.type).toBe("invalid_origin");
+    expect(core.started).toHaveLength(0);
+  });
+
+  it("rejects null, listed, and non-loopback origins while allowing loopback origins", async () => {
+    const core = new FakeIoCore();
+    const handler = createEnnodiaIoHandler(core);
+    const post = (origin: string) =>
+      handler(jsonRequest("/v1/chat/completions", {
+        model: "ennodia-auto",
+        messages: [{ role: "user", content: "Hello." }],
+      }, { origin }));
+
+    expect((await post("null")).status).toBe(403);
+    expect((await post("http://localhost/path")).status).toBe(403);
+    expect((await post("not a url")).status).toBe(403);
+    expect((await post("http://localhost:1 http://localhost:2")).status)
+      .toBe(403);
+    expect((await post("file:///tmp/payload.html")).status).toBe(403);
+    expect((await post("https://127.0.0.1.evil.invalid")).status).toBe(403);
+    expect((await post("http://localhost:5173")).status).toBe(200);
+    expect((await post("http://127.0.0.1:3000")).status).toBe(200);
+    expect((await post("http://[::1]:3000")).status).toBe(200);
+    expect(core.started).toHaveLength(3);
+  });
+
+  it("rejects forged Host headers in the default loopback posture", async () => {
+    const core = new FakeIoCore();
+    const handler = createEnnodiaIoHandler(core);
+    const health = (host: string) =>
+      handler(new Request("http://127.0.0.1/health", { headers: { host } }));
+
+    const forged = await health("attacker.invalid");
+    const forgedBody = await forged.json() as ErrorResponse;
+
+    expect(forged.status).toBe(403);
+    expect(forgedBody.error.type).toBe("invalid_host");
+    expect((await health("127.0.0.1:17273")).status).toBe(200);
+    expect((await health("127.0.0.2:17273")).status).toBe(200);
+    expect((await health("localhost:17273")).status).toBe(200);
+    expect((await health("localhost.")).status).toBe(200);
+    expect((await health("[::1]evil.invalid")).status).toBe(403);
+    expect((await health("localhost/ignored")).status).toBe(403);
+    expect((await health("[::1]:17273")).status).toBe(200);
+  });
+
+  it("requires a JSON media type for chat completions", async () => {
+    const core = new FakeIoCore();
+    const handler = createEnnodiaIoHandler(core);
+    const payload = JSON.stringify({
+      model: "ennodia-auto",
+      messages: [{ role: "user", content: "Hello." }],
+    });
+
+    const plain = await handler(new Request(
+      "http://127.0.0.1/v1/chat/completions",
+      {
+        method: "POST",
+        headers: { "content-type": "text/plain" },
+        body: payload,
+      },
+    ));
+    const missing = await handler(new Request(
+      "http://127.0.0.1/v1/chat/completions",
+      { method: "POST", body: new Blob([payload]) },
+    ));
+    const charset = await handler(jsonRequest("/v1/chat/completions", {
+      model: "ennodia-auto",
+      messages: [{ role: "user", content: "Hello." }],
+    }, { "content-type": "application/json; charset=utf-8" }));
+    const suffix = await handler(jsonRequest("/v1/chat/completions", {
+      model: "ennodia-auto",
+      messages: [{ role: "user", content: "Hello." }],
+    }, { "content-type": "application/chat-completion+json" }));
+    const plainBody = await plain.json() as ErrorResponse;
+
+    expect(plain.status).toBe(415);
+    expect(plainBody.error.type).toBe("unsupported_media_type");
+    expect(missing.status).toBe(415);
+    expect(charset.status).toBe(200);
+    expect(suffix.status).toBe(200);
+    expect(core.started).toHaveLength(2);
+  });
+
+  it("keeps explicit remote settings working behind bearer auth", async () => {
+    const core = new FakeIoCore();
+    const handler = createEnnodiaIoHandler(core, {
+      host: "0.0.0.0",
+      apiKey: "secret",
+    });
+    const post = (headers: Record<string, string>) =>
+      handler(jsonRequest("/v1/chat/completions", {
+        model: "ennodia-auto",
+        messages: [{ role: "user", content: "Hello." }],
+      }, { host: "host.docker.internal:17273", ...headers }));
+
+    const allowed = await post({ authorization: "Bearer secret" });
+    const noKey = await post({});
+    const crossOrigin = await post({
+      authorization: "Bearer secret",
+      origin: "https://attacker.invalid",
+    });
+
+    expect(allowed.status).toBe(200);
+    expect(noKey.status).toBe(401);
+    expect(crossOrigin.status).toBe(403);
+    expect(core.started).toHaveLength(1);
+  });
+});
+
+describe("Ennodia IO real loopback listener", () => {
+  it("validates origin, media type, and host before starting runs", async () => {
+    const core = new FakeIoCore();
+    const server = startEnnodiaIoServer(core as unknown as EnnodiaCore, {
+      port: 0,
+    });
+    const port = server.port;
+    if (port === undefined) {
+      throw new Error("Bun did not assign an ephemeral port.");
+    }
+
+    try {
+      const base = `http://127.0.0.1:${port}`;
+      const payload = JSON.stringify({
+        model: "ennodia-auto",
+        messages: [{ role: "user", content: "Hello." }],
+      });
+
+      const health = await fetch(`${base}/health`);
+      const ok = await fetch(`${base}/v1/chat/completions`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: payload,
+      });
+      const crossOrigin = await fetch(`${base}/v1/chat/completions`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          origin: "https://attacker.invalid",
+        },
+        body: payload,
+      });
+      const plain = await fetch(`${base}/v1/chat/completions`, {
+        method: "POST",
+        headers: { "content-type": "text/plain" },
+        body: payload,
+      });
+      const forgedHost = await rawHttpRequest(
+        port,
+        [
+          "POST /v1/chat/completions HTTP/1.1",
+          "Host: attacker.invalid",
+          "Content-Type: application/json",
+          `Content-Length: ${payload.length}`,
+          "Connection: close",
+          "",
+          payload,
+        ].join("\r\n"),
+      );
+
+      expect(health.status).toBe(200);
+      expect(ok.status).toBe(200);
+      expect(crossOrigin.status).toBe(403);
+      expect((await crossOrigin.json() as ErrorResponse).error.type)
+        .toBe("invalid_origin");
+      expect(plain.status).toBe(415);
+      expect((await plain.json() as ErrorResponse).error.type)
+        .toBe("unsupported_media_type");
+      expect(forgedHost).toMatch(/^HTTP\/1\.1 403/);
+      expect(forgedHost).toContain("invalid_host");
+      expect(core.started).toHaveLength(1);
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  it("rejects oversized requests at the native listener limit before Core work", async () => {
+    const core = new FakeIoCore();
+    const server = startEnnodiaIoServer(core as unknown as EnnodiaCore, {
+      port: 0,
+      maxRequestBodySize: 256,
+    });
+    const port = server.port;
+    if (port === undefined) {
+      throw new Error("Bun did not assign an ephemeral port.");
+    }
+
+    try {
+      const response = await fetch(
+        `http://127.0.0.1:${port}/v1/chat/completions`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: "x".repeat(16 * 1024),
+        },
+      );
+      const body = await response.text();
+
+      expect(response.status).toBe(413);
+      expect(body).toBe("");
+      expect(core.started).toHaveLength(0);
+    } finally {
+      server.stop(true);
+    }
+  });
+});
+
 type ChatCompletionResponse = {
   object: string;
   created: number;
@@ -619,6 +841,21 @@ function makeRunView(overrides: Partial<RunView> = {}): RunView {
     },
     ...overrides,
   };
+}
+
+function rawHttpRequest(port: number, request: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    let data = "";
+    const socket = connect(port, "127.0.0.1", () => {
+      socket.write(request);
+    });
+    socket.setTimeout(2_000, () => socket.destroy(new Error("HTTP fixture timed out")));
+    socket.on("data", (chunk: Buffer) => {
+      data += chunk.toString();
+    });
+    socket.on("end", () => resolve(data));
+    socket.on("error", reject);
+  });
 }
 
 async function waitUntil(predicate: () => boolean): Promise<void> {

@@ -42,9 +42,12 @@ export function diagnoseTasks(tasks: TaskView[]): TaskDiagnosis | undefined {
 }
 
 function likelyCause(tasks: TaskView[]): string {
+  if (tasks.every(hasAuthenticationError)) {
+    return "Agent authentication failed. This attempt did not establish how the selected model would handle the task.";
+  }
   if (tasks.every((task) => task.timedOut)) {
     if (tasks.some(outputChars) && tasks.some(hasRecentOutput)) {
-      return "Task needed more time; at least one provider was still producing output before the deadline.";
+      return "The task produced output near its deadline but did not return a completed result.";
     }
 
     if (tasks.some(outputChars)) {
@@ -75,8 +78,12 @@ function suggestions(
 ): string[] {
   const result = new Set<string>();
 
+  if (tasks.some(hasAuthenticationError)) {
+    result.add("Sign in through the affected agent's supported CLI, then retry the same task.");
+  }
+
   if (tasks.some((task) => task.timedOut)) {
-    result.add("Retry the timed-out provider with a longer timeoutMs.");
+    result.add("Inspect the attempt before retrying. Narrow the task, adjust its execution settings, or allow more time if justified.");
   }
 
   if (hasPartialOutput) {
@@ -85,7 +92,9 @@ function suggestions(
 
   if (tasks.some((task) => task.exitCode !== undefined && task.exitCode !== 0)) {
     result.add("Inspect stderr and task events with ennodia_get_task.");
-    result.add("Retry with a different harness if the provider command looks broken.");
+    if (!tasks.every(hasAuthenticationError)) {
+      result.add("Check the requested model and command configuration before retrying.");
+    }
   }
 
   if (tasks.some((task) => task.drainTimedOut)) {
@@ -97,6 +106,11 @@ function suggestions(
   }
 
   return [...result];
+}
+
+function hasAuthenticationError(task: TaskView): boolean {
+  return !task.timedOut && /^(?:Error: )?(?:Failed to authenticate:|OAuth session expired|Authentication failed:|Not logged in\b)/im
+    .test(`${task.stdout}\n${task.stderr}`);
 }
 
 function summaryLine(task: TaskView): string {

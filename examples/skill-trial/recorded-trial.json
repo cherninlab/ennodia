@@ -1,0 +1,42 @@
+{
+  "recordedAt": "2026-09-06",
+  "kind": "inconclusive native skill trial",
+  "harness": "antigravity",
+  "model": "Configured default; exact model not established",
+  "plain": {
+    "taskId": "125ffd40-c224-4615-a441-f31154a26096",
+    "status": "succeeded",
+    "elapsedMs": 18023,
+    "requestedSkills": [],
+    "output": "Contract violations identified in [`retryDelaySeconds`](./retry.ts#L2) based on [contract.md](./contract.md):\n\n* **Zero input (`\"0\"`)**: Returns `30` instead of `0` because `Number(\"0\")` evaluates to `0`, which is falsy in `0 || 30`.\n* **Values exceeding upper bound (`\"121\"`)**: Returns `121` instead of `30` because there is no `> 120` boundary check.\n* **Negative values (`\"-1\"`)**: Returns `-1` instead of `30` because negative numbers are truthy and not checked against `< 0`.\n* **Fractions (`\"1.5\"`)**: Returns `1.5` instead of `30` because `Number(\"1.5\")` parses floats without integer validation.\n* **Scientific notation (`\"1e2\"`)**: Returns `100` instead of `30`, directly violating the rule disallowing numeric notation like `1e2`.\n* **Hexadecimal notation (`\"0x10\"`)**: Returns `16` instead of `30`, directly violating the rule disallowing numeric notation like `0x10`.\n* **Binary / octal notation (`\"0b10\"`)**: Returns `2` instead of `30` because `Number()` parses alternative radix notations instead of strictly decimal integers.\n"
+  },
+  "requestedSkill": {
+    "taskId": "233ba69d-b691-4e34-94db-c3fa03a759bb",
+    "reportedStatus": "succeeded",
+    "observedOutcome": "No answer; required read_file access denied",
+    "exitCode": 0,
+    "elapsedMs": 17290,
+    "requestedSkills": [
+      {
+        "id": "source-grounded-audit",
+        "name": "source-grounded-audit",
+        "version": "local",
+        "hash": "87366950aa303123d38f7d97cd6cc01a842ca7cc18ffc41f75653bec76fe9cfa",
+        "source": "project",
+        "harnessIds": [
+          "antigravity",
+          "claude-code",
+          "codex",
+          "installable",
+          "opencode"
+        ],
+        "native": true
+      }
+    ],
+    "stderrExcerpt": "jetski: no output produced — a tool required the \"read_file\" permission that headless mode cannot prompt for, so it was auto-denied.",
+    "output": ""
+  },
+  "edits": "Local file URL prefixes normalized; CLI remediation instructions omitted from the diagnostic excerpt.",
+  "verification": "Plain findings checked against the contract and evaluator. This denied attempt cannot measure skill effectiveness.",
+  "limitation": "Uncontrolled native skill inventory; loading not verified. The zero-exit false success is fixed in the release candidate."
+}

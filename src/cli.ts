@@ -27,6 +27,9 @@ async function runMcp(core: EnnodiaCore): Promise<void> {
     void shutdown("transport closed");
   };
 
+  process.stdin.once("end", () => { void shutdown("stdin ended", 0); });
+  process.stdin.once("close", () => { void shutdown("stdin closed", 0); });
+
   process.once("SIGINT", () => {
     void shutdown("SIGINT", 130);
   });

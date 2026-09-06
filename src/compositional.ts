@@ -248,7 +248,7 @@ export function summarizeCompositionalTasks(input: {
     !knownIds.has(taskId)
   );
   const readyTaskIds = tasks
-    .filter((task) => task.status === "succeeded" && task.stdoutChars > 0)
+    .filter((task) => task.status === "succeeded" && hasTaskEvidence(task))
     .map((task) => task.id);
   const runningTaskIds = tasks
     .filter((task) => task.status === "running")
@@ -260,7 +260,7 @@ export function summarizeCompositionalTasks(input: {
     .filter((task) => task.status === "cancelled")
     .map((task) => task.id);
   const emptySucceededTaskIds = tasks
-    .filter((task) => task.status === "succeeded" && task.stdoutChars === 0)
+    .filter((task) => task.status === "succeeded" && !hasTaskEvidence(task))
     .map((task) => task.id);
   const compareReady = readyTaskIds.length >=
     (input.minSuccessfulTasksForCompare ?? 2);
@@ -328,4 +328,9 @@ function compositionalPrompt(
   ];
 
   return lines.join("\n");
+}
+
+function hasTaskEvidence(task: TaskView): boolean {
+  return task.hasOutput ?? Boolean(task.finalMessage?.trim() ||
+    task.finalMessageChars || task.stdoutChars || task.stderrChars);
 }

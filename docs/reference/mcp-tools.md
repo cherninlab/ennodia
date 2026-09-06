@@ -40,6 +40,7 @@ as native Agent Skills: folders containing `SKILL.md`, installed in paths
 supported by each harness. It does not inline full skill content into the
 delegated prompt. Task and run views include selected skill metadata in
 `appliedSkills`.
+This metadata records the request. It does not prove that the native agent loaded or followed the skill.
 
 `ennodia_estimate_budget`, `ennodia_estimate_compositional_budget`,
 `ennodia_start`, `ennodia_run`, `ennodia_start_compare`,
@@ -75,6 +76,19 @@ Fields named `maxOutputChars`, `maxAnswerChars`, or `maxCandidateChars` bound
 returned text. `0` omits that text while still returning status, IDs, timing,
 and character counts.
 
+For task views, `maxOutputChars` bounds each of `stdout`, `stderr`, and `finalMessage`.
+`includeOutput: false` omits their text. `hasOutput` and `finalMessageChars` remain available in compact views.
+`hasOutput` includes captured diagnostic output. It does not establish correctness or a useful answer.
+
+On macOS and Linux, tasks own process groups. Cancellation sends TERM, then KILL after a bounded grace period.
+Cleanup also removes descendants that remain in the owned group after the parent exits.
+Processes that create a separate session can escape that group.
+On Windows, cleanup signals the direct child process.
+Closing the MCP input stream shuts down active work.
+
+Raw and compositional batch starts cancel earlier workers if a later spawn fails.
+Active runs retain child evidence until comparison and receipt capture finish.
+
 ## Discovery and planning
 
 ### `ennodia_list_harnesses`
@@ -82,6 +96,9 @@ and character counts.
 Detects supported local artificial intelligence (AI) tools and reports
 availability, runnable state, command path, version, capabilities, and adapter
 notes.
+
+Version probes have bounded deadlines. A failed probe appears in adapter notes without blocking other discoveries.
+`runnable` means Ennodia found an executable adapter. Authentication and requested model access still require a real task.
 
 | Input | Default | Meaning |
 | --- | --- | --- |
@@ -447,8 +464,8 @@ successful non-empty task IDs ready for a Judge + Result Advisor comparison.
 | `taskIds` | required | Shard task IDs returned by `ennodia_start_compositional`. |
 | `prompt` | none | Optional comparison prompt included in `compareNext` when the minimum outputs are ready. |
 | `minSuccessfulTasksForCompare` | `2` | Minimum successful non-empty outputs required for `compareReady`. |
-| `includeOutput` | `false` | Include bounded stdout and stderr previews for known tasks. |
-| `maxOutputChars` | `2000` | Maximum stdout and stderr characters per task when output is included. |
+| `includeOutput` | `false` | Include bounded stdout, stderr, and finalMessage previews for known tasks. |
+| `maxOutputChars` | `2000` | Maximum characters per task output field when output is included. |
 
 The response includes `readyTaskIds`, `runningTaskIds`, `failedTaskIds`,
 `cancelledTaskIds`, `emptySucceededTaskIds`, and `missingTaskIds`. It includes
@@ -462,13 +479,14 @@ Returns task status, captured output, events, timing, and ETA.
 | Input | Default | Meaning |
 | --- | --- | --- |
 | `taskId` | required | ID returned by a raw, compositional, advised-plan, run, Plan Advisor, or Compare start. |
-| `includeOutput` | `true` | Include bounded stdout and stderr. |
+| `includeOutput` | `true` | Include bounded stdout, stderr, and finalMessage. |
 | `includeEvents` | `true` | Include bounded task events. |
-| `maxOutputChars` | `20000` | Maximum stdout and stderr characters. Capped at 200000. |
+| `maxOutputChars` | `20000` | Maximum characters per output field. Capped at 200000. |
 | `maxEvents` | `100` | Maximum task events. Capped at 300. |
 
 A task is terminal only after the child process exits and stdout/stderr have
-drained or timed out visibly.
+drained or timed out visibly. Final-message collection and adapter error checks complete before terminal status becomes visible.
+Antigravity's explicit no-output error is a failure even when its command exits with code zero.
 
 ### `ennodia_cancel_task`
 
@@ -485,9 +503,9 @@ returns a compact view. Request output or events only when you need them.
 
 | Input | Default | Meaning |
 | --- | --- | --- |
-| `includeOutput` | `false` | Include bounded stdout and stderr previews for each task. |
+| `includeOutput` | `false` | Include bounded stdout, stderr, and finalMessage previews for each task. |
 | `includeEvents` | `false` | Include bounded task events for each task. |
-| `maxOutputChars` | `4000` | Maximum stdout and stderr characters per task. Capped at 200000. |
+| `maxOutputChars` | `4000` | Maximum characters per task output field. Capped at 200000. |
 | `maxEvents` | `25` | Maximum events per task. Capped at 300. |
 
 ## Judge + Result Advisor

@@ -20,6 +20,7 @@ describe("harness adapters", () => {
       "/tmp/ennodia-fixture",
       "--model",
       "provider/model",
+      "--",
       "review this repo",
     ]);
     expect(command?.args).not.toContain("--auto");
@@ -71,6 +72,7 @@ describe("harness adapters", () => {
       "never",
       "--model",
       "provider/model",
+      "--",
       "review this repo",
     ]);
     expect(command?.args).not.toContain("--trust-all-tools");
@@ -95,6 +97,7 @@ describe("harness adapters", () => {
       "/tmp/ennodia-fixture",
       "--model",
       "provider/model",
+      "--",
       "review this repo",
     ]);
     expect(command?.args).not.toContain("--zen");

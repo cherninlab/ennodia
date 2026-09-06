@@ -2,6 +2,8 @@ import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { tmpdir } from "node:os";
 import { ENNODIA_VERSION } from "../version";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 
 const HANDSHAKE_TIMEOUT_MS = 10_000;
 
@@ -178,6 +180,7 @@ function assertPackedFiles(paths: string[]): void {
     "src/index.ts",
     "src/internal.ts",
     "src/planner.ts",
+    "src/process.ts",
     "src/plan-advice.ts",
     "src/priority.ts",
     "src/runs.ts",
@@ -190,6 +193,8 @@ function assertPackedFiles(paths: string[]): void {
     "skills/release-readiness/SKILL.md",
     "skills/rigorous-review/SKILL.md",
     "skills/source-grounded-audit/SKILL.md",
+    "examples/docs-drift/check.ts",
+    "examples/skill-trial/check.ts",
   ];
 
   for (const path of expected) {
@@ -220,38 +225,22 @@ function assertPackedFiles(paths: string[]): void {
 }
 
 async function assertMcpHandshake(label: string, command: string[]): Promise<void> {
-  const input = `${JSON.stringify({
-    jsonrpc: "2.0",
-    id: 1,
-    method: "initialize",
-    params: {
-      protocolVersion: "2024-11-05",
-      capabilities: {},
-      clientInfo: {
-        name: "ennodia-package-smoke",
-        version: "0",
-      },
-    },
-  })}\n`;
-
-  const result = await runCapture(command, { input, timeoutMs: HANDSHAKE_TIMEOUT_MS });
-  const responseLine = result.stdout
-    .split("\n")
-    .find((line) => line.trim().startsWith("{"));
-
-  if (!responseLine) {
-    throw new Error(`${label} did not return a JSON-RPC response.`);
-  }
-
-  const response = JSON.parse(responseLine) as {
-    result?: { serverInfo?: { version?: string } };
-  };
-  const version = response.result?.serverInfo?.version;
-
-  if (version !== ENNODIA_VERSION) {
-    throw new Error(
-      `${label} reported version ${version ?? "<missing>"} instead of ${ENNODIA_VERSION}.`,
-    );
+  const client = new Client({ name: "ennodia-package-smoke", version: "0" });
+  const transport = new StdioClientTransport({
+    command: command[0], args: command.slice(1), stderr: "pipe",
+  });
+  try {
+    // Keep the connection open until initialization completes. EOF now means
+    // the client disconnected and correctly shuts down the server's work.
+    await client.connect(transport, { timeout: HANDSHAKE_TIMEOUT_MS });
+    const version = client.getServerVersion()?.version;
+    if (version !== ENNODIA_VERSION) {
+      throw new Error(
+        `${label} reported version ${version ?? "<missing>"} instead of ${ENNODIA_VERSION}.`,
+      );
+    }
+  } finally {
+    await client.close();
   }
 }
 

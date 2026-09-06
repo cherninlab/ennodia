@@ -10,6 +10,7 @@ bunx @cherninlab/ennodia-io
 ```
 
 It exposes local provider options and a non-streaming chat-completions subset
-over installed local agent command-line interface (CLI) programs. See the main
-Ennodia docs for current limits, Cross-Origin Resource Sharing (CORS) posture,
-and examples.
+over installed local agent command-line interface (CLI) programs. The server
+binds to loopback by default, checks `Host` and `Origin` headers, and requires
+JSON media types for chat posts. See the main Ennodia docs for current limits,
+Cross-Origin Resource Sharing (CORS) posture, and examples.

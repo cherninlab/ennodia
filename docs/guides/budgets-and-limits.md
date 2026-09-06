@@ -95,7 +95,7 @@ supported quota surface.
 
 ## Practical Defaults
 
-- For a first documentation or code audit, start with two or three harnesses.
+- Start with one agent and a narrow task. Add attempts when they address a specific uncertainty.
 - Use `maxOutputChars` to keep Compare input bounded.
 - Keep `maxChildTasks` set when the prompt may route to many adapters.
 - Treat unknown subscription-limit status as a transparency signal, not proof

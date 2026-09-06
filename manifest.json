@@ -1,8 +1,8 @@
 {
   "manifest_version": "0.2",
   "name": "ennodia",
-  "version": "0.2.0",
-  "description": "Local MCP server for AI team advice, multi-agent review, Compare, and traceable receipts",
+  "version": "0.3.0-rc.1",
+  "description": "Try other agents, models, and skills from your familiar AI workflow through a local MCP server",
   "author": {
     "name": "Cherninlab"
   },
@@ -1007,7 +1007,7 @@
             "type": "boolean"
           },
           "skillIds": {
-            "description": "Optional list of skill IDs to apply to the prompt before starting the task.",
+            "description": "Installed native skill IDs to request from the selected harness. Returned metadata does not prove that the agent loaded the skill.",
             "type": "array",
             "items": {
               "type": "string"
@@ -1337,7 +1337,7 @@
             "maximum": 200000
           },
           "skillIds": {
-            "description": "Optional list of skill IDs to apply to the prompt before planning and running child tasks.",
+            "description": "Installed native skill IDs to request from child harnesses. Returned metadata does not prove that an agent loaded the skill.",
             "type": "array",
             "items": {
               "type": "string"
@@ -1637,7 +1637,7 @@
         "properties": {
           "includeOutput": {
             "default": false,
-            "description": "Include bounded stdout and stderr previews for each task.",
+            "description": "Include bounded stdout, stderr, and finalMessage previews for each task.",
             "type": "boolean"
           },
           "includeEvents": {
@@ -1647,7 +1647,7 @@
           },
           "maxOutputChars": {
             "default": 4000,
-            "description": "Maximum stdout and stderr characters to include per task. Use 0 to omit output text.",
+            "description": "Maximum characters in each task output field: stdout, stderr, and finalMessage. Use 0 to omit output text.",
             "type": "integer",
             "minimum": 0,
             "maximum": 200000
@@ -1725,12 +1725,12 @@
           },
           "includeOutput": {
             "default": false,
-            "description": "Include bounded stdout and stderr previews for each known task.",
+            "description": "Include bounded stdout, stderr, and finalMessage previews for each known task.",
             "type": "boolean"
           },
           "maxOutputChars": {
             "default": 2000,
-            "description": "Maximum stdout and stderr characters to include per task when includeOutput is true.",
+            "description": "Maximum characters in each task output field when includeOutput is true, including finalMessage.",
             "type": "integer",
             "minimum": 0,
             "maximum": 200000
@@ -2130,7 +2130,7 @@
           },
           "includeOutput": {
             "default": true,
-            "description": "Include bounded stdout and stderr previews.",
+            "description": "Include bounded stdout, stderr, and finalMessage previews.",
             "type": "boolean"
           },
           "includeEvents": {
@@ -2140,7 +2140,7 @@
           },
           "maxOutputChars": {
             "default": 20000,
-            "description": "Maximum stdout and stderr characters to include. Use 0 to omit output text.",
+            "description": "Maximum characters in each output field: stdout, stderr, and finalMessage. Use 0 to omit output text.",
             "type": "integer",
             "minimum": 0,
             "maximum": 200000

@@ -1,5 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test";
+import { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import * as os from "node:os";
 import { join } from "node:path";
 import {
   augmentPrompt,
@@ -13,13 +14,16 @@ import {
 } from "./skills";
 
 describe("Agent Skills", () => {
-  const testDir = join(process.cwd(), "tmp-test-skills");
+  let testDir: string;
+  let homeSpy: ReturnType<typeof spyOn>;
 
   beforeEach(() => {
-    mkdirSync(testDir, { recursive: true });
+    testDir = mkdtempSync(join(os.tmpdir(), "ennodia-skills-test-"));
+    homeSpy = spyOn(os, "homedir").mockReturnValue(join(testDir, "user"));
   });
 
   afterEach(() => {
+    homeSpy.mockRestore();
     rmSync(testDir, { recursive: true, force: true });
   });
 
