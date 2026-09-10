@@ -1,68 +1,36 @@
-import { workflows } from "../data/workflows";
-
 const tabs = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-audience]"));
 const panels = Array.from(document.querySelectorAll<HTMLElement>("[data-workflow]"));
-const promptSelect = document.querySelector<HTMLSelectElement>("#prompt-audience");
-const promptText = document.querySelector<HTMLElement>("#starter-prompt");
-const copyStatus = document.querySelector<HTMLElement>("#copy-status");
+const demo = document.querySelector<HTMLElement>("#in-practice");
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-let timer: ReturnType<typeof setTimeout> | undefined;
-let playingPanel: HTMLElement | undefined;
+let pendingTrace = true;
+let demoVisible = false;
+let frame = 0;
 
-function stopPlayback() {
-  clearTimeout(timer);
-  if (playingPanel) {
-    const button = playingPanel.querySelector<HTMLButtonElement>("[data-play]");
-    button?.setAttribute("aria-label", "Replay workflow");
-    button?.removeAttribute("data-playing");
-  }
-  playingPanel = undefined;
+// Trace the branch and return once; every word remains readable throughout.
+function traceHandoff() {
+  cancelAnimationFrame(frame);
+  for (const panel of panels) panel.querySelector(".workflow-diagram")?.removeAttribute("data-tracing");
+  if (!pendingTrace || !demoVisible || document.hidden || reducedMotion.matches) return;
+  pendingTrace = false;
+  // A painted static frame lets rapid switches restart CSS animations reliably.
+  frame = requestAnimationFrame(() => {
+    frame = requestAnimationFrame(() => {
+      panels.find(panel => !panel.hidden)?.querySelector(".workflow-diagram")?.setAttribute("data-tracing", "");
+    });
+  });
 }
 
-function setStep(panel: HTMLElement, step: number) {
-  panel.dataset.step = String(step);
-  for (const button of panel.querySelectorAll<HTMLButtonElement>("[data-step-button]")) {
-    button.setAttribute("aria-pressed", String(Number(button.dataset.stepButton) === step));
-  }
-}
-
-function play(panel: HTMLElement) {
-  stopPlayback();
-  playingPanel = panel;
-  const button = panel.querySelector<HTMLButtonElement>("[data-play]");
-  button?.setAttribute("aria-label", "Pause workflow");
-  button?.setAttribute("data-playing", "true");
-  setStep(panel, 0);
-  timer = setTimeout(() => {
-    setStep(panel, 1);
-    timer = setTimeout(() => {
-      setStep(panel, 2);
-      stopPlayback();
-    }, 3200);
-  }, 2300);
-}
-
-function updatePrompt(id: string) {
-  const workflow = workflows.find(item => item.id === id);
-  if (!workflow) return;
-  if (promptSelect) promptSelect.value = id;
-  if (promptText) promptText.textContent = workflow.prompt;
-  if (copyStatus) copyStatus.textContent = "";
-}
-
-function selectAudience(id: string) {
-  stopPlayback();
-  history.replaceState(null, "", `#tab-${id}`);
+function selectAudience(id: string, updateHash = true) {
+  if (!tabs.some(tab => tab.dataset.audience === id)) return;
+  if (updateHash) history.replaceState(null, "", `#tab-${id}`);
   for (const tab of tabs) {
     const selected = tab.dataset.audience === id;
     tab.setAttribute("aria-selected", String(selected));
     tab.tabIndex = selected ? 0 : -1;
   }
-  for (const panel of panels) {
-    panel.hidden = panel.dataset.workflow !== id;
-    setStep(panel, 2);
-  }
-  updatePrompt(id);
+  for (const panel of panels) panel.hidden = panel.dataset.workflow !== id;
+  pendingTrace = true;
+  traceHandoff();
 }
 
 for (const [index, tab] of tabs.entries()) {
@@ -81,52 +49,50 @@ for (const [index, tab] of tabs.entries()) {
   });
 }
 
-for (const panel of panels) {
-  for (const button of panel.querySelectorAll<HTMLButtonElement>("[data-step-button]")) {
-    button.addEventListener("click", () => {
-      stopPlayback();
-      setStep(panel, Number(button.dataset.stepButton));
-    });
-  }
-  panel.querySelector("[data-play]")?.addEventListener("click", () => {
-    if (playingPanel === panel) stopPlayback();
-    else play(panel);
-  });
-}
-
-for (const link of document.querySelectorAll<HTMLAnchorElement>("[data-show-audience]")) {
-  link.addEventListener("click", event => {
-    event.preventDefault();
-    const id = link.dataset.showAudience!;
-    selectAudience(id);
-    document.querySelector("#in-practice")?.scrollIntoView({ behavior: reducedMotion.matches ? "instant" : "smooth", block: "start" });
-    tabs.find(tab => tab.dataset.audience === id)?.focus({ preventScroll: true });
-  });
-}
-
-promptSelect?.addEventListener("change", () => updatePrompt(promptSelect.value));
-document.querySelector("[data-copy-prompt]")?.addEventListener("click", async () => {
-  const text = promptText?.textContent ?? "";
-  try {
-    await navigator.clipboard.writeText(text);
-    if (copyStatus) copyStatus.textContent = "Copied. Paste it into your agent conversation.";
-  } catch {
-    if (copyStatus) copyStatus.textContent = "Select the prompt above to copy it.";
-  }
-});
-
 function selectFromHash() {
   const id = location.hash.replace("#tab-", "");
-  if (workflows.some(item => item.id === id)) selectAudience(id);
+  selectAudience(id, false);
 }
 selectFromHash();
 window.addEventListener("hashchange", selectFromHash);
+
+if (demo) {
+  new IntersectionObserver(entries => {
+    demoVisible = entries.some(entry => entry.isIntersecting);
+    if (demoVisible && pendingTrace) traceHandoff();
+  }, { threshold: 0.25 }).observe(demo);
+}
 document.addEventListener("visibilitychange", () => {
-  if (document.hidden) stopPlayback();
+  if (document.hidden) {
+    cancelAnimationFrame(frame);
+    for (const panel of panels) panel.querySelector(".workflow-diagram")?.removeAttribute("data-tracing");
+  } else if (pendingTrace) traceHandoff();
 });
 reducedMotion.addEventListener("change", () => {
   if (reducedMotion.matches) {
-    stopPlayback();
-    for (const panel of panels) setStep(panel, 2);
+    pendingTrace = false;
+    cancelAnimationFrame(frame);
+    for (const panel of panels) panel.querySelector(".workflow-diagram")?.removeAttribute("data-tracing");
   }
 });
+
+for (const button of document.querySelectorAll<HTMLButtonElement>("[data-copy-value], [data-copy-target]")) {
+  let resetTimer: ReturnType<typeof setTimeout> | undefined;
+  button.addEventListener("click", async () => {
+    const text = button.dataset.copyValue ?? document.getElementById(button.dataset.copyTarget ?? "")?.textContent ?? "";
+    const status = button.closest(".install-link, .example-body")?.querySelector<HTMLElement>(".copy-feedback");
+    clearTimeout(resetTimer);
+    try {
+      await navigator.clipboard.writeText(text);
+      button.setAttribute("data-copied", "");
+      if (status) status.textContent = "Copied. Paste into your agent.";
+      resetTimer = setTimeout(() => {
+        button.removeAttribute("data-copied");
+        if (status) status.textContent = "";
+      }, 3000);
+    } catch {
+      button.removeAttribute("data-copied");
+      if (status) status.textContent = "Select the text above and copy it.";
+    }
+  });
+}

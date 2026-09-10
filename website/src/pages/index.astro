@@ -1,8 +1,7 @@
 ---
 import "../styles/landing.css";
-import { ArrowRight, ArrowUpRight, Check, ChevronDown, CodeXml, Copy, FileText, Folder, GraduationCap, MessageSquare, Play, Pause, Terminal, BriefcaseBusiness, Puzzle, GitBranch, CircleCheck } from "@lucide/astro";
+import { ArrowRight, ArrowUpRight, Check, ChevronDown, Copy, Terminal, CircleCheck } from "@lucide/astro";
 import logoSrc from "../../../docs/assets/logo.svg?url";
-import githubIconSrc from "../../../docs/assets/icons/github.svg?url";
 import codexLogoSrc from "../../../docs/assets/agents/codex-color.svg?url";
 import claudecodeLogoSrc from "../../../docs/assets/agents/claudecode-color.svg?url";
 import opencodeLogoSrc from "../../../docs/assets/agents/opencode-light.svg?url";
@@ -11,27 +10,40 @@ import kiroLogoSrc from "../../../docs/assets/agents/kiro-color.svg?url";
 import clineLogoSrc from "../../../docs/assets/agents/cline.svg?url";
 import hermesLogoSrc from "../../../docs/assets/agents/hermesagent.svg?url";
 import antigravityLogoSrc from "../../../docs/assets/agents/antigravity-color.svg?url";
+import InstallLink from "../components/InstallLink.astro";
+import WorkflowDiagram from "../components/WorkflowDiagram.astro";
+import HeroTitle from "../components/HeroTitle.astro";
 import { workflows } from "../data/workflows";
 
-const pageTitle = "Ennodia — let your AI agent call in the others";
-const pageDescription = "Stuck on a task? Ennodia lets Codex and other AI agents get help from your installed agents and skills, in the same conversation. Free, local, and open source.";
+const pageTitle = "Ennodia — connect your AI agents";
+const pageDescription = "Ennodia lets your AI agent give work to other installed agents, try skills, and bring results back to the same conversation. Free and open source.";
 const siteUrl = Astro.site ?? new URL("https://ennodia.cherninlab.com");
 const canonicalUrl = new URL(Astro.url.pathname, siteUrl).toString();
 const socialImageUrl = new URL("/og.png", siteUrl).toString();
 const adapters = [
-  { name: "Codex", logoSrc: codexLogoSrc },
-  { name: "Claude Code", logoSrc: claudecodeLogoSrc },
-  { name: "OpenCode", logoSrc: opencodeLogoSrc },
-  { name: "Antigravity", logoSrc: antigravityLogoSrc },
-  { name: "Kilo Code", logoSrc: kilocodeLogoSrc },
-  { name: "Kiro", logoSrc: kiroLogoSrc },
-  { name: "Cline", logoSrc: clineLogoSrc },
-  { name: "Hermes Agent", logoSrc: hermesLogoSrc },
+  { id: "codex", name: "Codex", logoSrc: codexLogoSrc },
+  { id: "claude-code", name: "Claude Code", logoSrc: claudecodeLogoSrc },
+  { id: "opencode", name: "OpenCode", logoSrc: opencodeLogoSrc },
+  { id: "antigravity", name: "Antigravity", logoSrc: antigravityLogoSrc },
+  { id: "kilo-code", name: "Kilo Code", logoSrc: kilocodeLogoSrc },
+  { id: "kiro", name: "Kiro", logoSrc: kiroLogoSrc },
+  { id: "cline", name: "Cline", logoSrc: clineLogoSrc },
+  { id: "hermes-agent", name: "Hermes Agent", logoSrc: hermesLogoSrc },
 ];
-const audienceIcons = [CodeXml, GraduationCap, BriefcaseBusiness];
+const skillDiagram = `contract.md          retry.ts
+     │                   │
+     └────────┬──────────┘
+              ▼
+   Code-review skill
+              │
+              ▼
+   Zero means “retry now.”
+   The code waits 30 seconds.
+              │
+              └──→ Test zero.`;
 const faqItems = [
-  { question: "Is Ennodia another chat app?", answer: "Ennodia is an add-on for your existing AI agent. It connects through Model Context Protocol (MCP). You continue in Codex or another compatible client while other agents work on focused tasks." },
-  { question: "What do I need to use it?", answer: "A compatible MCP client, Bun, and at least one supported agent command-line interface (CLI) with working provider access. Your main agent can help with setup. The study and sales examples use the same agent setup and files you supply." },
+  { question: "Is Ennodia another chat app?", answer: "Ennodia is an add-on for the agent you use. You stay in your usual conversation while it asks other installed agents to write code, answer questions, or review work." },
+  { question: "What do I need to use it?", answer: "An app such as Codex that can connect to Ennodia, plus a supported agent installed on your computer. That agent needs a working account or API key. Your agent can use the setup address to check what’s missing and guide you through installation.", link: { href: "/docs/getting-started/#requirements", label: "Setup requirements" } },
   { question: "Does it work with my subscriptions?", answer: "Ennodia uses each installed agent’s configured access. That can be a subscription or an API key, depending on the agent and provider. Their quotas and charges still apply. Ennodia itself is free." },
   { question: "What happens to my code and files?", answer: "Ennodia runs locally. It passes the requested task to your selected agents, which can send material to their configured providers. There is no Ennodia-hosted service. Local run history can be disabled." },
   { question: "What if every agent gets stuck?", answer: "You have a record of the approaches tried and the evidence they produced. Use that to reconsider the task or test another assumption. Agreement between agents does not prove correctness or impossibility." },
@@ -66,86 +78,60 @@ const applicationStructuredData = { "@context": "https://schema.org", "@type": "
   </head>
   <body>
     <a class="skip-link" href="#main-content">Skip to content</a>
-    <header class="site-header wrap">
-      <a class="brand" href="/" aria-label="Ennodia home"><img src={logoSrc} alt="Ennodia" width="136" height="29" /></a>
-      <nav aria-label="Main navigation">
-        <a href="#for-you">For you <ChevronDown size={14} aria-hidden="true" /></a>
-        <a href="/docs/getting-started/">Docs</a>
-        <a class="github-link" href="https://github.com/cherninlab/ennodia"><img src={githubIconSrc} alt="" width="18" height="18" /><span>GitHub</span></a>
-      </nav>
-      <a class="button compact" href="#get-started">Get Ennodia <ArrowUpRight size={16} aria-hidden="true" /></a>
-    </header>
     <main id="main-content">
       <section class="hero wrap" aria-labelledby="hero-title">
         <div class="hero-copy">
-          <p class="eyebrow"><span class="tiny-line"></span> Your agents. Working together.</p>
-          <h1 id="hero-title">Let your AI agent<br class="desktop-break" /> call in <em>the others.</em></h1>
-          <p class="hero-description">Stuck on a bug? Unsure about an answer? Ennodia lets your agent get help from other agents and skills, in the same conversation.</p>
-          <div class="actions"><a class="button primary" href="#get-started">Add Ennodia to your agent <ArrowUpRight size={18} aria-hidden="true" /></a><a class="text-link" href="#for-you">Find your use case <ArrowRight size={17} aria-hidden="true" /></a></div>
-          <p class="hero-note">Free and open source. Runs on your computer.</p>
-          <div class="works-with"><span>Works with</span>{adapters.slice(0,4).map((agent) => (<span class="agent-mini" title={agent.name}><img src={agent.logoSrc} alt={agent.name} width="23" height="23" /></span>))}<a href="#your-agents">and more <ArrowRight size={14} aria-hidden="true" /></a></div>
+          <HeroTitle harnesses={adapters} />
+          <InstallLink />
         </div>
         <div class="hero-visual" id="in-practice">
           <div class="audience-tabs" role="tablist" aria-label="Ennodia examples">
-            {workflows.map((workflow, index) => {const Icon = audienceIcons[index]; return (<button type="button" id={`tab-${workflow.id}`} role="tab" aria-controls={`panel-${workflow.id}`} aria-selected={index === 0 ? "true" : "false"} tabindex={index === 0 ? 0 : -1} data-audience={workflow.id}><Icon size={16} aria-hidden="true" /><span>{workflow.audience}</span></button>);})}
+            {workflows.map((workflow, index) => (<button type="button" id={`tab-${workflow.id}`} role="tab" aria-controls={`panel-${workflow.id}`} aria-selected={index === 0 ? "true" : "false"} tabindex={index === 0 ? 0 : -1} data-audience={workflow.id}>{workflow.audience}</button>))}
           </div>
           {workflows.map((workflow, index) => (
-            <div class="workflow-panel" id={`panel-${workflow.id}`} role="tabpanel" aria-labelledby={`tab-${workflow.id}`} hidden={index !== 0} data-workflow={workflow.id} data-step="2" tabindex="0">
-              <div class="conversation">
-                <div class="window-bar"><span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span><span><img src={codexLogoSrc} alt="" width="17" height="17" /> Your conversation in Codex</span><MessageSquare size={15} aria-hidden="true" /></div>
-                <div class="conversation-body">
-                  <div class="project-path"><Folder size={15} aria-hidden="true" /><span>{workflow.folder}</span></div>
-                  <div class="user-message">{workflow.request}</div>
-                  <div class="shared-files">{workflow.files.map(file => <span><FileText size={12} aria-hidden="true" />{file}</span>)}</div>
-                  <div class="agent-message"><img src={codexLogoSrc} alt="Codex" width="23" height="23" /><p>{workflow.delegation}</p></div>
-                  <div class="delegation-card">
-                    <div class="delegation-heading"><img src={logoSrc} alt="Ennodia" width="84" height="18" /><span class="run-label">{index === 0 ? "Second opinion" : "Independent review"}</span><GitBranch size={15} aria-hidden="true" /></div>
-                    <div class="worker"><img src={claudecodeLogoSrc} alt="" width="26" height="26" /><div><strong>Claude Code</strong><span>{workflow.assignment}</span></div><span class="worker-indicator" aria-hidden="true"></span></div>
-                    <p class="worker-finding"><Check size={15} aria-hidden="true" />{workflow.finding}</p>
-                  </div>
-                  <div class="returned-result"><img src={codexLogoSrc} alt="Codex" width="23" height="23" /><p>{workflow.result}</p></div>
-                </div>
-              </div>
-              <div class="demo-controls"><div class="step-buttons" aria-label="Workflow steps">{["Your task", "Another agent", "Back to you"].map((label,step) => <button type="button" data-step-button={step} aria-label={`Step ${step + 1}: ${label}`} aria-pressed={step === 2 ? "true" : "false"}><span>{step + 1}</span><span>{label}</span></button>)}</div><button class="replay-button" type="button" data-play aria-label="Play workflow"><Play class="play-icon" size={16} aria-hidden="true" /><Pause class="pause-icon" size={16} aria-hidden="true" /></button></div>
-              <p class="demo-caption">Illustrated workflow <span>Same conversation, from question to review.</span></p>
+            <div class="workflow-panel" id={`panel-${workflow.id}`} role="tabpanel" aria-labelledby={`tab-${workflow.id}`} hidden={index !== 0} data-workflow={workflow.id} tabindex="0">
+              <WorkflowDiagram workflow={workflow} />
             </div>
           ))}
         </div>
+        <a class="text-link hero-proof" href="#recorded-review">Watch an agent check documentation <ArrowRight size={16} aria-hidden="true" /></a>
       </section>
-      <section class="recognition wrap" aria-labelledby="recognition-title">
-        <p class="eyebrow">Sound familiar?</p><h2 id="recognition-title">“Maybe another model<br />could solve this.”</h2>
-        <div class="recognition-copy"><p>So you open another tool. Explain the project again. Paste the files. Compare the answers yourself.</p><p>With Ennodia, your agent can do that work with you. Send a focused task to another agent. Review what comes back. Continue where you left off.</p></div>
-      </section>
-      <section class="use-cases wrap" id="for-you" aria-labelledby="use-cases-title">
-        <div class="section-heading"><div><p class="eyebrow">Ennodia for the work in front of you</p><h2 id="use-cases-title">What are you working on?</h2></div><p>Code, course notes, or a customer brief.<br />Start with a task you want to check.</p></div>
-        <div class="story-grid">{workflows.map((workflow,index) => {const Icon = audienceIcons[index]; return (
-          <article class="story-card"><a href={`#tab-${workflow.id}`} class="story-link" data-show-audience={workflow.id}><div class="story-image"><img src={workflow.illustration} alt={workflow.illustrationAlt} width="960" height="640" loading="lazy" /><span class="story-category"><Icon size={15} aria-hidden="true" />For {workflow.audience.toLowerCase()}</span><span class="story-arrow"><ArrowUpRight size={22} aria-hidden="true" /></span></div><h3>{workflow.title}</h3><p>{workflow.description}</p><span class="story-cta">Explore this example <ArrowRight size={16} aria-hidden="true" /></span></a></article>
-        );})}</div>
-        <p class="setup-note"><Terminal size={16} aria-hidden="true" />These examples use a configured AI agent and files you provide. <a href="/docs/getting-started/">See the setup requirements <ArrowUpRight size={13} aria-hidden="true" /></a></p>
+      <section class="use-cases wrap" id="for-you" aria-label="Examples">
+        <div class="story-grid">{workflows.map((workflow) => (
+          <article class="story-card">
+            <div class="story-copy">
+              <h3>{workflow.title}</h3><p>{workflow.description}</p>
+              <details class="story-example">
+                <summary>Try this with your agent <ChevronDown size={17} aria-hidden="true" /></summary>
+                <div class="example-body"><p>Use your own {workflow.materials}. Paste this into the conversation where you’re working:</p><blockquote id={`prompt-${workflow.id}`}>{workflow.prompt}</blockquote><button type="button" class="text-button" data-copy-target={`prompt-${workflow.id}`}><Copy class="copy-icon" size={17} aria-hidden="true" /><Check class="copied-icon" size={17} aria-hidden="true" />Copy prompt</button><span class="copy-feedback" role="status"></span></div>
+              </details>
+            </div>
+            <div class="story-image"><img src={workflow.illustration} alt={workflow.illustrationAlt} width="960" height="640" loading="lazy" /></div>
+          </article>
+        ))}</div>
       </section>
       <section class="skill-section wrap" aria-labelledby="skill-title">
-        <div class="skill-visual" aria-label="A review skill runs in a separate task and returns findings to your main conversation">
-          <div class="skill-file"><div class="file-heading"><Puzzle size={22} aria-hidden="true" /><span>Try a review skill</span></div><div class="file-path"><Folder size={15} aria-hidden="true" /> skills / source-grounded-audit</div><div class="skill-paper"><FileText size={21} aria-hidden="true" /><strong>SKILL.md</strong><span>Check claims against the source.<br />Return evidence and corrections.</span></div><div class="skill-context"><img src={logoSrc} alt="Ennodia" width="78" height="17" /><span>Separate task context</span></div></div>
-          <div class="finding-slip"><span class="finding-icon"><Check size={18} aria-hidden="true" /></span><div><strong>Back in your conversation</strong><span>The useful finding.<br />The source to check it against.</span></div><img src={codexLogoSrc} alt="Codex" width="24" height="24" /></div>
-        </div>
-        <div class="skill-copy"><p class="eyebrow">A new skill doesn’t need the whole conversation</p><h2 id="skill-title">Try the skill.<br />Keep the useful part.</h2><p>A review skill looks promising. But you don’t know if it will help this task—or send it on a long detour.</p><p>Let another agent try it in a separate context. Bring back the findings you can use, with the sources to check them.</p><a class="text-link" href="/docs/evidence/skill-trial/">Walk through a skill trial <ArrowRight size={17} aria-hidden="true" /></a></div>
+        <div class="skill-copy"><h2 id="skill-title">Compare skills without cluttering your conversation</h2><p>Let another agent try a skill through Ennodia in a separate conversation. Compare its answer with your current approach before deciding what to use.</p><a class="text-link" href="/docs/evidence/skill-trial/">See a code-review example <ArrowRight size={17} aria-hidden="true" /></a></div>
+        <figure class="skill-visual" role="img" aria-label="A source review compares the retry contract with the code. The contract accepts zero as retry now, but the code waits 30 seconds. The next check tests zero."><pre aria-hidden="true">{skillDiagram}</pre></figure>
+      </section>
+      <section class="proof-section wrap" id="recorded-review" aria-labelledby="proof-title">
+        <div class="proof-copy"><h2 id="proof-title">Watch an agent find<br />errors in documentation</h2><p>In this recording, Ennodia asks another agent to check a sample project’s README against its code. The agent finds three errors: the port number, a configuration setting, and the expected response.</p><p>The example includes the files and findings so you can repeat the check.</p><a class="text-link" href="/docs/evidence/docs-drift/">Read the findings and try it yourself <ArrowRight size={17} aria-hidden="true" /></a></div>
+        <div class="recording"><div class="recording-bar"><Terminal size={18} aria-hidden="true" /><span>Recorded Ennodia run · test project</span></div><video controls preload="none" aria-label="Recorded Ennodia documentation review" poster="/demos/docs-drift-poster.webp" src="/demos/docs-drift.mp4"></video><div class="recording-caption"><CircleCheck size={16} aria-hidden="true" /><span>Findings checked against the source</span><a href="/docs/evidence/docs-drift/">Text version <ArrowUpRight size={14} aria-hidden="true" /></a></div></div>
       </section>
       <section class="agents-section wrap" id="your-agents" aria-labelledby="agents-title">
-        <div class="section-heading"><div><p class="eyebrow">Keep the tools you like</p><h2 id="agents-title">One conversation.<br />A little help from the others.</h2></div><p>Connect the agents installed on your computer.<br />Use their configured models and subscriptions.</p></div>
-        <div class="agent-network"><div class="network-brand"><img src={logoSrc} alt="Ennodia" width="158" height="34" /></div><ul>{adapters.map(agent => <li><img src={agent.logoSrc} alt="" width="34" height="34" /><span>{agent.name}</span></li>)}</ul></div>
-        <a class="text-link" href="/docs/reference/supported-harnesses/">Check agent and model compatibility <ArrowRight size={17} aria-hidden="true" /></a>
+        <h2 id="agents-title">Keep the tools you like</h2><p>Ennodia connects the agents on your computer, using your models and subscriptions.</p>
+        <ul class="agent-list">{adapters.map(agent => <li><img src={agent.logoSrc} alt="" width="30" height="30" /><span>{agent.name}</span></li>)}</ul>
+        <a class="text-link" href="/docs/reference/supported-harnesses/">Check compatibility <ArrowRight size={17} aria-hidden="true" /></a>
       </section>
-      <section class="proof-section" aria-labelledby="proof-title"><div class="wrap proof-layout">
-        <div class="proof-copy"><p class="eyebrow">Watch an actual run</p><h2 id="proof-title">A second review.<br />Three stale instructions found.</h2><p>We gave another agent a small project with documentation that no longer matched its code.</p><p>It found the wrong port, an outdated variable, and an incorrect response. It also kept a historical migration record intact.</p><a class="text-link" href="/docs/evidence/docs-drift/">Read the example and reproduce it <ArrowRight size={17} aria-hidden="true" /></a><p class="proof-note">A recorded fixture review. One example, with its source and findings available to inspect.</p></div>
-        <div class="recording"><div class="recording-bar"><Terminal size={17} aria-hidden="true" /><span>Documentation review · actual MCP run</span></div><video controls preload="none" aria-label="Recorded Ennodia documentation review" poster="/demos/docs-drift-poster.webp" src="/demos/docs-drift.mp4"></video><div class="recording-caption"><CircleCheck size={15} aria-hidden="true" /><span>Findings checked against the fixture source</span><a href="/docs/evidence/docs-drift/">Text version <ArrowUpRight size={13} aria-hidden="true" /></a></div></div>
-      </div></section>
-      <section class="faq-section wrap" aria-labelledby="faq-title"><div><p class="eyebrow">Before you start</p><h2 id="faq-title">A few good questions.</h2></div><div class="faq-list">{faqItems.map(item => <details><summary>{item.question}<ChevronDown size={18} aria-hidden="true" /></summary><p>{item.answer}</p></details>)}</div></section>
+      <section class="faq-section wrap" aria-labelledby="faq-title"><h2 id="faq-title">Frequently asked questions</h2><div class="faq-list">{faqItems.map(item => <details><summary>{item.question}<ChevronDown size={18} aria-hidden="true" /></summary><p>{item.answer}{item.link && <> <a href={item.link.href}>{item.link.label}</a>.</>}</p></details>)}</div></section>
       <section class="start-section wrap" id="get-started" aria-labelledby="start-title">
-        <div class="start-copy"><img src={logoSrc} alt="Ennodia" width="154" height="33" /><h2 id="start-title">Give your agent<br />someone to work with.</h2><p>Add Ennodia to Codex or another compatible agent.<br />Then try it on the task you have open.</p><a class="button primary" href="/docs/getting-started/">Set up Ennodia <ArrowUpRight size={18} aria-hidden="true" /></a><p class="start-requirements">Requires Bun and a supported agent with working model access.</p></div>
-        <div class="try-prompt"><div class="prompt-heading"><MessageSquare size={19} aria-hidden="true" /><strong>After setup, try this</strong></div><label for="prompt-audience">Example for</label><select id="prompt-audience">{workflows.map(w => <option value={w.id}>{w.audience}</option>)}</select><p id="starter-prompt">{workflows[0].prompt}</p><button class="button" type="button" data-copy-prompt><Copy size={16} aria-hidden="true" />Copy prompt</button><span id="copy-status" role="status"></span></div>
+        <h2 id="start-title"><span class="start-title-lead">Try <img class="start-title-brand" src={logoSrc} alt="Ennodia" width="141" height="30" /></span> on the task you have open right now</h2>
+        <InstallLink />
+        <p>Use your preferred <a href="/docs/getting-started/">compatible chat app, CLI, or IDE</a>.<br />Your agent gets the instructions to install and connect Ennodia.</p>
+        <a class="text-link" href="/docs/getting-started/#manual-setup">Manual setup <ArrowUpRight size={16} aria-hidden="true" /></a>
       </section>
     </main>
-    <footer class="site-footer wrap"><a href="/" aria-label="Ennodia home"><img src={logoSrc} alt="Ennodia" width="117" height="25" /></a><p>Open source. Built to work together.</p><nav aria-label="Footer"><a href="/docs/roadmap/">Roadmap</a><a href="https://github.com/cherninlab/ennodia">GitHub <ArrowUpRight size={13} aria-hidden="true" /></a></nav></footer>
+    <footer class="site-footer wrap"><a href="/" aria-label="Ennodia home"><img src={logoSrc} alt="Ennodia" width="117" height="25" /></a><p>Free. Open source. Runs on your computer.</p><nav aria-label="Footer"><a href="/docs/roadmap/">Roadmap</a><a href="https://github.com/cherninlab/ennodia">GitHub <ArrowUpRight size={14} aria-hidden="true" /></a></nav></footer>
     <script type="application/ld+json" set:html={JSON.stringify(faqStructuredData)} />
     <script type="application/ld+json" set:html={JSON.stringify(applicationStructuredData)} />
     <script>import "../scripts/landing";</script>

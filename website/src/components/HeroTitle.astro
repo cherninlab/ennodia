@@ -1,0 +1,73 @@
+---
+import "../../../docs/assets/agent-font/ennodia-agents.css";
+import logoSrc from "../../../docs/assets/logo.svg?url";
+
+interface Props { harnesses: { id: string; name: string }[] }
+const { harnesses } = Astro.props;
+// Change both names on each turn, covering every directed pair before repeating.
+const pairs = harnesses.slice(1).flatMap((_, offset) =>
+  harnesses.map((harness, index) => [harness.id, harnesses[(index + offset + 1) % harnesses.length].id])
+);
+---
+<h1 id="hero-title" class="harness-title" data-harness-pairs={JSON.stringify(pairs)}
+  tabindex="0" aria-describedby="hero-motion-hint"
+  aria-label="Ennodia: let Codex call in Claude Code, and let your other agents call on each other">
+  {['let', 'call in'].map((prefix, row) => (
+    <span class="harness-title-row" aria-hidden="true">
+      <span class="harness-title-prefix">
+        {row === 0 && <img class="harness-title-brand" src={logoSrc} alt="" width="136" height="29" />}
+        <span class="harness-title-word">{prefix}</span>
+      </span>
+      <span class="harness-title-slot">
+        {harnesses.map(harness => (
+          <span class="harness-title-variant" data-harness={harness.id} data-active={harness.id === pairs[0][row] ? '' : undefined}>
+            <span class="harness-title-name"><span class={`agent-logo agent-logo--${harness.id}`}></span><span>{harness.name}</span></span>
+          </span>
+        ))}
+      </span>
+    </span>
+  ))}
+</h1>
+<span id="hero-motion-hint" class="hero-motion-hint">Focus here to pause the changing names.</span>
+
+<script>import "../scripts/hero-title";</script>
+
+<style>
+  .harness-title { display: grid; grid-template-columns: max-content max-content; column-gap: .24em; justify-content: center; font-size: clamp(32px, 4.3vw, 54px); line-height: 1.2; }
+  .hero-motion-hint { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .harness-title-row { display: grid; grid-template-columns: subgrid; grid-column: 1 / -1; align-items: baseline; }
+  .harness-title-prefix { display: flex; align-items: baseline; justify-content: end; gap: .28em; text-align: right; }
+  /* Match capital height; compensate for the SVG's space below its baseline. */
+  .harness-title-brand { width: 3.84em; height: auto; align-self: baseline; transform: translateY(.051em); }
+  .harness-title-slot { display: grid; }
+  .harness-title-variant {
+    grid-area: 1 / 1;
+    display: flex;
+    align-items: baseline;
+    justify-content: start;
+    white-space: nowrap;
+    visibility: hidden;
+    opacity: 0;
+    transform: translateY(.12em);
+  }
+  .harness-title-variant[data-active] { visibility: visible; opacity: 1; transform: none; }
+  [data-rotating] .harness-title-variant[data-active] { animation: name-in 360ms cubic-bezier(.22, 1, .36, 1) 120ms both; }
+  .harness-title-variant[data-leaving] { visibility: visible; animation: name-out 160ms ease both; }
+  .harness-title-name { display: inline-flex; align-items: baseline; gap: .16em; }
+  .harness-title-name .agent-logo { font-size: .74em; align-self: center; transform: translateY(.025em); }
+  @keyframes name-in { from { opacity: 0; transform: translateY(.12em); } to { opacity: 1; transform: none; } }
+  @keyframes name-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(-.1em); } }
+  @media (max-width: 720px) {
+    .harness-title-row:first-child, .harness-title-row:first-child .harness-title-prefix { display: contents; }
+    .harness-title-brand { grid-column: 1 / -1; justify-self: center; align-self: center; width: 4em; margin-bottom: .4em; transform: none; }
+    .harness-title-word { text-align: right; }
+  }
+  @media (max-width: 380px) {
+    .harness-title-row:last-child { display: contents; }
+    .harness-title-row:last-child .harness-title-prefix, .harness-title-row:last-child .harness-title-slot { grid-column: 1 / -1; justify-self: center; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .harness-title-variant { animation: none !important; transform: none; }
+    .harness-title-variant[data-leaving] { visibility: hidden; }
+  }
+</style>

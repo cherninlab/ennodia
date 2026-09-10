@@ -3,14 +3,33 @@ title: Installation for Agents
 description: A copy-paste installation page for agents that install Ennodia in Codex, Claude Code, OpenCode, Antigravity, and other Model Context Protocol (MCP) clients.
 ---
 
-This page is for the agent that does the installation. Install Ennodia as a local Model
-Context Protocol (MCP) server. Then enable it in the user's MCP client.
+This page gives setup instructions to the user's agent.
+Install Ennodia as a local Model Context Protocol (MCP) server.
+Then connect it to the user's preferred compatible client.
 
 ## Copy-Paste Prompt
 
 ```text
 try-ennodia.cherninlab.com
 ```
+
+The user can send this address in a new or existing agent conversation.
+The agent handles the setup steps below.
+
+## Check the Environment
+
+1. Identify the user's client and the machine where Ennodia will run.
+2. Check that the client can launch a local standard input/output (stdio) MCP server.
+3. Check for Bun `1.3.14` or newer in that environment.
+4. Check for a supported agent command-line interface (CLI) with working provider access.
+
+Use the client's supported configuration method and the tools' official installation instructions.
+Preserve existing server entries and unrelated settings.
+Use the client's normal permissions.
+
+If the current client cannot launch a local MCP server, explain the missing capability.
+Use a compatible local client for Ennodia.
+See [Supported Harnesses](/docs/reference/supported-harnesses/) for the worker agents Ennodia can call.
 
 ## Install Command
 
@@ -51,24 +70,38 @@ For a local Ennodia checkout, use:
 }
 ```
 
-## First Agent Checks
+The configuration above shows the server command and arguments.
+Adapt its format to the client's documented configuration method.
+Reload the tools or restart the client only when its setup instructions require this step.
+Tell the user which step is needed before trying to call Ennodia.
 
-After MCP configuration, call these tools:
+## Get One Useful Result
 
-1. `ennodia_list_harnesses`
-2. `ennodia_estimate_budget`
-3. `ennodia_plan`
-4. `ennodia_run`
-5. `ennodia_get_run`
+After the client exposes Ennodia's tools, start with one small task:
 
-`ennodia_list_harnesses` shows the available local tools. See the current
-adapter list and identifiers (IDs) in
-[Supported Harnesses](/docs/reference/supported-harnesses/).
+1. Call `ennodia_list_harnesses` with `refresh: true`.
+2. Choose one available worker for a focused, read-only check from the user's current task.
+3. Call `ennodia_run` with `prompt`, `harnessId`, `mode: "single"`, `compare: false`, and the relevant `cwd`.
+4. Poll `ennodia_get_run` with the returned `id` as `runId`.
+5. Stop when the status is `succeeded`, `failed`, or `cancelled`.
+6. Report the useful finding or the specific failure in the user's conversation.
+
+For example, request a read-only check of one function or one documentation claim against its source.
+Include the relevant files or task details in the worker prompt.
+Request evidence the main agent can inspect.
+
+Discovery checks installed commands, not active authentication, model access, or provider quota.
+A successful small run verifies the selected worker's configuration.
+If provider access is missing, identify the affected worker and its normal login or configuration step.
+
+The first run does not require separate planning, budget estimation, or Compare calls.
+These tools remain available for larger tasks.
+See [MCP Tools](/docs/reference/mcp-tools/) for exact parameters and identifiers (IDs).
 
 ## Installed Components
 
 Ennodia is a local MCP server. It lets the user's main agent request help from
-other installed agent command-line interface (CLI) programs during the same task.
+other installed agent CLI programs during the same task.
 
 The number of agents is not the primary benefit. Ennodia uses current local
 installs, subscriptions, and model choices. It discovers supported CLI programs and

@@ -1,22 +1,36 @@
 ---
 title: Quickstart
-description: Install Ennodia manually, perform the first checks, and find the next documentation page.
+description: Give your agent the Ennodia setup link, get your first useful result, or follow the manual installation instructions.
 ---
 
-This page gives manual installation instructions for a Model Context Protocol
-(MCP) client. To use an agent for installation and configuration, see
-[Installation for Agents](/docs/install/).
+Paste this address into a new or existing conversation with your agent:
 
-## Requirements
+```text
+try-ennodia.cherninlab.com
+```
+
+Your agent can follow the setup instructions, check the requirements, and connect Ennodia to your client.
+Continue in your preferred compatible chat app, command-line interface (CLI), or editor.
+Ennodia connects through Model Context Protocol (MCP).
+
+The [installation instructions for agents](/docs/install/) explain the setup steps.
+Your agent will identify any client restart or reload needed to make the new tools available.
+
+After setup, [try your first useful result](#your-first-useful-result).
+For manual setup, follow the instructions below.
+
+## Manual Setup
+
+### Requirements
 
 - Bun `1.3.14` or newer
 - An MCP client that can launch a standard input/output (stdio) server
-- At least one supported artificial intelligence (AI) command-line tool for
-  real agent execution
+- At least one supported artificial intelligence (AI) command-line tool with
+  working provider access
 
 See [Supported Harnesses](/docs/reference/supported-harnesses/).
 
-## Install from npm
+### Install from npm
 
 Install the stable release from npm:
 
@@ -30,7 +44,7 @@ To use Bun directly, run `bunx ennodia`.
 The JSR package `@cherninlab/ennodia` exposes TypeScript modules for import.
 Use the npm package for the stdio MCP executable.
 
-## Local Checkout
+### Local Checkout
 
 Use a checkout to modify Ennodia:
 
@@ -41,7 +55,7 @@ bun install
 bun run verify
 ```
 
-## MCP Client Config
+### MCP Client Config
 
 ```json
 {
@@ -68,6 +82,10 @@ For a local checkout, use the source file:
 ```
 
 Replace `/absolute/path/to/ennodia` with your local repository path.
+
+Use your client's supported configuration method.
+Preserve existing server entries.
+Reload the tools or restart the client if its setup instructions require this step.
 
 ## Your first useful result
 

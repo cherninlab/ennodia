@@ -1,0 +1,13 @@
+---
+import { Check, Copy } from "@lucide/astro";
+---
+<div class="install-link">
+  <div class="install-address">
+    <code>try-ennodia.cherninlab.com</code>
+    <button type="button" data-copy-value="try-ennodia.cherninlab.com" aria-label="Copy installation address">
+      <Copy class="copy-icon" size={20} aria-hidden="true" />
+      <Check class="copied-icon" size={20} aria-hidden="true" />
+    </button>
+  </div>
+  <span class="copy-feedback" role="status"></span>
+</div>

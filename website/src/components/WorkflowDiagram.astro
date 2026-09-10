@@ -1,0 +1,91 @@
+---
+import type { workflows } from "../data/workflows";
+
+interface Props { workflow: (typeof workflows)[number] }
+const { workflow } = Astro.props;
+const { task, action, source, finding, next } = workflow.diagram;
+
+type Segment = { text: string; phase?: "out" | "worker" | "return" | "next" };
+type Row = Segment[];
+const text = (value: string): Segment => ({ text: value });
+const marked = (value: string, phase: Segment["phase"]): Segment => ({ text: value, phase });
+
+function wrap(value: string, width: number) {
+  const lines: string[] = [];
+  for (const word of value.split(" ")) {
+    const last = lines.length - 1;
+    if (last < 0 || lines[last].length + word.length + 1 > width) lines.push(word);
+    else lines[last] += ` ${word}`;
+  }
+  return lines;
+}
+
+function diagram(compact: boolean): Row[] {
+  const workerColumn = compact ? 13 : 31;
+  const innerWidth = compact ? 17 : 25;
+  const returnColumn = workerColumn + Math.floor(innerWidth / 2) + 1;
+  const prefix = `│${" ".repeat(workerColumn - 1)}`;
+  const box = (value: string) => `│ ${value.padEnd(innerWidth - 2)} │`;
+  const outboundLabel = compact ? "├─ Ennodia " : "├──── Ennodia ";
+  const outbound = `${outboundLabel}${"─".repeat(workerColumn - outboundLabel.length - 1)}→`;
+  const returning = compact ? "←─ results return " : "←──── results return ";
+  const bodyWidth = compact ? 29 : 55;
+  const rows: Row[] = [
+    [text("Your conversation in Codex")],
+    [text("│")],
+    ...wrap(task, bodyWidth).map((line, index) => [text(`${index === 0 ? "├─ " : "│  "}${line}`)]),
+    [text(prefix), marked(`┌${"─".repeat(innerWidth)}┐`, "worker")],
+    [marked(outbound, "out"), marked(box("Claude Code"), "worker")],
+    ...[action, source].flatMap(value => wrap(value, innerWidth - 2)).map(line => [text(prefix), marked(box(line), "worker")]),
+    [text(prefix), marked(`└${"─".repeat(returnColumn - workerColumn - 1)}┬${"─".repeat(workerColumn + innerWidth - returnColumn)}┘`, "worker")],
+    [text("├"), marked(`${returning}${"─".repeat(returnColumn - returning.length - 1)}╯`, "return")],
+    ...wrap(finding, bodyWidth).map(line => [text("│  "), marked(line, "return")]),
+    [text("│")],
+    ...wrap(next, bodyWidth).map((line, index) => [text(`${index === 0 ? "├─ " : "│  "}`), marked(line, "next")]),
+    [text("↓")],
+  ];
+  return rows;
+}
+const layouts = [{ name: "wide", rows: diagram(false) }, { name: "compact", rows: diagram(true) }];
+const description = `Your conversation in Codex: ${task} Ennodia sends focused work to Claude Code, which ${action} using ${source}. The result returns to the same conversation: ${finding} Next: ${next}`;
+---
+<div class="workflow-diagram" role="img" aria-label={description}>
+  {layouts.map(layout => (
+    <div class={`diagram-lines diagram-${layout.name}`} aria-hidden="true">
+      {layout.rows.map(row => <div class="diagram-line">{row.map(segment => <span class:list={{ "trace-part": segment.phase }} data-phase={segment.phase} data-text={segment.phase ? segment.text : undefined}>{segment.text}</span>)}</div>)}
+    </div>
+  ))}
+</div>
+<style>
+  .workflow-diagram {
+    --trace: #3260d3;
+    width: max-content;
+    max-width: 100%;
+    margin-inline: auto;
+    text-align: left;
+    color: #424640;
+    font: 15px/1.5 var(--mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+    font-variant-ligatures: none;
+    letter-spacing: 0;
+  }
+  .diagram-line { white-space: pre; min-height: 1.5em; }
+  .diagram-line:first-child { color: #20211f; }
+  .diagram-compact { display: none; }
+  .trace-part { position: relative; display: inline-block; }
+  .trace-part::after { content: attr(data-text); position: absolute; inset: 0; color: var(--trace); clip-path: inset(0 100% 0 0); pointer-events: none; }
+  [data-tracing] [data-phase="out"]::after { animation: trace-out .85s steps(24, end) .1s both; }
+  [data-tracing] [data-phase="worker"]::after { animation: trace-worker .9s ease 1.05s both; }
+  [data-tracing] [data-phase="return"]::after { animation: trace-return .9s steps(24, end) 2.05s both; }
+  [data-tracing] [data-phase="next"]::after { animation: trace-worker .7s ease 3.15s both; }
+  @keyframes trace-out { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0); } }
+  @keyframes trace-return { from { clip-path: inset(0 0 0 100%); } to { clip-path: inset(0); } }
+  @keyframes trace-worker { 0%, 100% { clip-path: inset(0); opacity: 0; } 35%, 75% { clip-path: inset(0); opacity: 1; } }
+  @media (max-width: 720px) {
+    .workflow-diagram { font-size: 14px; }
+    .diagram-wide { display: none; }
+    .diagram-compact { display: block; min-height: 24em; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .trace-part::after { display: none; }
+  }
+</style>
