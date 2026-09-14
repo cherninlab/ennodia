@@ -1,7 +1,7 @@
 {
   "manifest_version": "0.2",
   "name": "ennodia",
-  "version": "0.3.0-rc.1",
+  "version": "0.3.0-rc.2",
   "description": "Try other agents, models, and skills from your familiar AI workflow through a local MCP server",
   "author": {
     "name": "Cherninlab"
@@ -683,6 +683,35 @@
       "inputSchema": {
         "type": "object",
         "properties": {
+          "model": {
+            "description": "Explicit model selection required for Pragmatic mode.",
+            "type": "string"
+          },
+          "pragmatic": {
+            "type": "object",
+            "properties": {
+              "recipe": {
+                "type": "string",
+                "enum": [
+                  "investigate",
+                  "patch"
+                ],
+                "description": "investigate returns cited findings; patch returns a unified diff proposal. Both instruct workers not to edit files. Native harness permissions still apply."
+              },
+              "acceptanceCriteria": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 8000,
+                "description": "Concrete completion checks for this bounded assignment, including required evidence."
+              }
+            },
+            "required": [
+              "recipe",
+              "acceptanceCriteria"
+            ],
+            "additionalProperties": false,
+            "description": "Experimental bounded delegation: requires explicit harnessId and model, forces one worker with no automatic comparison or retry. This is workflow guidance, not a permission sandbox or a savings guarantee."
+          },
           "prompt": {
             "type": "string",
             "minLength": 1,
@@ -1236,10 +1265,35 @@
     },
     {
       "name": "ennodia_run",
-      "description": "Start a high-level Ennodia orchestration. Use this as the default entrypoint: it plans routing, starts one or more local harness tasks, optionally compares successful outputs, and returns a run ID. Runs usually take minutes; poll ennodia_get_run with sensible spacing and trust remainingMs/etaConfidence instead of aborting early.",
+      "description": "Start a high-level Ennodia orchestration. Set pragmatic for a bounded investigation or patch proposal using one explicit model. Use this as the default entrypoint: it plans routing, starts one or more local harness tasks, optionally compares successful outputs, and returns a run ID. Runs usually take minutes; poll ennodia_get_run with sensible spacing and trust remainingMs/etaConfidence instead of aborting early.",
       "inputSchema": {
         "type": "object",
         "properties": {
+          "pragmatic": {
+            "type": "object",
+            "properties": {
+              "recipe": {
+                "type": "string",
+                "enum": [
+                  "investigate",
+                  "patch"
+                ],
+                "description": "investigate returns cited findings; patch returns a unified diff proposal. Both instruct workers not to edit files. Native harness permissions still apply."
+              },
+              "acceptanceCriteria": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 8000,
+                "description": "Concrete completion checks for this bounded assignment, including required evidence."
+              }
+            },
+            "required": [
+              "recipe",
+              "acceptanceCriteria"
+            ],
+            "additionalProperties": false,
+            "description": "Experimental bounded delegation: requires explicit harnessId and model, forces one worker with no automatic comparison or retry. This is workflow guidance, not a permission sandbox or a savings guarantee."
+          },
           "prompt": {
             "type": "string",
             "minLength": 1,

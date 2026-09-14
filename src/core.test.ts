@@ -9,6 +9,86 @@ import { FileHistorySink } from "./history";
 import type { RoutePlan } from "./planner";
 
 describe("EnnodiaCore", () => {
+  it("rejects patch answers truncated in final files or captured streams", async () => {
+    for (const finalFile of [false, true]) {
+      const adapter: HarnessAdapter = {
+        ...coreAdapter,
+        buildCommand: (_path, input) => ({
+          command: process.execPath,
+          args: ["-e", finalFile
+            ? "await Bun.write(process.argv[1], 'x'.repeat(200001))"
+            : "process.stdout.write('x'.repeat(200001))", input.finalMessagePath ?? ""],
+        }),
+      };
+      const core = new EnnodiaCore({
+        discoverHarnesses: async () => [coreDiscovery],
+        findHarnessAdapter: () => adapter,
+        planRoute: () => coreRoutePlan,
+      });
+      try {
+        const run = await core.startRun({
+          prompt: "Propose a patch", harnessId: adapter.id, model: "fixture-model",
+          pragmatic: { recipe: "patch", acceptanceCriteria: "Complete diff" },
+        });
+        const result = await waitForRun(core, run.id);
+        expect(result.status).toBe("failed");
+        expect(result.error).toContain("Patch output was truncated");
+        expect(result.finalAnswer).toBeUndefined();
+        expect(core.getTask(result.taskIds[0]!)?.outputTruncated).toBe(true);
+      } finally {
+        await core.shutdown();
+      }
+    }
+  });
+
+  it("uses the same Pragmatic contract for budget preflight and one-worker execution", async () => {
+    let capturedModel: string | undefined;
+    const adapter: HarnessAdapter = {
+      ...coreAdapter,
+      buildCommand: (path, input) => {
+        capturedModel = input.model;
+        return coreAdapter.buildCommand!(path, input);
+      },
+    };
+    const core = new EnnodiaCore({
+      discoverHarnesses: async () => [coreDiscovery],
+      findHarnessAdapter: (id) => id === adapter.id ? adapter : undefined,
+      planRoute: () => ({ ...coreRoutePlan, parallelSuggested: true, compareSuggested: true }),
+    });
+    const input = {
+      prompt: "Inspect the log",
+      harnessId: "core-agent",
+      model: "fixture-small",
+      pragmatic: { recipe: "investigate" as const, acceptanceCriteria: "Cite the exact error" },
+      mode: "auto" as const,
+      compare: "auto" as const,
+    };
+    try {
+      const estimated = await core.estimateRun(input);
+      const plain = await core.estimateRun({ prompt: input.prompt, harnessId: input.harnessId, compare: false });
+      expect(estimated.budget.estimate.estimatedTotalInputTokens).toBeGreaterThan(plain.budget.estimate.estimatedTotalInputTokens);
+      await expect(core.startRun({ ...input, budget: { maxEstimatedInputTokens: plain.budget.estimate.estimatedTotalInputTokens } })).rejects.toThrow("Budget limit exceeded");
+      await expect(core.startRun({ ...input, model: "" })).rejects.toThrow("explicit harnessId and model");
+      expect(core.listTasks()).toHaveLength(0);
+      const started = await core.startRun(input);
+      expect(started.budget).toEqual(estimated.budget);
+      const result = await waitForRun(core, started.id);
+      expect(result.status).toBe("succeeded");
+      expect(result.mode).toBe("single");
+      expect(result.compareMode).toBe(false);
+      expect(result.compareId).toBeUndefined();
+      expect(result.model).toBe("fixture-small");
+      expect(capturedModel).toBe("fixture-small");
+      expect(result.pragmatic).toEqual(input.pragmatic);
+      expect(result.finalAnswer).toContain("Cite the exact error");
+      expect(result.finalAnswer?.match(/<ennodia-pragmatic-worker-contract>/g)).toHaveLength(1);
+      expect(core.listTasks()).toHaveLength(1);
+      expect(core.listTasks()[0]?.usage).toBeUndefined();
+    } finally {
+      await core.shutdown();
+    }
+  });
+
   it("keeps manager state isolated per core instance", async () => {
     const first = createFixtureCore();
     const second = createFixtureCore();

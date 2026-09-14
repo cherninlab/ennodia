@@ -1,3 +1,4 @@
+import { preparePragmaticRun, type PragmaticOptions } from "./pragmatic";
 import { randomUUID } from "node:crypto";
 import {
   checkBudgetLimits,
@@ -65,6 +66,7 @@ export type RunEvent = {
 };
 
 export type RunStartInput = {
+  pragmatic?: PragmaticOptions;
   prompt: string;
   category?: RouteCategory;
   harnessId?: string;
@@ -93,6 +95,8 @@ export type RunView = {
   status: RunStatus;
   mode: RunMode;
   compareMode: RunCompareMode;
+  pragmatic?: PragmaticOptions;
+  model?: string;
   promptPreview: string;
   createdAt: string;
   updatedAt: string;
@@ -165,6 +169,8 @@ type InternalRun = {
   status: RunStatus;
   mode: RunMode;
   compareMode: RunCompareMode;
+  pragmatic?: PragmaticOptions;
+  model?: string;
   prompt: string;
   plan: RoutePlan;
   harnessOverridden: boolean;
@@ -220,6 +226,7 @@ export class RunManager {
       throw new Error("RunManager is shutting down.");
     }
 
+    input = preparePragmaticRun(input);
     validateRunAdvisorAliases(input);
 
     const harnesses = await this.dependencies.discoverHarnesses({
@@ -264,6 +271,8 @@ export class RunManager {
       status: "executing",
       mode,
       compareMode,
+      pragmatic: input.pragmatic,
+      model: input.model,
       prompt: input.prompt,
       plan,
       harnessOverridden: Boolean(input.harnessId),
@@ -444,6 +453,11 @@ export class RunManager {
         return;
       }
 
+      if (run.pragmatic?.recipe === "patch" && successfulTasks.some((task) => task.outputTruncated)) {
+        this.failRun(run, "Patch output was truncated. Do not apply partial output. Submit a smaller bounded patch assignment.");
+        return;
+      }
+
       run.failedTaskDiagnosis = safeDiagnoseTasks(
         terminalTasks.filter((task) => task.status !== "succeeded"),
       );
@@ -586,6 +600,8 @@ export class RunManager {
       status: run.status,
       mode: run.mode,
       compareMode: run.compareMode,
+      pragmatic: run.pragmatic,
+      model: run.model,
       promptPreview: preview(run.prompt),
       createdAt: new Date(run.createdAtMs).toISOString(),
       updatedAt: new Date(run.updatedAtMs).toISOString(),

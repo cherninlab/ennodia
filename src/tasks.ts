@@ -63,6 +63,8 @@ export type TaskView = {
   finalMessageChars?: number;
   /** Availability of non-whitespace answer evidence, even in compact views. */
   hasOutput?: boolean;
+  /** The preferred answer was truncated during capture or in this view. */
+  outputTruncated?: boolean;
   /** Best-effort usage metrics parsed from the adapter's own output. */
   usage?: HarnessUsage;
   /** Set when this task ran against an isolated copy of the requested cwd
@@ -103,6 +105,7 @@ type InternalTask = Omit<
   | "eventCount"
   | "finalMessageChars"
 > & {
+  streamCaptureTruncated?: boolean;
   createdAtMs: number;
   updatedAtMs: number;
   endedAtMs?: number;
@@ -709,6 +712,7 @@ export class TaskManager {
         }
 
         const chunk = decoder.decode(value, { stream: true });
+        task.streamCaptureTruncated ||= task[streamName].length + chunk.length > MAX_CAPTURE_CHARS;
         task[streamName] = appendLimited(task[streamName], chunk);
         task.lastOutputAtMs = Date.now();
         this.pushEvent(task, { type: streamName, message: chunk });
@@ -717,6 +721,7 @@ export class TaskManager {
 
       const finalChunk = decoder.decode();
       if (finalChunk) {
+        task.streamCaptureTruncated ||= task[streamName].length + finalChunk.length > MAX_CAPTURE_CHARS;
         task[streamName] = appendLimited(task[streamName], finalChunk);
         task.lastOutputAtMs = Date.now();
         this.pushEvent(task, { type: streamName, message: finalChunk });
@@ -775,6 +780,11 @@ export class TaskManager {
         ? tail(task.finalMessage, maxOutputChars) : undefined,
       finalMessageChars: task.finalMessage?.length ?? 0,
       hasOutput: Boolean(task.finalMessage?.trim() || task.stdout.trim() || task.stderr.trim()),
+      outputTruncated: task.finalMessage?.trim()
+        ? !includeOutput || task.finalMessage.length > maxOutputChars
+        : Boolean(task.streamCaptureTruncated ||
+          task.stdout.length > (includeOutput ? maxOutputChars : 0) ||
+          task.stderr.length > (includeOutput ? maxOutputChars : 0)),
       usage: task.usage,
       isolatedFrom: task.isolatedFrom,
     };

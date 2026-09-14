@@ -1,3 +1,4 @@
+export { pragmaticSchema, type PragmaticOptions } from "./pragmatic";
 export {
   createEnnodiaServer,
   shutdownEnnodia,

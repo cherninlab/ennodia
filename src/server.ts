@@ -1,3 +1,4 @@
+import { pragmaticSchema } from "./pragmatic";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { compositionalSliceSchema } from "./compositional";
@@ -376,6 +377,8 @@ export function createEnnodiaServer(core: EnnodiaCore = defaultCore): McpServer 
       description:
         "Estimate the input-token budget for a planned Ennodia run and report whether optional limits would be exceeded before starting child tasks.",
       inputSchema: {
+        model: z.string().optional().describe("Explicit model selection required for Pragmatic mode."),
+        pragmatic: pragmaticSchema.optional(),
         prompt: z
           .string()
           .min(1)
@@ -623,8 +626,9 @@ export function createEnnodiaServer(core: EnnodiaCore = defaultCore): McpServer 
     {
       title: "Run Ennodia",
       description:
-        "Start a high-level Ennodia orchestration. Use this as the default entrypoint: it plans routing, starts one or more local harness tasks, optionally compares successful outputs, and returns a run ID. Runs usually take minutes; poll ennodia_get_run with sensible spacing and trust remainingMs/etaConfidence instead of aborting early.",
+        "Start a high-level Ennodia orchestration. Set pragmatic for a bounded investigation or patch proposal using one explicit model. Use this as the default entrypoint: it plans routing, starts one or more local harness tasks, optionally compares successful outputs, and returns a run ID. Runs usually take minutes; poll ennodia_get_run with sensible spacing and trust remainingMs/etaConfidence instead of aborting early.",
       inputSchema: {
+        pragmatic: pragmaticSchema.optional(),
         prompt: z
           .string()
           .min(1)

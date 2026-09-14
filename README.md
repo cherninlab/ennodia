@@ -104,3 +104,9 @@ Compare examines completed answers and returns advice with its evidence and limi
 bun install
 bun run verify
 ```
+
+### Experimental Pragmatic mode
+
+In `ennodia@next`, delegate bounded investigation or patch proposals to an explicitly selected model.
+[Pragmatic mode](docs/guides/pragmatic-mode.md) keeps bulky evidence outside the main conversation and returns findings for verification.
+Savings are not yet validated.

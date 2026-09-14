@@ -1,3 +1,4 @@
+import { preparePragmaticRun, type PragmaticOptions } from "./pragmatic";
 import { createHash } from "node:crypto";
 import type {
   AdvisorExecutionPlan,
@@ -109,6 +110,8 @@ export type EnnodiaCoreOptions = {
 export type EnnodiaCoreShutdownOptions = TaskManagerShutdownOptions;
 
 export type RunEstimateInput = {
+  pragmatic?: PragmaticOptions;
+  model?: string;
   prompt: string;
   category?: RouteCategory;
   harnessId?: string;
@@ -551,6 +554,7 @@ export class EnnodiaCore {
   }
 
   async estimateRun(input: RunEstimateInput): Promise<RunEstimate> {
+    input = preparePragmaticRun(input);
     const harnesses = await this.discoverHarnesses({ refresh: input.refresh });
     const plan = this.planRoute(input.prompt, harnesses, {
       category: input.category,

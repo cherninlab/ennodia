@@ -4,6 +4,22 @@ import { describe, expect, it } from "bun:test";
 import { ENNODIA_VERSION } from "./version";
 
 describe("MCP server tool surface", () => {
+  it("exposes Pragmatic contracts and rejects invalid selection through MCP", async () => {
+    await withClient(async (client) => {
+      const listed = await client.listTools();
+      for (const name of ["ennodia_run", "ennodia_estimate_budget"]) {
+        const properties = inputProperties(listed.tools.find((tool) => tool.name === name));
+        expect(properties.pragmatic).toBeDefined();
+        expect(properties.model).toBeDefined();
+        const result = await client.callTool({ name, arguments: {
+          prompt: "test", pragmatic: { recipe: "patch", acceptanceCriteria: "Return diff" },
+        } });
+        expect(result.isError).toBe(true);
+        expect(resultText(result)).toContain("explicit harnessId and model");
+      }
+    });
+  });
+
   it("exposes media preparation guidance before any worker launch", async () => {
     await withClient(async (client) => {
       const tools = await client.listTools();

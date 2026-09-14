@@ -64,6 +64,7 @@ export default defineConfig({
             { label: "Recipes", slug: "docs/guides/recipes" },
             { label: "Understand Results", slug: "docs/guides/understand-results" },
             { label: "Using Agent Skills", slug: "docs/guides/agent-skills" },
+            { label: "Pragmatic mode", slug: "docs/guides/pragmatic-mode" },
             { label: "Troubleshooting", slug: "docs/guides/troubleshooting" },
             { label: "Budgets and Limits", slug: "docs/guides/budgets-and-limits" },
             { label: "Running Better Audits", slug: "docs/guides/running-better-audits" }

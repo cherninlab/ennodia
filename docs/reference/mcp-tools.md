@@ -601,3 +601,12 @@ server process.
 | `includeEvents` | `false` | Include bounded Judge and Result Advisor events. |
 | `maxCandidateChars` | `2000` | Maximum characters per candidate. Capped at 200000. |
 | `maxEvents` | `25` | Maximum events per comparison. Capped at 300. |
+
+## Pragmatic run settings
+
+`ennodia_run` and `ennodia_estimate_budget` accept optional `pragmatic: {recipe, acceptanceCriteria}` and require explicit `harnessId` and `model` with it.
+Recipes are `investigate` and `patch`. Both instruct workers to avoid file changes.
+Pragmatic runs use one worker without automatic comparison or retries. Native harness permissions still apply.
+
+Run views include the requested `model` and `pragmatic` settings.
+See [Pragmatic mode](/docs/guides/pragmatic-mode/) for examples, evidence retrieval, and measurement limits.
