@@ -92,7 +92,7 @@ Reload the tools or restart the client if its setup instructions require this st
 After installation, give your primary agent a small request:
 
 ```text
-Use Ennodia to get one additional opinion on this function.
+Use Ennodia MCP to get one additional opinion on this function.
 Choose an available agent. Keep the review read-only.
 Return one concrete issue or explain that no issue was established.
 Bring the findings back to this conversation.

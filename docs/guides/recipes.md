@@ -11,7 +11,7 @@ Give your primary agent the relevant files, attempted fixes, and the result you 
 ## A task is stuck
 
 ```text
-Use Ennodia to get a second opinion on this bug.
+Use Ennodia MCP to get a second opinion on this bug.
 Give one available agent the failing test and our attempted fixes.
 Request a different explanation and a concrete check for it.
 Keep the review read-only and return the findings here.
@@ -23,7 +23,7 @@ Repeating the same suggestion is a result to record, not a reason to restart the
 ## A skill might help
 
 ```text
-Use Ennodia to try an installed review skill on this change in a separate task.
+Use Ennodia MCP to try an installed review skill on this change in a separate task.
 Keep the review read-only. Bring back useful findings and unsupported suggestions.
 Show which skill and model were requested and what remains unverified.
 ```
@@ -35,7 +35,7 @@ Use the [small skill trial](/docs/evidence/skill-trial/) to practice comparing t
 ## Two answers disagree
 
 ```text
-Use Ennodia to compare these two answers.
+Use Ennodia MCP to compare these two answers.
 Identify the assumption behind each disagreement and the evidence for each side.
 Recommend the smallest check that can settle it.
 Keep useful partial findings even if neither answer solves the whole task.

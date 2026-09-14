@@ -80,6 +80,63 @@ describe("EnnodiaCore", () => {
     await core.shutdown();
   });
 
+  it("uses injected adapter media guidance for every budget preflight before starting workers", async () => {
+    let commandBuilds = 0;
+    const adapter: HarnessAdapter = {
+      ...coreAdapter,
+      inputGuidance: [
+        "Inspect the original audio with native tools and report the exact range and audible evidence. ".repeat(200),
+      ],
+      buildCommand: (commandPath, input) => {
+        commandBuilds += 1;
+        return coreAdapter.buildCommand!(commandPath, input);
+      },
+    };
+    const core = new EnnodiaCore({
+      discoverHarnesses: async () => [coreDiscovery],
+      findHarnessAdapter: (id) => id === adapter.id ? adapter : undefined,
+      planRoute: () => coreRoutePlan,
+    });
+    const defaultCore = createFixtureCore();
+    const prompt = "Listen to /tmp/reference.mp3 and describe the spoken delivery.";
+    const budget = { maxEstimatedInputTokens: 1_000 };
+    const runInput = { prompt, harnessId: adapter.id, compare: false as const, budget };
+    const compositionalInput = {
+      prompt: "Assess the recording.",
+      slices: [{ harnessId: adapter.id, prompt }],
+      includeCompareEstimate: false,
+      budget,
+    };
+
+    try {
+      // This limit admits global fallback guidance, but cannot fit this adapter's guidance alone.
+      expect((await defaultCore.estimateRun(runInput)).budget.exceeded).toBe(false);
+      const guidanceTokens = Math.ceil(adapter.inputGuidance![0].length / 4);
+      expect(guidanceTokens).toBeGreaterThan(budget.maxEstimatedInputTokens);
+
+      for (const estimate of [
+        await core.estimateRun(runInput),
+        await core.estimateCompositional(compositionalInput),
+      ]) {
+        expect(estimate.budget.exceeded).toBe(true);
+        expect(estimate.budget.estimate.estimatedTotalInputTokens).toBeGreaterThanOrEqual(guidanceTokens);
+        expect(estimate.budget.issues.join(" ")).toContain("maxEstimatedInputTokens 1000");
+      }
+
+      await expect(core.startRun(runInput)).rejects.toThrow("Budget limit exceeded");
+      await expect(core.startTasks({ prompt, harnessId: adapter.id, budget }))
+        .rejects.toThrow("Budget limit exceeded");
+      await expect(core.startCompositional(compositionalInput))
+        .rejects.toThrow("Budget limit exceeded");
+      expect(commandBuilds).toBe(0);
+      expect(core.listTasks()).toHaveLength(0);
+      expect(core.listRuns()).toHaveLength(0);
+    } finally {
+      await core.shutdown();
+      await defaultCore.shutdown();
+    }
+  });
+
   it("starts raw task batches behind a budget preflight", async () => {
     const core = createFixtureCore();
 

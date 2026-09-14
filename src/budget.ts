@@ -1,4 +1,5 @@
 import { MAX_PROMPT_CANDIDATE_CHARS } from "./compare";
+import { findHarnessAdapter, withInputGuidance } from "./harnesses";
 
 export type BudgetLimits = {
   maxEstimatedInputTokens?: number;
@@ -67,15 +68,17 @@ const NATIVE_SKILL_PROMPT_OVERHEAD_CHARS = 220;
 
 export function estimateRunBudget(
   input: EstimateRunBudgetInput,
+  findAdapter = findHarnessAdapter,
 ): BudgetEstimate {
   const selectedHarnessIds = [...new Set(input.selectedHarnessIds)];
   const selectedHarnessCount = selectedHarnessIds.length;
   const maxOutputCharsPerCandidate = compareCandidateChars(input.maxOutputChars);
-  const estimatedPromptTokensPerTask = estimateTokensFromChars(
-    input.prompt.length + NATIVE_SKILL_PROMPT_OVERHEAD_CHARS,
-  );
-  const estimatedChildTaskInputTokens =
-    estimatedPromptTokensPerTask * selectedHarnessCount;
+  const estimatedChildTaskInputTokens = selectedHarnessIds.reduce((total, id) =>
+    total + estimateTokensFromChars(
+      withInputGuidance(input.prompt, findAdapter(id)).length + NATIVE_SKILL_PROMPT_OVERHEAD_CHARS,
+    ), 0);
+  const estimatedPromptTokensPerTask = selectedHarnessCount === 0 ? 0
+    : Math.ceil(estimatedChildTaskInputTokens / selectedHarnessCount);
   const estimatedCompareInputTokens = input.comparePlanned
     ? estimateCompareInputTokens({
       promptChars: input.prompt.length,
@@ -96,7 +99,7 @@ export function estimateRunBudget(
     tokenEstimateRatio: `1 token ~= ${CHARS_PER_TOKEN} characters`,
     assumptions: [
       "Budgeting is a preflight input-token estimate, not a provider bill.",
-      "Child-task estimates include the user prompt and Ennodia skill pointer only; harness system prompts, file reads, tool calls, and provider-side context are excluded and can make real usage higher.",
+      "Child-task estimates include the user prompt, applicable media input guidance, and Ennodia skill pointer; harness system prompts, file reads, tool calls, and provider-side context are excluded and can make real usage higher.",
       "Output tokens, tool calls, cache behavior, and provider pricing are not known before a run starts.",
       `Compare estimates cap each task candidate at ${MAX_PROMPT_CANDIDATE_CHARS} characters because that is the judge prompt truncation bound.`,
       "Subscription quota checks use supported CLI/API surfaces only; Ennodia does not inspect private account pages or provider-private APIs.",
@@ -107,6 +110,7 @@ export function estimateRunBudget(
 
 export function estimateTaskBatchBudget(
   input: EstimateTaskBatchBudgetInput,
+  findAdapter = findHarnessAdapter,
 ): BudgetEstimate {
   const tasks = input.tasks;
   const selectedHarnessIds = tasks.map((task) => task.harnessId);
@@ -114,7 +118,7 @@ export function estimateTaskBatchBudget(
   const uniqueHarnessIds = [...new Set(selectedHarnessIds)];
   const maxOutputCharsPerCandidate = compareCandidateChars(input.maxOutputChars);
   const perTaskTokenEstimates = tasks.map((task) =>
-    estimateTokensFromChars(task.prompt.length + NATIVE_SKILL_PROMPT_OVERHEAD_CHARS)
+    estimateTokensFromChars(withInputGuidance(task.prompt, findAdapter(task.harnessId)).length + NATIVE_SKILL_PROMPT_OVERHEAD_CHARS)
   );
   const estimatedChildTaskInputTokens = perTaskTokenEstimates.reduce(
     (total, tokens) => total + tokens,
@@ -145,7 +149,7 @@ export function estimateTaskBatchBudget(
       "Budgeting is a preflight input-token estimate, not a provider bill.",
       "Task-batch estimates count one child task per resolved slice and harness.",
       "estimatedPromptTokensPerTask is the average across slices because slice prompts can differ.",
-      "Child-task estimates include slice prompts and Ennodia skill pointers only; harness system prompts, file reads, tool calls, and provider-side context are excluded and can make real usage higher.",
+      "Child-task estimates include slice prompts, applicable media input guidance, and Ennodia skill pointers; harness system prompts, file reads, tool calls, and provider-side context are excluded and can make real usage higher.",
       "Output tokens, tool calls, cache behavior, and provider pricing are not known before a run starts.",
       `Compare estimates cap each task candidate at ${MAX_PROMPT_CANDIDATE_CHARS} characters because that is the judge prompt truncation bound.`,
       "Subscription quota checks use supported CLI/API surfaces only; Ennodia does not inspect private account pages or provider-private APIs.",

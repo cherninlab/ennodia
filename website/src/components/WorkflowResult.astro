@@ -1,0 +1,56 @@
+---
+import { ChevronDown } from "@lucide/astro";
+import type { Workflow } from "../data/workflows";
+
+interface Props { workflow: Workflow }
+const { workflow } = Astro.props;
+const { summary, context, fields, limitation, href, linkLabel } = workflow.evidence;
+---
+<details class="workflow-result" id={`result-${workflow.id}`}>
+  <summary>{summary}<ChevronDown size={18} aria-hidden="true" /></summary>
+  <div class="result-body">
+    <p class="result-context">{context}</p>
+    <dl>
+      {fields.map(field => (
+        <div class="result-field">
+          <dt>{field.label}</dt>
+          <dd>{field.value}</dd>
+        </div>
+      ))}
+    </dl>
+    <p class="result-limitation">{limitation}</p>
+    {href && linkLabel && <a class="result-download" href={href} download>{linkLabel.before}<strong>{linkLabel.emphasis}</strong>{linkLabel.after}</a>}
+  </div>
+</details>
+<style>
+  .workflow-result {
+    width: 100%;
+    max-width: 640px;
+    margin: 16px 0 0;
+    color: inherit;
+    text-align: left;
+    font: inherit;
+  }
+  summary {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: fit-content;
+    margin-inline: 0;
+    padding-block: 8px;
+    list-style: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary :global(svg) { flex-shrink: 0; transition: transform .18s ease; }
+  details[open] > summary :global(svg) { transform: rotate(180deg); }
+  .result-body { margin-top: 12px; padding-top: 20px; border-top: 1px solid var(--line); font: 16px/1.6 "Helvetica Neue", Arial, sans-serif; }
+  .result-context, .result-limitation { margin: 0; color: var(--muted); }
+  dl { display: grid; gap: 16px; margin: 20px 0; }
+  .result-field { display: grid; grid-template-columns: 1fr; gap: 2px; }
+  dt { color: var(--muted); }
+  dd { margin: 0; overflow-wrap: anywhere; }
+  .result-download { display: inline-block; margin-top: 16px; text-decoration: underline; text-underline-offset: 4px; }
+  @media (prefers-reduced-motion: reduce) {
+    summary :global(svg) { transition: none; }
+  }
+</style>

@@ -10,6 +10,7 @@ import type {
   HarnessRunInput,
   HarnessUsage,
 } from "./harnesses";
+import { withInputGuidance } from "./harnesses";
 import { preview, tailItems } from "./internal";
 import { signalOwnedProcess } from "./process";
 import {
@@ -22,7 +23,7 @@ export type TaskStatus = "running" | "succeeded" | "failed" | "cancelled";
 
 export type TaskEvent = {
   at: string;
-  type: "started" | "stdout" | "stderr" | "exit" | "cancel" | "error";
+  type: "started" | "input-guidance" | "stdout" | "stderr" | "exit" | "cancel" | "error";
   message?: string;
 };
 
@@ -200,9 +201,10 @@ export class TaskManager {
     const finalMessagePath = join(tmpdir(), `ennodia-final-${randomUUID()}.txt`);
 
     const timeoutMs = input.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    const guidedPrompt = withInputGuidance(input.prompt, adapter);
     const augmentedPrompt = input.skills && input.skills.length > 0
-      ? augmentPrompt(input.prompt, input.skills, adapter.id)
-      : input.prompt;
+      ? augmentPrompt(guidedPrompt, input.skills, adapter.id)
+      : guidedPrompt;
     let commandSpec: CommandSpec;
     let cwd: string;
     let child: TaskProcess;
@@ -275,6 +277,12 @@ export class TaskManager {
     this.tasks.set(task.id, task);
     this.pruneTasks(task.id);
     this.pushEvent(task, { type: "started", message: "Task started." });
+    if (guidedPrompt !== input.prompt) {
+      this.pushEvent(task, {
+        type: "input-guidance",
+        message: "Media input guidance was included in the worker prompt. Native inspection remains unverified until the worker reports evidence.",
+      });
+    }
 
     task.streamsDone = Promise.all([
       this.pipeStreamSafely(task, "stdout", child.stdout),

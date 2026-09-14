@@ -1,6 +1,6 @@
 ---
 import "../styles/landing.css";
-import { ArrowRight, ArrowUpRight, Check, ChevronDown, Copy, Terminal, CircleCheck } from "@lucide/astro";
+import { ArrowRight, ArrowUpRight, Check, ChevronDown, Copy } from "@lucide/astro";
 import logoSrc from "../../../docs/assets/logo.svg?url";
 import codexLogoSrc from "../../../docs/assets/agents/codex-color.svg?url";
 import claudecodeLogoSrc from "../../../docs/assets/agents/claudecode-color.svg?url";
@@ -12,8 +12,9 @@ import hermesLogoSrc from "../../../docs/assets/agents/hermesagent.svg?url";
 import antigravityLogoSrc from "../../../docs/assets/agents/antigravity-color.svg?url";
 import InstallLink from "../components/InstallLink.astro";
 import WorkflowDiagram from "../components/WorkflowDiagram.astro";
+import AudioExcerpt from "../components/AudioExcerpt.astro";
 import HeroTitle from "../components/HeroTitle.astro";
-import { workflows } from "../data/workflows";
+import { audioResult, workflows } from "../data/workflows";
 
 const pageTitle = "Ennodia — connect your AI agents";
 const pageDescription = "Ennodia lets your AI agent give work to other installed agents, try skills, and bring results back to the same conversation. Free and open source.";
@@ -30,17 +31,16 @@ const adapters = [
   { id: "cline", name: "Cline", logoSrc: clineLogoSrc },
   { id: "hermes-agent", name: "Hermes Agent", logoSrc: hermesLogoSrc },
 ];
-const skillDiagram = `contract.md          retry.ts
-     │                   │
-     └────────┬──────────┘
-              ▼
-   Code-review skill
-              │
-              ▼
-   Zero means “retry now.”
-   The code waits 30 seconds.
-              │
-              └──→ Test zero.`;
+const skillDiagram = `Same code + same model
+│
+├─ Plain review
+│  6 failing cases found
+│
+└─ With review skill
+   File read blocked
+
+Findings kept
+Skill benefit not established`;
 const faqItems = [
   { question: "Is Ennodia another chat app?", answer: "Ennodia is an add-on for the agent you use. You stay in your usual conversation while it asks other installed agents to write code, answer questions, or review work." },
   { question: "What do I need to use it?", answer: "An app such as Codex that can connect to Ennodia, plus a supported agent installed on your computer. That agent needs a working account or API key. Your agent can use the setup address to check what’s missing and guide you through installation.", link: { href: "/docs/getting-started/#requirements", label: "Setup requirements" } },
@@ -94,9 +94,9 @@ const applicationStructuredData = { "@context": "https://schema.org", "@type": "
             </div>
           ))}
         </div>
-        <a class="text-link hero-proof" href="#recorded-review">Watch an agent check documentation <ArrowRight size={16} aria-hidden="true" /></a>
       </section>
-      <section class="use-cases wrap" id="for-you" aria-label="Examples">
+      <section class="use-cases wrap" id="for-you" aria-labelledby="examples-title">
+        <h2 id="examples-title">Examples</h2>
         <div class="story-grid">{workflows.map((workflow) => (
           <article class="story-card">
             <div class="story-copy">
@@ -106,17 +106,13 @@ const applicationStructuredData = { "@context": "https://schema.org", "@type": "
                 <div class="example-body"><p>Use your own {workflow.materials}. Paste this into the conversation where you’re working:</p><blockquote id={`prompt-${workflow.id}`}>{workflow.prompt}</blockquote><button type="button" class="text-button" data-copy-target={`prompt-${workflow.id}`}><Copy class="copy-icon" size={17} aria-hidden="true" /><Check class="copied-icon" size={17} aria-hidden="true" />Copy prompt</button><span class="copy-feedback" role="status"></span></div>
               </details>
             </div>
-            <div class="story-image"><img src={workflow.illustration} alt={workflow.illustrationAlt} width="960" height="640" loading="lazy" /></div>
+            {workflow.illustration ? <div class="story-image"><img src={workflow.illustration.src} alt={workflow.illustration.alt} width="960" height="640" loading="lazy" /></div> : <AudioExcerpt result={audioResult} />}
           </article>
         ))}</div>
       </section>
       <section class="skill-section wrap" aria-labelledby="skill-title">
-        <div class="skill-copy"><h2 id="skill-title">Compare skills without cluttering your conversation</h2><p>Let another agent try a skill through Ennodia in a separate conversation. Compare its answer with your current approach before deciding what to use.</p><a class="text-link" href="/docs/evidence/skill-trial/">See a code-review example <ArrowRight size={17} aria-hidden="true" /></a></div>
-        <figure class="skill-visual" role="img" aria-label="A source review compares the retry contract with the code. The contract accepts zero as retry now, but the code waits 30 seconds. The next check tests zero."><pre aria-hidden="true">{skillDiagram}</pre></figure>
-      </section>
-      <section class="proof-section wrap" id="recorded-review" aria-labelledby="proof-title">
-        <div class="proof-copy"><h2 id="proof-title">Watch an agent find<br />errors in documentation</h2><p>In this recording, Ennodia asks another agent to check a sample project’s README against its code. The agent finds three errors: the port number, a configuration setting, and the expected response.</p><p>The example includes the files and findings so you can repeat the check.</p><a class="text-link" href="/docs/evidence/docs-drift/">Read the findings and try it yourself <ArrowRight size={17} aria-hidden="true" /></a></div>
-        <div class="recording"><div class="recording-bar"><Terminal size={18} aria-hidden="true" /><span>Recorded Ennodia run · test project</span></div><video controls preload="none" aria-label="Recorded Ennodia documentation review" poster="/demos/docs-drift-poster.webp" src="/demos/docs-drift.mp4"></video><div class="recording-caption"><CircleCheck size={16} aria-hidden="true" /><span>Findings checked against the source</span><a href="/docs/evidence/docs-drift/">Text version <ArrowUpRight size={14} aria-hidden="true" /></a></div></div>
+        <div class="skill-copy"><h2 id="skill-title">Compare skills without cluttering your conversation</h2><p>Try the same task with and without a requested skill in separate conversations. Compare the findings and failed attempts before deciding what to use.</p><a class="text-link" href="/docs/evidence/skill-trial/">See both recorded attempts <ArrowRight size={17} aria-hidden="true" /></a></div>
+        <figure class="skill-visual" role="img" aria-label="Recorded trial with the same code and model. The plain review found six failing cases. The requested-skill attempt was blocked by file permissions. The findings were kept, but the skill's benefit was not established."><pre aria-hidden="true">{skillDiagram}</pre></figure>
       </section>
       <section class="agents-section wrap" id="your-agents" aria-labelledby="agents-title">
         <h2 id="agents-title">Keep the tools you like</h2><p>Ennodia connects the agents on your computer, using your models and subscriptions.</p>
@@ -129,9 +125,9 @@ const applicationStructuredData = { "@context": "https://schema.org", "@type": "
         <InstallLink />
         <p>Use your preferred <a href="/docs/getting-started/">compatible chat app, CLI, or IDE</a>.<br />Your agent gets the instructions to install and connect Ennodia.</p>
         <a class="text-link" href="/docs/getting-started/#manual-setup">Manual setup <ArrowUpRight size={16} aria-hidden="true" /></a>
+        <p class="github-invitation">If Ennodia fits your workflow, <a href="https://github.com/cherninlab/ennodia"><strong>give it a star on GitHub</strong></a>.</p>
       </section>
     </main>
-    <footer class="site-footer wrap"><a href="/" aria-label="Ennodia home"><img src={logoSrc} alt="Ennodia" width="117" height="25" /></a><p>Free. Open source. Runs on your computer.</p><nav aria-label="Footer"><a href="/docs/roadmap/">Roadmap</a><a href="https://github.com/cherninlab/ennodia">GitHub <ArrowUpRight size={14} aria-hidden="true" /></a></nav></footer>
     <script type="application/ld+json" set:html={JSON.stringify(faqStructuredData)} />
     <script type="application/ld+json" set:html={JSON.stringify(applicationStructuredData)} />
     <script>import "../scripts/landing";</script>

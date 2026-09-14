@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { harnessAdapters } from "./harnesses";
+import { harnessAdapters, hasMultimodalInput, withInputGuidance } from "./harnesses";
 import { allPriorityHarnessIds } from "./priority";
 
 describe("harness adapters", () => {
@@ -137,5 +137,28 @@ describe("harness adapters", () => {
     for (const priorityId of allPriorityHarnessIds()) {
       expect(adapterIds.has(priorityId)).toBe(true);
     }
+  });
+
+  it("scopes Antigravity's native-audio evidence to the observed CLI, model, and sample", () => {
+    const adapter = harnessAdapters.find((candidate) => candidate.id === "antigravity");
+    const guidance = adapter?.inputGuidance?.join("\n") ?? "";
+
+    expect(guidance).toContain("headless input is text-only");
+    expect(guidance).toContain("agy 1.2.0 and gemini-3.8-flash-medium");
+    expect(guidance).toContain("eight-second MP3 loaded through view_file");
+    expect(guidance).toContain("spoken words absent from the prompt");
+    expect(guidance).toContain("scoped observations, not a universal FLAC/WAV support rule");
+    expect(guidance).toContain("keep normal permission settings");
+  });
+
+  it("recognizes media paths without inferring verified access for other harnesses", () => {
+    for (const prompt of ["Inspect /tmp/sample.MP3", "Inspect /tmp/frame.png", "Listen to this recording.", "Compare these recordings.", "Inspect /tmp/reference.ogg", "Assess voice fidelity."]) {
+      expect(hasMultimodalInput(prompt)).toBe(true);
+      const guided = withInputGuidance(prompt, harnessAdapters.find((adapter) => adapter.id === "codex"));
+      expect(guided.startsWith(prompt)).toBe(true);
+      expect(guided).toContain("Missing guidance means unverified access");
+      expect(guided).not.toContain("gemini-3.8-flash-medium");
+    }
+    expect(hasMultimodalInput("Review the release plan and listenPort setting.")).toBe(false);
   });
 });

@@ -1,0 +1,44 @@
+---
+import { FileAudio } from "@lucide/astro";
+
+interface Props { result: string }
+const { result } = Astro.props;
+---
+<figure class="audio-excerpt">
+  <div class="audio-file">
+    <FileAudio size={22} strokeWidth={1.5} aria-hidden="true" />
+    <p><span>audio_probe.mp3</span> <span class="audio-range">· 0:00–0:08</span></p>
+  </div>
+  <div class="audio-return">
+    <span class="audio-path" aria-hidden="true">│<br />╰─→</span>
+    <p class="audio-result">{result}</p>
+  </div>
+  <figcaption>
+    <p>Gemini via Antigravity</p>
+    <a href="#result-audio">View recorded result</a>
+  </figcaption>
+</figure>
+<style>
+  .audio-excerpt {
+    width: 100%;
+    max-width: 368px;
+    margin: 0 auto;
+    padding-block: 12px;
+    color: var(--ink);
+    background: var(--paper);
+    font: 15px/1.6 var(--mono);
+    letter-spacing: 0;
+    text-align: left;
+  }
+  .audio-file { display: flex; align-items: center; gap: 12px; }
+  .audio-file :global(svg) { flex-shrink: 0; }
+  .audio-file p { margin: 0; }
+  .audio-file span { display: inline-block; }
+  .audio-range { color: var(--muted); }
+  .audio-return { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 0; margin-top: 8px; }
+  .audio-path { padding-left: 9px; color: var(--muted); white-space: nowrap; line-height: 1.6; }
+  .audio-result { margin: 24px 0 0 10px; font-size: 18px; line-height: 1.55; overflow-wrap: anywhere; }
+  figcaption { margin: 18px 0 0 44px; font-family: "Helvetica Neue", Arial, sans-serif; font-size: 15px; line-height: 1.6; }
+  figcaption p { margin: 0; color: var(--muted); }
+  figcaption a { display: inline-block; margin-top: 8px; text-decoration: underline; text-underline-offset: 4px; }
+</style>

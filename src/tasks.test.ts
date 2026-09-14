@@ -9,7 +9,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { HarnessAdapter, HarnessDiscovery } from "./harnesses";
+import { harnessAdapters, type HarnessAdapter, type HarnessDiscovery } from "./harnesses";
 import { TaskManager, type TaskSpawn } from "./tasks";
 
 describe("TaskManager", () => {
@@ -45,6 +45,60 @@ describe("TaskManager", () => {
     expect(result.stdout).toBe("stdin:from stdin\n");
     expect(result.command).toContain("<stdin-prompt>");
     expect(result.command).not.toContain("from stdin");
+  });
+
+  it("delivers media guidance without skills, redacts prompt argv, and preserves unrelated and internal prompts", async () => {
+    const fixtureDir = mkdtempSync(join(tmpdir(), "ennodia-media-guidance-"));
+    const commandPath = join(fixtureDir, "agy-fixture");
+    writeFileSync(commandPath, [
+      "#!/bin/sh",
+      '[ "$1" = --sandbox ] && [ "$2" = --print ] || exit 2',
+      'printf "%s" "$3"',
+      "",
+    ].join("\n"), { mode: 0o755 });
+    const adapter = harnessAdapters.find((candidate) => candidate.id === "antigravity")!;
+    const discovery: HarnessDiscovery = {
+      ...echoDiscovery,
+      id: adapter.id,
+      name: adapter.name,
+      commandPath,
+    };
+    const manager = new TaskManager();
+    const mediaPrompt = "Compare native audio in /tmp/original.mp3 and /tmp/cleaned.mp3.";
+
+    try {
+      for (const prompt of [
+        mediaPrompt,
+        "Review the release plan.",
+        "ENNODIA_COMPARE_JUDGE\nCompare native audio in /tmp/sample.mp3.",
+        "ENNODIA_PLAN_ADVISOR\nPlan native audio listening for /tmp/sample.mp3.",
+      ]) {
+        const { task } = manager.start(adapter, discovery, { prompt, timeoutMs: 5_000 });
+        const result = await waitForTask(manager, task.id);
+
+        expect(result.status).toBe("succeeded");
+        expect(result.appliedSkills).toBeUndefined();
+        expect(result.promptPreview).toBe(prompt.replace(/\s+/g, " "));
+        expect(result.command).toEqual([
+          "agy-fixture", "--sandbox", "--print", "<prompt>", "--print-timeout", "5s",
+        ]);
+        const events = result.events.filter((event) => event.type === "input-guidance");
+        if (prompt === mediaPrompt) {
+          expect(result.stdout.startsWith(`${prompt}\n\nEnnodia media input guidance`)).toBe(true);
+          expect(result.stdout).toContain("eight-second MP3 loaded through view_file");
+          expect(result.stdout).toContain("keep normal permission settings");
+          expect(result.command.join(" ")).not.toContain("view_file");
+          expect(events).toHaveLength(1);
+          expect(events[0].message).toContain("Native inspection remains unverified");
+        } else {
+          expect(result.stdout).toBe(prompt);
+          expect(events).toHaveLength(0);
+        }
+      }
+    } finally {
+      await manager.shutdown();
+      rmSync(fixtureDir, { recursive: true, force: true });
+    }
   });
 
   it("settles and kills the child process when a stdin write fails", async () => {

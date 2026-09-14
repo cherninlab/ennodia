@@ -44,6 +44,8 @@ export type HarnessAdapter = {
   versionArgs?: string[];
   capabilities: string[];
   notes?: string[];
+  /** Input preparation guidance, not a guarantee of model or tool access. */
+  inputGuidance?: string[];
   buildCommand?: (commandPath: string, input: HarnessRunInput) => CommandSpec;
   /** Best-effort usage extraction from a finished task's captured output. */
   extractUsage?: (stdout: string, stderr: string) => HarnessUsage | undefined;
@@ -62,6 +64,7 @@ export type HarnessDiscovery = {
   version?: string;
   capabilities: string[];
   notes: string[];
+  inputGuidance?: string[];
 };
 
 export type DiscoverHarnessesOptions = {
@@ -83,6 +86,29 @@ let cachedDiscovery:
   | { createdAtMs: number; harnesses: HarnessDiscovery[] }
   | undefined;
 let inFlightDiscovery: Promise<HarnessDiscovery[]> | undefined;
+
+export const MULTIMODAL_INPUT_GUIDANCE = [
+  "Ennodia passes text prompts and local file paths, not media attachments. Native input depends on the selected harness, model, file tools, permissions, and format. Missing guidance means unverified access.",
+  "When native listening or viewing is required, first load one small sample with native file tools. Report the file, inspected range, tool, and content-specific evidence, or the exact blocking error. A transcript, DSP score, or extracted frame is not equivalent evidence.",
+  "For media comparisons, use matching excerpts and an original reference. Separate cleanup quality from voice or image fidelity. Report conversions and limitations; a successful process exit does not establish successful media inspection.",
+];
+
+export function hasMultimodalInput(prompt: string): boolean {
+  return /\b(audio|video|image|multimodal|listen|listening|sound|speech|voice|recordings?|footage)\b|\.(mp3|wav|flac|m4a|aac|opus|ogg|ogv|mp4|mov|webm|png|jpe?g|webp)\b/i.test(prompt);
+}
+
+/** Keep preparation instructions out of unrelated work and internal text judges. */
+export function withInputGuidance(
+  prompt: string,
+  adapter?: Pick<HarnessAdapter, "inputGuidance">,
+): string {
+  if (!hasMultimodalInput(prompt) || /^ENNODIA_(?:COMPARE|PLAN_ADVISOR)/.test(prompt)) {
+    return prompt;
+  }
+  return `${prompt}\n\nEnnodia media input guidance (applies when native media inspection is required):\n${
+    (adapter?.inputGuidance ?? MULTIMODAL_INPUT_GUIDANCE).map((note) => `- ${note}`).join("\n")
+  }`;
+}
 
 export const harnessAdapters: HarnessAdapter[] = [
   {
@@ -299,6 +325,13 @@ export const harnessAdapters: HarnessAdapter[] = [
       "/Applications/Antigravity IDE.app",
     ],
     capabilities: ["ide", "browser-automation", "agents", "non-interactive-cli"],
+    inputGuidance: [
+      ...MULTIMODAL_INPUT_GUIDANCE,
+      "Antigravity headless input is text-only, including stream-json content blocks. Put local paths in the prompt and use the worker's native view_file tool when available; do not send Gemini API attachment blocks to agy. https://antigravity.google/docs/cli/headless/",
+      "Observed 2026-09-10 with agy 1.2.0 and gemini-3.8-flash-medium: an eight-second MP3 loaded through view_file and returned spoken words absent from the prompt. Start with a short MP3 probe for this route, then compare matched samples after confirming native access.",
+      "In that same case, FLAC was rejected as unsupported MIME audio/x-flac; four WAV samples timed out without output. These are scoped observations, not a universal FLAC/WAV support rule. CLI release notes list broader audio support: https://antigravity.google/changelog",
+      "Use native file tools first. Headless command permission denials cannot be approved interactively; report the blocked operation and keep normal permission settings. Do not keep guessing formats or repeat an unchanged failed request.",
+    ],
     notes: [
       "Runs through the supported `agy` CLI surface.",
       "Defaults to Antigravity sandbox mode for Ennodia-launched tasks.",
@@ -397,6 +430,7 @@ async function discoverHarness(
     version,
     capabilities: adapter.capabilities,
     notes,
+    ...(adapter.inputGuidance ? { inputGuidance: [...adapter.inputGuidance] } : {}),
   };
 }
 

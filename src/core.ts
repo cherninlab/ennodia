@@ -360,6 +360,7 @@ export class EnnodiaCore {
       advisorModel: input.advisorModel,
       timeoutMs: input.timeoutMs,
       budget: input.budget,
+      findHarnessAdapter: this.findHarnessAdapter,
     });
   }
 
@@ -428,7 +429,7 @@ export class EnnodiaCore {
               harnessId: slice.harnessId,
             })),
             comparePlanned: false,
-          }),
+          }, this.findHarnessAdapter),
           input.budget,
         );
         assertBudgetWithinLimits(budget);
@@ -575,7 +576,7 @@ export class EnnodiaCore {
             selectedHarnessIds.length,
           ),
           maxOutputChars: input.maxOutputChars,
-        }),
+        }, this.findHarnessAdapter),
         input.budget,
       ),
     };
@@ -602,7 +603,7 @@ export class EnnodiaCore {
         prompt: input.prompt,
         selectedHarnessIds,
         comparePlanned: false,
-      }),
+      }, this.findHarnessAdapter),
       input.budget,
     );
     assertBudgetWithinLimits(budget);
@@ -648,6 +649,7 @@ export class EnnodiaCore {
         input.includeCompareEstimate ?? true,
         input.maxOutputChars,
         input.budget,
+        this.findHarnessAdapter,
       ),
     };
   }
@@ -662,6 +664,7 @@ export class EnnodiaCore {
       input.includeCompareEstimate ?? true,
       input.maxOutputChars,
       input.budget,
+      this.findHarnessAdapter,
     );
     assertBudgetWithinLimits(budget);
 
@@ -900,6 +903,7 @@ export class EnnodiaCore {
       name: discovery.name,
       runnable: true,
       capabilities: [...new Set(discovery.capabilities)].sort(),
+      ...(discovery.inputGuidance ? { inputGuidance: [...discovery.inputGuidance] } : {}),
       allowedModelIds: [
         ...new Set(input.allowedModels?.[discovery.id] ?? []),
       ].sort(),

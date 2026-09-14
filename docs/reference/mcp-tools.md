@@ -89,13 +89,35 @@ Closing the MCP input stream shuts down active work.
 Raw and compositional batch starts cancel earlier workers if a later spawn fails.
 Active runs retain child evidence until comparison and receipt capture finish.
 
+### Media review
+
+Ennodia transports text prompts with local file paths. Native media inspection depends on the selected harness, model, available tools, and permissions.
+Discovery and Plan Advisor expose optional, bounded `inputGuidance: string[]` for adapter observations and input advice.
+This guidance does not guarantee successful ingestion or model access.
+
+Media prompts also receive preparation guidance at worker launch, recorded by an `input-guidance` task event.
+Budget estimates include this added prompt text.
+Automatic native-audio routes suggest one worker without comparison. Keyword routing does not verify the worker's native access.
+For Antigravity, see [supported harnesses](/docs/reference/supported-harnesses/#antigravity) for the text-only wire format and scoped native-media observations.
+
+1. Run a small native-media probe before launching a larger review or comparison.
+2. Include exact local files, requested ranges, and the reference in each worker prompt.
+3. Match excerpts, playback level, and reference material across audio candidates.
+4. Request the model, inspected files and ranges, native tool results, errors, and excerpt-specific findings.
+5. Retain task IDs and available terminal history receipts with the final assessment.
+
+Successful media ingestion and excerpt-specific observations support a native listening claim.
+Transcription, digital signal processing (DSP), and text-only judges provide separate evidence. Label each method and any fallback explicitly.
+A Judge's comparison of written reports does not establish that the Judge inspected the source media.
+Task output and history receipts are bounded. They do not provide complete transcripts or a permanent audit record.
+
 ## Discovery and planning
 
 ### `ennodia_list_harnesses`
 
 Detects supported local artificial intelligence (AI) tools and reports
 availability, runnable state, command path, version, capabilities, and adapter
-notes.
+notes. Optional `inputGuidance` contains a bounded string array of input advice and scoped observations.
 
 Version probes have bounded deadlines. A failed probe appears in adapter notes without blocking other discoveries.
 `runnable` means Ennodia found an executable adapter. Authentication and requested model access still require a real task.
@@ -166,6 +188,10 @@ allowed harnesses, caller-approved models, installed skills, and hard size
 limits. It can propose only explicit worker slices containing a prompt, harness,
 optional model, and skill IDs. It cannot choose `cwd`, environment variables,
 arguments, permissions, isolation, timeouts, retries, or budgets.
+
+Harness inventory entries preserve optional `inputGuidance: string[]` from discovery.
+Plan Advisor treats this bounded guidance as observations, not proof of native media support.
+Slices execute concurrently. For unverified native access, its instructions request a probe-only plan, followed by a new plan after the probe.
 
 The lifecycle is deliberately two-phase: request and inspect advice first, then
 launch the exact validated plan in a separate call. Ennodia rejects invalid

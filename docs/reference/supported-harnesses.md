@@ -32,11 +32,27 @@ installed and runnable on the current machine.
 ```
 
 The response reports availability, runnable state, command path, version,
-capabilities, and adapter notes.
+capabilities, adapter notes, and optional `inputGuidance`.
+
+`inputGuidance` is a bounded `string[]` of adapter observations and input advice.
+It does not guarantee media support, authentication, or access to a requested model.
+Plan Advisor receives this guidance in its harness inventory.
 
 Discovery checks installed commands, not active authentication or model access.
 A stalled version probe stops at its deadline and adds an adapter note.
 Use a small real task to check the selected agent before sending larger work.
+
+## Media Inputs
+
+Ennodia sends a text prompt through the selected CLI. Include local file paths and requested ranges in that prompt.
+The harness must read those files through its available tools and normal permissions.
+Model application programming interface (API) capabilities do not establish support through a harness's input transport or file tools.
+Run a small native-media probe before a larger review or comparison.
+
+Record the files, ranges, model, tool results, errors, and task IDs.
+For audio comparisons, match excerpts, playback level, and reference material across candidates.
+Native audio findings need evidence of successful media ingestion and observations tied to the requested excerpt.
+Transcription, digital signal processing (DSP), and text-only judging provide distinct evidence. Label each method explicitly.
 
 ## Claude Code Models
 
@@ -63,6 +79,22 @@ such as `opencode-go/kimi-k2.7-code`.
 
 An explicit `jetski: no output produced` error is treated as a failed task even if the command exits with code zero.
 Check the requested tool access in normal Antigravity settings. A denied read does not measure the model or skill's quality.
+
+Ennodia uses `agy --print` with a text prompt containing local paths.
+Antigravity's documented stream input accepts text blocks only. It rejects media blocks.
+Use native `view_file` inspection when the selected harness and model expose it.
+Check the tool result before claiming native audio, image, video, or document inspection.
+See [headless input](https://antigravity.google/docs/cli/headless/#send-a-prompt) and the [CLI changelog](https://antigravity.google/changelog).
+
+A September 10, 2026 probe used `agy` 1.2.0 with Gemini 3.8 Flash Medium:
+
+- An eight-second MP3 native probe succeeded.
+- FLAC sent as `audio/x-flac` was rejected.
+- One comparison with four WAV samples timed out. This outcome leaves WAV support unresolved.
+
+These observations apply to that run configuration. They do not define a universal format blacklist.
+The CLI changelog records audio attachment support and media-type normalization fixes.
+Gemini API audio support uses a separate interface. Its [format list](https://ai.google.dev/gemini-api/docs/audio) does not guarantee `view_file` compatibility.
 
 Antigravity can fail setup when the `agy` CLI is not on `PATH`. Tell the user or
 primary agent to verify:

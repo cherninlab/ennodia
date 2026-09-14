@@ -1,4 +1,5 @@
 import type { HarnessDiscovery } from "./harnesses";
+import { hasMultimodalInput, MULTIMODAL_INPUT_GUIDANCE } from "./harnesses";
 import {
   CATEGORY_HARNESS_PRIORITIES,
   type RouteCategory,
@@ -11,6 +12,7 @@ export type RoutePlan = {
   selected?: string;
   parallelSuggested: boolean;
   compareSuggested: boolean;
+  inputGuidance?: string[];
 };
 
 export type PlanRouteOptions = {
@@ -26,6 +28,10 @@ export function planRoute(
   const runnable = harnesses.filter((harness) => harness.runnable);
   const runnableIds = new Set(runnable.map((harness) => harness.id));
   const reasons: string[] = [];
+  const audioInspectionSignals = /\bnative audio\b|\baudio listening\b|\blistening comparison\b|\blisten to\b[^.!?\n]{0,80}\b(audio|recordings?|files?|samples?)\b|\b(compare|assess|judge)\b[^.!?\n]{0,60}\b(audio|recordings?|voice|sound)\b/.test(lower);
+  const requestedAction = lower.replace(/^\s*(?:please\s+)?(?:(?:can|could|would|will)\s+you\s+|i\s+(?:want|need)\s+you\s+to\s+)?(?:please\s+)?/, "");
+  const softwareMaintenance = /^(fix|implement|refactor|debug)\b|^write\b[^.!?\n]{0,40}\b(script|function|tests?)\b|^review (?:the )?(code|implementation)\b/.test(requestedAction);
+  const nativeAudioProbe = !options.category && audioInspectionSignals && !softwareMaintenance;
 
   let category: RouteCategory = "general";
   const strongBrowserSignals =
@@ -48,6 +54,9 @@ export function planRoute(
   if (options.category) {
     category = options.category;
     reasons.push("Caller-provided category.");
+  } else if (nativeAudioProbe) {
+    category = "general";
+    reasons.push("The task needs native audio inspection. Start with one capability probe; compare after native access is confirmed.");
   } else if (browserSignals) {
     category = "browser";
     reasons.push("The prompt mentions a website, UI, or rendered page.");
@@ -70,11 +79,16 @@ export function planRoute(
       (id) => !CATEGORY_HARNESS_PRIORITIES[category].includes(id),
     ),
   ];
+  if (nativeAudioProbe && runnableIds.has("antigravity")) {
+    candidates.splice(candidates.indexOf("antigravity"), 1);
+    candidates.unshift("antigravity");
+    reasons.push("Antigravity has an observed native-audio probe path. This is a probe candidate, not verified model access.");
+  }
 
   const complexSignals = /\b(audit|assess|compare|critique|evaluate|inspect|judge|multiple|parallel|review|several|tradeoff|best)\b/.test(
     lower,
   );
-  const parallelSuggested = candidates.length > 1 && complexSignals;
+  const parallelSuggested = !nativeAudioProbe && candidates.length > 1 && complexSignals;
   const compareSuggested = parallelSuggested;
 
   return {
@@ -84,6 +98,15 @@ export function planRoute(
     selected: candidates[0],
     parallelSuggested,
     compareSuggested,
+    ...(hasMultimodalInput(prompt) ? {
+      inputGuidance: [
+        ...MULTIMODAL_INPUT_GUIDANCE,
+        "Keyword routing does not verify native media access. Inspect the chosen harness inputGuidance and select a harness/model explicitly for the initial probe.",
+        ...runnable.flatMap((harness) => (harness.inputGuidance ?? [])
+          .filter((note) => !MULTIMODAL_INPUT_GUIDANCE.includes(note))
+          .map((note) => `${harness.id}: ${note}`)),
+      ],
+    } : {}),
   };
 }
 

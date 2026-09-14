@@ -6,6 +6,8 @@ import {
   estimateTaskBatchBudget,
 } from "./budget";
 import { buildJudgePrompt, MAX_PROMPT_CANDIDATE_CHARS } from "./compare";
+import { harnessAdapters, type HarnessAdapter } from "./harnesses";
+import { TaskManager } from "./tasks";
 
 describe("budget estimates", () => {
   it("estimates run fan-out and Compare input separately", () => {
@@ -23,6 +25,69 @@ describe("budget estimates", () => {
       estimate.estimatedChildTaskInputTokens +
         estimate.estimatedCompareInputTokens,
     );
+  });
+
+  it("budgets run and batch prompts against guidance actually received by no-skill workers", async () => {
+    const prompt = "Compare native audio in /tmp/original.mp3 and /tmp/cleaned.mp3.";
+    const tasks = [
+      { harnessId: "antigravity", prompt },
+      { harnessId: "codex", prompt },
+      { harnessId: "antigravity", prompt: "Inspect /tmp/third.mp3." },
+    ];
+    const manager = new TaskManager();
+    const receivedPrompts: string[] = [];
+
+    try {
+      for (const input of tasks) {
+        const adapter: HarnessAdapter = {
+          ...harnessAdapters.find((candidate) => candidate.id === input.harnessId)!,
+          buildCommand: (command, runInput) => ({
+            command,
+            args: ["-c", 'printf "%s" "$1"', "budget-fixture", runInput.prompt],
+          }),
+        };
+        const { task } = manager.start(adapter, {
+          id: adapter.id,
+          name: adapter.name,
+          kind: adapter.kind,
+          available: true,
+          runnable: true,
+          commandPath: "/bin/sh",
+          capabilities: adapter.capabilities,
+          notes: [],
+        }, { prompt: input.prompt, timeoutMs: 5_000 });
+        const result = await manager.waitForTerminal(task.id, 5_000);
+        expect(result?.status).toBe("succeeded");
+        expect(result?.stdout).toContain("Ennodia media input guidance");
+        receivedPrompts.push(result!.stdout);
+      }
+
+      expect(receivedPrompts[0].length).toBeGreaterThan(receivedPrompts[1].length);
+      const run = estimateRunBudget({
+        prompt,
+        selectedHarnessIds: ["antigravity", "codex", "antigravity"],
+        comparePlanned: false,
+      });
+      const batch = estimateTaskBatchBudget({ tasks, comparePlanned: false });
+
+      for (const [estimate, workerPrompts, rawPrompts] of [
+        [run, receivedPrompts.slice(0, 2), tasks.slice(0, 2)],
+        [batch, receivedPrompts, tasks],
+      ] as const) {
+        const actualPromptTokens = workerPrompts.reduce((sum, text) => sum + Math.ceil(text.length / 4), 0);
+        // Preserve the existing skill allowance when recreating the old raw-only ceiling.
+        const rawOnlyCeiling = rawPrompts.reduce((sum, task) => sum + Math.ceil((task.prompt.length + 220) / 4), 0);
+        expect(actualPromptTokens).toBeGreaterThan(rawOnlyCeiling);
+        expect(estimate.estimatedChildTaskInputTokens).toBeGreaterThanOrEqual(actualPromptTokens);
+        expect(estimate.estimatedTotalInputTokens).toBe(estimate.estimatedChildTaskInputTokens);
+        expect(estimate.selectedHarnessCount).toBe(workerPrompts.length);
+        const check = checkBudgetLimits(estimate, { maxEstimatedInputTokens: rawOnlyCeiling });
+        expect(check.exceeded).toBe(true);
+        expect(check.issues.join(" ")).toContain(`maxEstimatedInputTokens ${rawOnlyCeiling}`);
+      }
+    } finally {
+      await manager.shutdown();
+    }
   });
 
   it("treats direct Compare as Judge plus Result Advisor child tasks", () => {

@@ -20,7 +20,7 @@ It contains a short function and a local contract with deliberate mismatches.
 5. Run the plain review and skill review as separate read-only tasks.
 
 ```text
-Use Ennodia for two separate read-only reviews of examples/skill-trial/retry.ts.
+Use Ennodia MCP for two separate read-only reviews of examples/skill-trial/retry.ts.
 Provide contract.md as the source of truth. Use the same agent and model.
 First run: request no additional skill.
 Second run: request the installed source-grounded-audit skill.

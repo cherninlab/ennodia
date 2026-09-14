@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import {
   AdvisorPlanProposalSchema,
+  AdvisorInventorySnapshotSchema,
   buildPlanAdvisorPrompt,
   compileAdvisorExecutionPlan,
   parseAdvisorPlanProposal,
@@ -10,6 +11,18 @@ import {
 } from "./advisor";
 
 describe("Plan Advisor", () => {
+  it("keeps optional guidance compatible and bounds its size", () => {
+    const snapshot = inventory();
+    expect(AdvisorInventorySnapshotSchema.safeParse(snapshot).success).toBe(true);
+    snapshot.harnesses[0]!.inputGuidance = ["Scoped native-input observation."];
+    expect(AdvisorInventorySnapshotSchema.parse(snapshot).harnesses[0]!.inputGuidance)
+      .toEqual(snapshot.harnesses[0]!.inputGuidance);
+    snapshot.harnesses[0]!.inputGuidance = ["x".repeat(1_001)];
+    expect(AdvisorInventorySnapshotSchema.safeParse(snapshot).success).toBe(false);
+    snapshot.harnesses[0]!.inputGuidance = Array(33).fill("input rule");
+    expect(AdvisorInventorySnapshotSchema.safeParse(snapshot).success).toBe(false);
+  });
+
   it("compiles an inert plan with explicit model provenance and per-slice skills", () => {
     const result = compileAdvisorExecutionPlan(validProposal(), inventory());
 

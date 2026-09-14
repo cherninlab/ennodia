@@ -1,91 +1,85 @@
 ---
-import type { workflows } from "../data/workflows";
+import type { Workflow } from "../data/workflows";
+import WorkflowResult from "./WorkflowResult.astro";
+import logoSrc from "../../../docs/assets/logo.svg?url";
+import codexLogoSrc from "../../../docs/assets/agents/codex-color.svg?url";
 
-interface Props { workflow: (typeof workflows)[number] }
+interface Props { workflow: Workflow }
 const { workflow } = Astro.props;
-const { task, action, source, finding, next } = workflow.diagram;
-
-type Segment = { text: string; phase?: "out" | "worker" | "return" | "next" };
-type Row = Segment[];
-const text = (value: string): Segment => ({ text: value });
-const marked = (value: string, phase: Segment["phase"]): Segment => ({ text: value, phase });
-
-function wrap(value: string, width: number) {
-  const lines: string[] = [];
-  for (const word of value.split(" ")) {
-    const last = lines.length - 1;
-    if (last < 0 || lines[last].length + word.length + 1 > width) lines.push(word);
-    else lines[last] += ` ${word}`;
-  }
-  return lines;
-}
-
-function diagram(compact: boolean): Row[] {
-  const workerColumn = compact ? 13 : 31;
-  const innerWidth = compact ? 17 : 25;
-  const returnColumn = workerColumn + Math.floor(innerWidth / 2) + 1;
-  const prefix = `│${" ".repeat(workerColumn - 1)}`;
-  const box = (value: string) => `│ ${value.padEnd(innerWidth - 2)} │`;
-  const outboundLabel = compact ? "├─ Ennodia " : "├──── Ennodia ";
-  const outbound = `${outboundLabel}${"─".repeat(workerColumn - outboundLabel.length - 1)}→`;
-  const returning = compact ? "←─ results return " : "←──── results return ";
-  const bodyWidth = compact ? 29 : 55;
-  const rows: Row[] = [
-    [text("Your conversation in Codex")],
-    [text("│")],
-    ...wrap(task, bodyWidth).map((line, index) => [text(`${index === 0 ? "├─ " : "│  "}${line}`)]),
-    [text(prefix), marked(`┌${"─".repeat(innerWidth)}┐`, "worker")],
-    [marked(outbound, "out"), marked(box("Claude Code"), "worker")],
-    ...[action, source].flatMap(value => wrap(value, innerWidth - 2)).map(line => [text(prefix), marked(box(line), "worker")]),
-    [text(prefix), marked(`└${"─".repeat(returnColumn - workerColumn - 1)}┬${"─".repeat(workerColumn + innerWidth - returnColumn)}┘`, "worker")],
-    [text("├"), marked(`${returning}${"─".repeat(returnColumn - returning.length - 1)}╯`, "return")],
-    ...wrap(finding, bodyWidth).map(line => [text("│  "), marked(line, "return")]),
-    [text("│")],
-    ...wrap(next, bodyWidth).map((line, index) => [text(`${index === 0 ? "├─ " : "│  "}`), marked(line, "next")]),
-    [text("↓")],
-  ];
-  return rows;
-}
-const layouts = [{ name: "wide", rows: diagram(false) }, { name: "compact", rows: diagram(true) }];
-const description = `Your conversation in Codex: ${task} Ennodia sends focused work to Claude Code, which ${action} using ${source}. The result returns to the same conversation: ${finding} Next: ${next}`;
+const { task, worker, action, source, finding, checkLabel, check, next } = workflow.diagram;
 ---
-<div class="workflow-diagram" role="img" aria-label={description}>
-  {layouts.map(layout => (
-    <div class={`diagram-lines diagram-${layout.name}`} aria-hidden="true">
-      {layout.rows.map(row => <div class="diagram-line">{row.map(segment => <span class:list={{ "trace-part": segment.phase }} data-phase={segment.phase} data-text={segment.phase ? segment.text : undefined}>{segment.text}</span>)}</div>)}
+<div class="workflow-diagram">
+  <div class="chat-heading"><img src={codexLogoSrc} alt="" width="20" height="20" />Your chat in Codex</div>
+  <div class="conversation-line">
+    <p class="chat-request" data-phase="out">{task}</p>
+    <section class="delegated-work" aria-label="Ennodia work in a separate agent session">
+      <span class="handoff-out" aria-hidden="true">───→</span>
+      <header class="delegation-heading">
+        <img src={logoSrc} alt="Ennodia" width="113" height="24" />
+      </header>
+      <div class="worker-step" data-phase="worker">
+        <p>{worker} · {action}</p>
+        <p class="worker-source">{source}</p>
+      </div>
+      <div class="worker-findings" data-phase="check">
+        <p>{checkLabel}<br />{check}</p>
+      </div>
+      <div data-phase="saved"><WorkflowResult workflow={workflow} /></div>
+      <span class="handoff-return" aria-hidden="true">←───</span>
+    </section>
+    <div class="chat-result">
+      <p class="return-label">Back in your chat</p>
+      <p data-phase="return">{finding}</p>
+      <p data-phase="next">{next}</p>
     </div>
-  ))}
+  </div>
 </div>
 <style>
   .workflow-diagram {
     --trace: #3260d3;
-    width: max-content;
-    max-width: 100%;
+    --thread-line: #b9bcb6;
+    width: 100%;
+    max-width: 600px;
     margin-inline: auto;
     text-align: left;
-    color: #424640;
-    font: 15px/1.5 var(--mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+    color: var(--ink);
+    font: 15px/1.6 var(--mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
     font-variant-ligatures: none;
-    letter-spacing: 0;
   }
-  .diagram-line { white-space: pre; min-height: 1.5em; }
-  .diagram-line:first-child { color: #20211f; }
-  .diagram-compact { display: none; }
-  .trace-part { position: relative; display: inline-block; }
-  .trace-part::after { content: attr(data-text); position: absolute; inset: 0; color: var(--trace); clip-path: inset(0 100% 0 0); pointer-events: none; }
-  [data-tracing] [data-phase="out"]::after { animation: trace-out .85s steps(24, end) .1s both; }
-  [data-tracing] [data-phase="worker"]::after { animation: trace-worker .9s ease 1.05s both; }
-  [data-tracing] [data-phase="return"]::after { animation: trace-return .9s steps(24, end) 2.05s both; }
-  [data-tracing] [data-phase="next"]::after { animation: trace-worker .7s ease 3.15s both; }
-  @keyframes trace-out { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0); } }
-  @keyframes trace-return { from { clip-path: inset(0 0 0 100%); } to { clip-path: inset(0); } }
-  @keyframes trace-worker { 0%, 100% { clip-path: inset(0); opacity: 0; } 35%, 75% { clip-path: inset(0); opacity: 1; } }
-  @media (max-width: 720px) {
+  p { margin: 0; }
+  .chat-heading { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
+  .chat-heading img { filter: grayscale(1); }
+  .conversation-line { position: relative; }
+  .conversation-line::before { content: ""; position: absolute; left: 0; top: 0; bottom: 12px; border-left: 1px solid var(--thread-line); }
+  .chat-request, .chat-result { position: relative; padding-left: 24px; }
+  .chat-request::before, .chat-result::before { content: ""; position: absolute; left: 0; top: 12px; width: 14px; border-top: 1px solid var(--thread-line); }
+  .delegated-work { position: relative; margin: 28px 0 28px 4ch; padding: 22px 26px; border: 1px solid var(--thread-line); }
+  .handoff-out, .handoff-return { position: absolute; left: calc(-4ch - 1px); color: #62685e; white-space: pre; }
+  .handoff-out { top: 22px; }
+  .handoff-return { bottom: 20px; }
+  .delegation-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; padding-bottom: 20px; border-bottom: 1px solid var(--line); }
+  .delegation-heading img { width: 113px; height: auto; }
+  .worker-step { margin-top: 20px; }
+  .worker-source { color: #62685e; }
+  .worker-findings { display: grid; gap: 12px; margin-top: 16px; }
+  .return-label { margin-bottom: 8px; color: #62685e; }
+  .chat-result { padding-bottom: 0; }
+  .chat-result::after { content: ""; position: absolute; left: 0; top: 13px; bottom: 0; border-left: 1px solid var(--paper); }
+  .chat-result > p:last-child { margin-top: 4px; }
+  [data-tracing] .handoff-out { animation: emphasize .9s ease .1s both; }
+  [data-tracing] [data-phase="worker"] { animation: emphasize 1s ease 1s both; }
+  [data-tracing] [data-phase="check"] { animation: emphasize 1s ease 2.1s both; }
+  [data-tracing] [data-phase="saved"] { animation: emphasize .8s ease 3.2s both; }
+  [data-tracing] .handoff-return, [data-tracing] [data-phase="return"] { animation: emphasize 1s ease 4.1s both; }
+  [data-tracing] [data-phase="next"] { animation: emphasize .8s ease 5s both; }
+  @keyframes emphasize { 0%, 100% { color: inherit; } 35%, 75% { color: var(--trace); } }
+  @media (max-width: 480px) {
     .workflow-diagram { font-size: 14px; }
-    .diagram-wide { display: none; }
-    .diagram-compact { display: block; min-height: 24em; }
+    .delegated-work { padding: 18px; margin-block: 24px; }
+    .delegation-heading { gap: 10px; padding-bottom: 16px; }
+    .worker-step { margin-top: 16px; }
   }
   @media (prefers-reduced-motion: reduce) {
-    .trace-part::after { display: none; }
+    [data-tracing] [data-phase], [data-tracing] .handoff-out, [data-tracing] .handoff-return { animation: none; }
   }
 </style>

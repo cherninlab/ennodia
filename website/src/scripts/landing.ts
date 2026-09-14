@@ -50,8 +50,16 @@ for (const [index, tab] of tabs.entries()) {
 }
 
 function selectFromHash() {
-  const id = location.hash.replace("#tab-", "");
+  const id = location.hash.replace(/^#(?:tab|result)-/, "");
   selectAudience(id, false);
+  if (location.hash.startsWith("#result-") && tabs.some(tab => tab.dataset.audience === id)) {
+    const result = document.querySelector<HTMLDetailsElement>(`#result-${id}`);
+    if (result) {
+      result.open = true;
+      result.querySelector("summary")?.focus({ preventScroll: true });
+      result.scrollIntoView({ block: "start" });
+    }
+  }
 }
 selectFromHash();
 window.addEventListener("hashchange", selectFromHash);

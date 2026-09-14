@@ -31,7 +31,7 @@ bun examples/docs-drift/check.ts
 3. Give this request to your primary agent.
 
 ```text
-Use Ennodia to review examples/docs-drift in a separate read-only task.
+Use Ennodia MCP to review examples/docs-drift in a separate read-only task.
 Compare the current README with config.ts. Identify each conflicting claim.
 Distinguish current instructions from the labeled historical migration record.
 Return proposed corrections with file references. Bring the findings back here.

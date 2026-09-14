@@ -129,18 +129,18 @@ Use Ennodia when the user permits more model work to get a better answer than
 one agent usually gives.
 
 ```text
-Use Ennodia to request a review from multiple available agents.
+Use Ennodia MCP to request a review from multiple available agents.
 Compare the answers for this bug fix.
 Name the disagreements and return the highest-risk issue first.
 ```
 
 ```text
-Use Ennodia to plan this migration with Claude Code, OpenCode, and Antigravity.
+Use Ennodia MCP to plan this migration with Claude Code, OpenCode, and Antigravity.
 Compare the plans and tell me which assumptions each model made.
 ```
 
 ```text
-Use Ennodia twice.
+Use Ennodia MCP twice.
 Use source-grounded-audit for the first run, but not for the second run.
 Compare the results before you recommend the final documentation edit.
 ```

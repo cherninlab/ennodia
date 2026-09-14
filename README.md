@@ -10,7 +10,7 @@ The findings come back to the same conversation.
 You keep your familiar interface and decide what to try next.
 
 ```text
-Use Ennodia to get a second opinion on this bug.
+Use Ennodia MCP to get a second opinion on this bug.
 Give one available agent the failing test and our attempted fixes.
 Request a different explanation and a way to test it.
 Bring the findings back here.

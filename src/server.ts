@@ -53,7 +53,7 @@ export function createEnnodiaServer(core: EnnodiaCore = defaultCore): McpServer 
     {
       title: "List Ennodia harnesses",
       description:
-        "Discover supported local AI harnesses and report availability, runnable state, command path, version, capabilities, and adapter notes. Use first when setup or routing fails.",
+        "Discover local harnesses, availability, versions, capabilities, adapter notes, and inputGuidance. Before audio/image/video work, read inputGuidance: model capabilities do not guarantee native input through a harness. Use first when setup or routing fails.",
       inputSchema: {
         refresh: z
           .boolean()
@@ -485,7 +485,7 @@ export function createEnnodiaServer(core: EnnodiaCore = defaultCore): McpServer 
         prompt: z
           .string()
           .min(1)
-          .describe("The task to send to the selected local harness or harnesses."),
+          .describe("The task to send to the selected local harness or harnesses. For native media, first read ennodia_list_harnesses inputGuidance, specify local paths and a harness/model, then verify one small sample before comparison. Ennodia sends text, not media attachments."),
         category: categorySchema.optional(),
         harnessId: z
           .string()
@@ -628,7 +628,7 @@ export function createEnnodiaServer(core: EnnodiaCore = defaultCore): McpServer 
         prompt: z
           .string()
           .min(1)
-          .describe("The user task to route to local AI harnesses."),
+          .describe("The user task to route to local AI harnesses. For native media, first read ennodia_list_harnesses inputGuidance, specify local paths and a harness/model, then verify one small sample with mode single and compare false. Ennodia sends text, not media attachments."),
         category: categorySchema.optional(),
         harnessId: z
           .string()
@@ -933,7 +933,7 @@ export function createEnnodiaServer(core: EnnodiaCore = defaultCore): McpServer 
         prompt: z
           .string()
           .min(1)
-          .describe("Original user task or question the candidate responses answer."),
+          .describe("Original user task or question the candidate responses answer. Compare judges candidate text, not attached media. For media quality, first obtain native inspection evidence with files/ranges/tool details; keep transcription or DSP scores distinct from listening or viewing."),
         taskIds: z
           .array(z.string().min(1).describe("Completed Ennodia task ID."))
           .default([])

@@ -5,7 +5,7 @@ import {
   type BudgetCheck,
   type BudgetLimits,
 } from "./budget";
-import type { HarnessDiscovery } from "./harnesses";
+import type { HarnessAdapter, HarnessDiscovery } from "./harnesses";
 import type { RoutePlan } from "./planner";
 import type { RouteCategory } from "./priority";
 import type { TaskView } from "./tasks";
@@ -216,6 +216,7 @@ export function estimateCompositionalBudget(
   includeCompareEstimate: boolean,
   maxOutputChars: number | undefined,
   budget: BudgetLimits | undefined,
+  findAdapter?: (id: string) => HarnessAdapter | undefined,
 ): BudgetCheck {
   return checkBudgetLimits(
     estimateTaskBatchBudget({
@@ -225,7 +226,7 @@ export function estimateCompositionalBudget(
       })),
       comparePlanned: includeCompareEstimate,
       maxOutputChars,
-    }),
+    }, findAdapter),
     budget,
   );
 }

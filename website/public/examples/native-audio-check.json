@@ -1,0 +1,67 @@
+{
+  "title": "A native listening check from the same conversation",
+  "recordType": "sanitized-real-run",
+  "date": "2026-09-10",
+  "purpose": "Check whether the selected worker can inspect a short audio sample and return content-specific findings.",
+  "run": {
+    "id": "e16d914d-35e9-4f2a-8e3e-dd890b5c77c2",
+    "taskId": "7341984c-d164-4e0a-a4e7-57d004676a39",
+    "startedAt": "2026-09-10T11:00:30.209Z",
+    "endedAt": "2026-09-10T11:00:50.250Z",
+    "elapsedMs": 20041,
+    "taskElapsedMs": 20040,
+    "status": "succeeded",
+    "mode": "single",
+    "compareMode": false,
+    "harness": "Antigravity",
+    "harnessVersion": "1.2.0",
+    "requestedModel": "gemini-3.8-flash-medium",
+    "selection": "The caller explicitly selected the harness and model."
+  },
+  "input": {
+    "file": "audio_probe.mp3",
+    "durationSeconds": 8,
+    "requestedRangeSeconds": [0, 8],
+    "transport": "A local file path in a text prompt; Ennodia did not attach audio bytes."
+  },
+  "workerReport": {
+    "reportedTool": "view_file",
+    "reportedRange": "The entire eight-second sample",
+    "resultSummary": "Spoken words returned from the eight-second sample.",
+    "spokenExcerptOmitted": true,
+    "evidenceType": "A content-specific spoken excerpt and the worker's report of native file inspection",
+    "directProviderToolTraceIncluded": false
+  },
+  "process": [
+    {
+      "at": "2026-09-10T11:00:30.209Z",
+      "event": "Run started with one selected harness."
+    },
+    {
+      "at": "2026-09-10T11:00:30.210Z",
+      "event": "Media input guidance was included in the worker prompt."
+    },
+    {
+      "at": "2026-09-10T11:00:50.248Z",
+      "event": "The worker process exited with code 0."
+    },
+    {
+      "at": "2026-09-10T11:00:50.250Z",
+      "event": "Ennodia completed the run and recorded its result."
+    }
+  ],
+  "history": {
+    "recordedAt": "2026-09-10T11:00:50.250Z",
+    "persistedReceiptVerified": true,
+    "verification": "The matching run was read from persisted history in a separate process. Its final answer matched the captured result, and its task retained the input-guidance event.",
+    "verifiedOn": "2026-09-11",
+    "retainedEvidence": ["run and task IDs", "timestamps", "final answer", "task events"]
+  },
+  "limits": [
+    "Native tool use is worker-reported. This record contains no independent provider tool-call trace.",
+    "A process exit code and a spoken excerpt do not establish audio cleanup quality.",
+    "This was one listening check. It did not complete a cleanup comparison or rank alternative outputs.",
+    "The elapsed time describes this run only; it is not a benchmark or a speed, token, or cost savings claim.",
+    "The original media, spoken excerpt, full prompt, local paths, speaker identity, and unverified recording-setting descriptions are omitted."
+  ]
+}

@@ -4,6 +4,22 @@ import { describe, expect, it } from "bun:test";
 import { ENNODIA_VERSION } from "./version";
 
 describe("MCP server tool surface", () => {
+  it("exposes media preparation guidance before any worker launch", async () => {
+    await withClient(async (client) => {
+      const tools = await client.listTools();
+      for (const name of ["ennodia_run", "ennodia_start"]) {
+        const prompt = inputProperties(tools.tools.find((tool) => tool.name === name)).prompt;
+        expect(prompt).toMatchObject({ description: expect.stringContaining("inputGuidance") });
+      }
+      const result = await client.callTool({ name: "ennodia_list_harnesses", arguments: {} });
+      const harnesses = JSON.parse(resultText(result)) as Array<{ id: string; inputGuidance?: string[] }>;
+      const guidance = harnesses.find((harness) => harness.id === "antigravity")?.inputGuidance;
+      expect(guidance?.join(" ")).toContain("view_file");
+      expect(guidance?.join(" ")).toContain("eight-second MP3");
+      expect(guidance?.join(" ")).toContain("not a universal FLAC/WAV support rule");
+    });
+  });
+
   it("exposes budget on every process-starting orchestration tool", async () => {
     await withClient(async (client) => {
       const tools = await client.listTools();

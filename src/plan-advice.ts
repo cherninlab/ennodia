@@ -97,6 +97,7 @@ export type PlanAdviceManagerStartInput = {
   advisorModel?: string;
   timeoutMs?: number;
   budget?: BudgetLimits;
+  findHarnessAdapter?: (id: string) => HarnessAdapter | undefined;
 };
 
 export type PlanAdviceRevalidationContext = {
@@ -117,6 +118,7 @@ type InternalPlanAdvice = {
   advisorModel?: string;
   advisorTimeoutMs: number;
   budgetLimits?: BudgetLimits;
+  findHarnessAdapter?: PlanAdviceManagerStartInput["findHarnessAdapter"];
   advisorBudget: BudgetCheck;
   executionBudget?: BudgetCheck;
   proposal?: AdvisorPlanProposal;
@@ -167,7 +169,7 @@ export class PlanAdviceManager {
           harnessId: input.advisor.adapter.id,
         }],
         comparePlanned: false,
-      }),
+      }, () => input.advisor.adapter),
       input.budget,
     );
     assertBudgetWithinLimits(advisorBudget);
@@ -208,6 +210,7 @@ export class PlanAdviceManager {
       advisorTimeoutMs: advisorTask.timeoutMs ??
         input.timeoutMs ?? DEFAULT_ADVISOR_TIMEOUT_MS,
       budgetLimits: input.budget ? { ...input.budget } : undefined,
+      findHarnessAdapter: input.findHarnessAdapter,
       advisorBudget,
       issues: [],
       createdAtMs: now,
@@ -386,7 +389,7 @@ export class PlanAdviceManager {
             harnessId: slice.harnessId,
           })),
           comparePlanned: false,
-        }),
+        }, record.findHarnessAdapter),
         record.budgetLimits,
       );
       record.executionBudget = executionBudget;

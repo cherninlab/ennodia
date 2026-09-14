@@ -250,7 +250,7 @@ export class RunManager {
           selectedHarnessIds.length,
         ),
         maxOutputChars: input.maxOutputChars,
-      }),
+      }, this.dependencies.findHarnessAdapter),
       input.budget,
     );
 

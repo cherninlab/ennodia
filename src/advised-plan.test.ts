@@ -9,6 +9,103 @@ import type { HarnessAdapter, HarnessDiscovery } from "./harnesses";
 import { TaskManager } from "./tasks";
 
 describe("EnnodiaCore advised plans", () => {
+  it("checks custom worker guidance before freezing and before executing an advised plan", async () => {
+    const mediaProposal = proposal();
+    mediaProposal.slices = [{
+      ...mediaProposal.slices[0]!,
+      prompt: "Compare native audio in /tmp/sample.mp3.",
+    }];
+    const baseAdapter = advisorFixtureAdapter("core-agent", mediaProposal);
+    let workerCommandBuilds = 0;
+    const adapter: HarnessAdapter = {
+      ...baseAdapter,
+      inputGuidance: ["Required custom native media preparation. ".repeat(2_000)],
+      buildCommand: (commandPath, input) => {
+        if (!input.prompt.startsWith("ENNODIA_PLAN_ADVISOR")) workerCommandBuilds += 1;
+        return baseAdapter.buildCommand!(commandPath, input);
+      },
+    };
+    const core = new EnnodiaCore({
+      discoverHarnesses: async () => [discovery(adapter, "1.0.0")],
+      findHarnessAdapter: (id) => id === adapter.id ? adapter : undefined,
+    });
+    const adviceInput = {
+      prompt: "Compare native audio recordings.",
+      advisorHarnessId: adapter.id,
+      allowedHarnessIds: [adapter.id],
+      allowedModels: { [adapter.id]: ["approved-model"] },
+      timeoutMs: 5_000,
+    };
+
+    try {
+      const started = await core.startPlanAdvice(adviceInput);
+      const ready = await core.waitForPlanAdvice(started.id, 10_000);
+      expect(ready?.status).toBe("ready");
+      const budget = {
+        maxEstimatedInputTokens: ready!.advisorBudget.estimate.estimatedTotalInputTokens,
+      };
+      expect(ready!.executionBudget!.estimate.estimatedTotalInputTokens)
+        .toBeGreaterThan(budget.maxEstimatedInputTokens);
+
+      await expect(core.startAdvisedPlan({
+        adviceId: started.id,
+        expectedPlanDigest: ready!.planDigest!,
+        budget,
+      })).rejects.toThrow("Budget limit exceeded");
+      expect(core.getPlanAdvice(started.id)?.status).toBe("ready");
+      expect(core.listTasks()).toHaveLength(1);
+
+      const bounded = await core.startPlanAdvice({ ...adviceInput, budget });
+      const rejected = await core.waitForPlanAdvice(bounded.id, 10_000);
+      expect(rejected?.status).toBe("invalid");
+      expect(rejected?.issues.map((issue) => issue.code)).toContain("execution-budget-exceeded");
+      expect(rejected?.plan).toBeUndefined();
+      expect(core.listTasks()).toHaveLength(2);
+      expect(workerCommandBuilds).toBe(0);
+    } finally {
+      await core.shutdown();
+    }
+  });
+
+  it("passes input guidance into Advisor context and rejects guidance drift before launch", async () => {
+    let guidance = "Probe one MP3 through native file tools before comparison.";
+    let advisorPrompt = "";
+    const taskManager = new TaskManager();
+    const start = taskManager.start.bind(taskManager);
+    taskManager.start = ((adapter, discovery, input) => {
+      advisorPrompt = input.prompt;
+      return start(adapter, discovery, input);
+    }) as TaskManager["start"];
+    const core = createAdvisorCore(
+      () => "1.0.0",
+      (base) => ({ ...base, inputGuidance: [guidance] }),
+      taskManager,
+    );
+    try {
+      const started = await core.startPlanAdvice({
+        prompt: "Compare audio recordings.",
+        advisorHarnessId: "core-agent",
+        allowedHarnessIds: ["core-agent"],
+        allowedModels: { "core-agent": ["approved-model"] },
+        maxSlices: 2,
+        timeoutMs: 5_000,
+      });
+      const ready = await core.waitForPlanAdvice(started.id, 10_000);
+      expect(ready?.status).toBe("ready");
+      const snapshot = JSON.parse(advisorPrompt.split("Inventory JSON:\n")[1]!.split("\nTask JSON:")[0]!);
+      expect(snapshot.harnesses[0].inputGuidance).toEqual([guidance]);
+      expect(advisorPrompt).toContain("probe-only slice");
+      guidance = "Native input is blocked for this configuration.";
+      await expect(core.startAdvisedPlan({
+        adviceId: started.id,
+        expectedPlanDigest: ready!.planDigest!,
+      })).rejects.toThrow("inventory changed");
+      expect(core.listTasks()).toHaveLength(1);
+    } finally {
+      await core.shutdown();
+    }
+  });
+
   it("revalidates a frozen plan and launches its exact repeated slices", async () => {
     let harnessVersion = "1.0.0";
     const core = createAdvisorCore(() => harnessVersion);
