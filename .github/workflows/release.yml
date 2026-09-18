@@ -57,7 +57,21 @@ jobs:
 
       - name: Run release checks
         run: |
-          bun run release:check
+          package_version="$(node -p "require('./package.json').version")"
+          if npm view "ennodia@${package_version}" version >/dev/null 2>&1; then
+            # npm rejects publish dry-runs for immutable existing versions.
+            # Recheck the artifact and runtime without attempting republication.
+            bun run version:sync
+            bun run verify
+            bun run pack:check
+            bun run jsr:check
+            bun run package:smoke
+            bun run --cwd packages/ennodia-io check
+            bun run --cwd packages/ennodia-io test
+            bun run --cwd packages/ennodia-io pack:check
+          else
+            bun run release:check
+          fi
           git diff --exit-code
 
       - name: Validate release tag
