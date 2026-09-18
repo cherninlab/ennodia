@@ -12,9 +12,9 @@ import hermesLogoSrc from "../../../docs/assets/agents/hermesagent.svg?url";
 import antigravityLogoSrc from "../../../docs/assets/agents/antigravity-color.svg?url";
 import InstallLink from "../components/InstallLink.astro";
 import WorkflowDiagram from "../components/WorkflowDiagram.astro";
-import AudioExcerpt from "../components/AudioExcerpt.astro";
+import WorkflowTree from "../components/WorkflowTree.astro";
 import HeroTitle from "../components/HeroTitle.astro";
-import { audioResult, workflows } from "../data/workflows";
+import { workflows } from "../data/workflows";
 
 const pageTitle = "Ennodia — connect your AI agents";
 const pageDescription = "Ennodia lets your AI agent give work to other installed agents, try skills, and bring results back to the same conversation. Free and open source.";
@@ -31,16 +31,6 @@ const adapters = [
   { id: "cline", name: "Cline", logoSrc: clineLogoSrc },
   { id: "hermes-agent", name: "Hermes Agent", logoSrc: hermesLogoSrc },
 ];
-const skillDiagram = `Same code + same model
-│
-├─ Plain review
-│  6 failing cases found
-│
-└─ With review skill
-   File read blocked
-
-Findings kept
-Skill benefit not established`;
 const faqItems = [
   { question: "Is Ennodia another chat app?", answer: "Ennodia is an add-on for the agent you use. You stay in your usual conversation while it asks other installed agents to write code, answer questions, or review work." },
   { question: "What do I need to use it?", answer: "An app such as Codex that can connect to Ennodia, plus a supported agent installed on your computer. That agent needs a working account or API key. Your agent can use the setup address to check what’s missing and guide you through installation.", link: { href: "/docs/getting-started/#requirements", label: "Setup requirements" } },
@@ -106,13 +96,16 @@ const applicationStructuredData = { "@context": "https://schema.org", "@type": "
                 <div class="example-body"><p>Use your own {workflow.materials}. Paste this into the conversation where you’re working:</p><blockquote id={`prompt-${workflow.id}`}>{workflow.prompt}</blockquote><button type="button" class="text-button" data-copy-target={`prompt-${workflow.id}`}><Copy class="copy-icon" size={17} aria-hidden="true" /><Check class="copied-icon" size={17} aria-hidden="true" />Copy prompt</button><span class="copy-feedback" role="status"></span></div>
               </details>
             </div>
-            {workflow.illustration ? <div class="story-image"><img src={workflow.illustration.src} alt={workflow.illustration.alt} width="960" height="640" loading="lazy" /></div> : <AudioExcerpt result={audioResult} />}
+            <WorkflowDiagram workflow={workflow} evidence={false} />
           </article>
         ))}</div>
       </section>
       <section class="skill-section wrap" aria-labelledby="skill-title">
         <div class="skill-copy"><h2 id="skill-title">Compare skills without cluttering your conversation</h2><p>Try the same task with and without a requested skill in separate conversations. Compare the findings and failed attempts before deciding what to use.</p><a class="text-link" href="/docs/evidence/skill-trial/">See both recorded attempts <ArrowRight size={17} aria-hidden="true" /></a></div>
-        <figure class="skill-visual" role="img" aria-label="Recorded trial with the same code and model. The plain review found six failing cases. The requested-skill attempt was blocked by file permissions. The findings were kept, but the skill's benefit was not established."><pre aria-hidden="true">{skillDiagram}</pre></figure>
+        <WorkflowTree root="Same code + same model" branches={[
+          { title: "Plain review", lines: ["6 failing cases found"] },
+          { title: "With review skill", lines: ["File read blocked"] },
+        ]} outcome={["Findings kept", "Skill benefit not established"]} />
       </section>
       <section class="agents-section wrap" id="your-agents" aria-labelledby="agents-title">
         <h2 id="agents-title">Keep the tools you like</h2><p>Ennodia connects the agents on your computer, using your models and subscriptions.</p>

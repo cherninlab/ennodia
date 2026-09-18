@@ -61,8 +61,6 @@ h3 { font-size: 28px; line-height: 1.25; font-weight: 500; letter-spacing: -.025
 .story-card,.skill-section,.faq-section { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); column-gap: var(--column-gap); align-items: start; }
 .story-card + .story-card { border-top: 1px solid var(--line); padding-top: 48px; }
 .story-copy > p,.skill-copy > p { margin-top: 20px; font-size: 17px; line-height: 1.7; color: var(--muted); }
-.story-image { margin-top: -20px; }
-.story-image img { width: 100%; height: auto; aspect-ratio: 3 / 2; }
 .story-example { margin-top: 24px; }
 .story-example summary { display: flex; align-items: center; gap: 12px; width: fit-content; font-size: 16px; padding-block: 8px; list-style: none; }
 summary::-webkit-details-marker { display: none; }
@@ -73,8 +71,6 @@ details[open] > summary > svg { transform: rotate(180deg); }
 .text-button { display: inline-flex; align-items: center; gap: 8px; background: transparent; border: 0; padding: 8px 0; font-size: 15px; }
 .text-button:hover { color: var(--accent); }
 .skill-copy .text-link { margin-top: 24px; }
-.skill-visual { padding-top: 5px; }
-.skill-visual pre { width: max-content; max-width: 100%; margin: 0 auto; font: 14px/1.85 var(--mono); color: #485043; }
 .agents-section > p { font-size: 17px; color: var(--muted); max-width: 52ch; margin-top: 20px; }
 .agent-list { list-style: none; padding: 0; margin: 32px 0; display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); column-gap: 32px; row-gap: 24px; }
 .agent-list li { display: flex; gap: 10px; align-items: center; font-size: 15px; }
@@ -109,10 +105,6 @@ details[open] > summary > svg { transform: rotate(180deg); }
   .story-card,.skill-section,.faq-section { grid-template-columns: 1fr; row-gap: 32px; }
   .story-grid { gap: 40px; }
   .story-card + .story-card { padding-top: 40px; }
-  .story-image { margin-top: 0; }
-  .story-image img { max-width: 400px; margin-inline: auto; }
-  .skill-visual { padding-top: 0; }
-  .skill-visual pre { font-size: 15px; }
   .agent-list { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 24px; }
   .faq-list details:first-child summary { padding-top: 0; }
   .start-section { padding-bottom: 48px; }
@@ -124,7 +116,6 @@ details[open] > summary > svg { transform: rotate(180deg); }
   .install-address code { font-size: 13px; }
   .audience-tabs { gap: 16px; }
   .audience-tabs button { font-size: 15px; }
-  .skill-visual pre { font-size: 14px; }
 }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
