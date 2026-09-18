@@ -79,7 +79,7 @@ export const workflows: Workflow[] = [
     },
     evidence: {
       summary: "View recorded run",
-      context: `10 September 2026 · ${(audioCheck.run.elapsedMs / 1000).toFixed(1)} seconds`,
+      context: "Recorded native audio check",
       fields: [
         { label: "Task", value: "Check native listening before comparing audio cleanups." },
         { label: "Agent", value: "Gemini 3.8 Flash Medium through Antigravity 1.2.0, selected by the caller." },
