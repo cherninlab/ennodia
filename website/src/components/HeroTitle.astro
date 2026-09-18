@@ -33,7 +33,7 @@ const pairs = harnesses.slice(1).flatMap((_, offset) =>
 <script>import "../scripts/hero-title";</script>
 
 <style>
-  .harness-title { display: grid; grid-template-columns: max-content max-content; column-gap: .24em; justify-content: center; font-size: clamp(32px, 4.3vw, 54px); line-height: 1.2; }
+  .harness-title { display: grid; grid-template-columns: max-content max-content; column-gap: .24em; justify-content: center; font-size: clamp(23px, 3.3vw, 42px); line-height: 1.3; }
   .hero-motion-hint { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   .harness-title-row { display: grid; grid-template-columns: subgrid; grid-column: 1 / -1; align-items: baseline; }
   .harness-title-prefix { display: flex; align-items: baseline; justify-content: end; gap: .28em; text-align: right; }
@@ -61,10 +61,6 @@ const pairs = harnesses.slice(1).flatMap((_, offset) =>
     .harness-title-row:first-child, .harness-title-row:first-child .harness-title-prefix { display: contents; }
     .harness-title-brand { grid-column: 1 / -1; justify-self: center; align-self: center; width: 4em; margin-bottom: .4em; transform: none; }
     .harness-title-word { text-align: right; }
-  }
-  @media (max-width: 380px) {
-    .harness-title-row:last-child { display: contents; }
-    .harness-title-row:last-child .harness-title-prefix, .harness-title-row:last-child .harness-title-slot { grid-column: 1 / -1; justify-self: center; }
   }
   @media (prefers-reduced-motion: reduce) {
     .harness-title-variant { animation: none !important; transform: none; }

@@ -15,13 +15,6 @@ const { root, branches, outcome } = Astro.props;
   <slot />
 </div>
 <style>
-  @font-face {
-    font-family: "Martian Mono";
-    src: url("/fonts/martian-mono-regular.ttf") format("truetype");
-    font-style: normal;
-    font-weight: 400;
-    font-display: swap;
-  }
   .workflow-tree { width: 100%; min-width: 0; text-align: left; color: var(--ink); font: 15px/1.8 "Martian Mono", var(--mono); font-variant-ligatures: none; overflow-wrap: anywhere; }
   p { margin: 0; }
   ul { list-style: none; margin: 0; padding: 1.8em 0 0; }

@@ -1,3 +1,11 @@
+  @font-face {
+    font-family: "Martian Mono";
+    src: url("/fonts/martian-mono-regular.ttf") format("truetype");
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+  }
+
 :root {
   color-scheme: light;
   --paper: #fbfbf9;
@@ -24,16 +32,16 @@ button,summary { cursor: pointer; }
 img { display: block; max-width: 100%; object-fit: contain; }
 svg { flex-shrink: 0; }
 h1,h2,h3,p,figure,blockquote { margin: 0; }
-h1,h2,h3 { text-wrap: balance; }
+h1,h2,h3 { text-wrap: balance; font-family: "Martian Mono", var(--mono); font-weight: 400; letter-spacing: 0; }
 a:focus-visible,button:focus-visible,summary:focus-visible,[tabindex]:focus-visible { outline: 2px solid var(--accent); outline-offset: 5px; }
 .wrap { width: min(var(--page-width), calc(100% - 64px)); margin-inline: auto; }
 .skip-link { position: fixed; left: 18px; top: -100px; padding: 12px 18px; background: white; z-index: 20; }
 .skip-link:focus { top: 16px; }
 .text-link { display: inline-flex; align-items: center; gap: 8px; }
 .text-link:hover { color: var(--accent); }
-h1 { font-size: clamp(42px,4.3vw,54px); font-weight: 500; letter-spacing: -.04em; line-height: 1.12; }
-h2 { font-size: 36px; line-height: 1.2; font-weight: 500; letter-spacing: -.032em; }
-h3 { font-size: 28px; line-height: 1.25; font-weight: 500; letter-spacing: -.025em; }
+h1 { font-size: clamp(23px,3.3vw,42px); line-height: 1.3; }
+h2 { font-size: 28px; line-height: 1.4; }
+h3 { font-size: 23px; line-height: 1.45; }
 .hero { padding-top: 64px; text-align: center; }
 .hero-copy { margin-inline: auto; }
 .text-link { font-size: 16px; line-height: 1.6; }
@@ -100,8 +108,8 @@ details[open] > summary > svg { transform: rotate(180deg); }
   .install-address code { font-size: 15px; }
   .hero-visual { margin-top: 48px; }
   .audience-tabs { gap: 20px; margin-bottom: 28px; }
-  h2 { font-size: 32px; }
-  h3 { font-size: 27px; }
+  h2 { font-size: 25px; }
+  h3 { font-size: 22px; }
   .story-card,.skill-section,.faq-section { grid-template-columns: 1fr; row-gap: 32px; }
   .story-grid { gap: 40px; }
   .story-card + .story-card { padding-top: 40px; }
@@ -111,7 +119,7 @@ details[open] > summary > svg { transform: rotate(180deg); }
 }
 @media (max-width: 380px) {
   .wrap { width: calc(100% - 32px); }
-  h1 { font-size: 37px; }
+  h1 { font-size: 23px; }
   .install-address { padding-inline: 10px 6px; gap: 6px; }
   .install-address code { font-size: 13px; }
   .audience-tabs { gap: 16px; }
