@@ -65,6 +65,11 @@ describe("owned task lifecycle", () => {
       const view = summarizeCompositionalTasks({ requestedTaskIds: [task.id], tasks: [compact], minSuccessfulTasksForCompare: 1 });
       expect(view.compareReady).toBe(true);
       expect(view.emptySucceededTaskIds).toEqual([]);
+      expect(view.tasks[0]?.outputTruncated).toBe(true);
+      expect(view.tasks[0]?.captureTruncated).toBe(false);
+      const lost = summarizeCompositionalTasks({ requestedTaskIds: [task.id], tasks: [{ ...compact, captureTruncated: true }], minSuccessfulTasksForCompare: 1 });
+      expect(lost.compareReady).toBe(false);
+      expect(lost.truncatedTaskIds).toEqual([task.id]);
     } finally { await manager.shutdown(); }
   });
 

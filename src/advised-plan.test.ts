@@ -180,7 +180,7 @@ describe("EnnodiaCore advised plans", () => {
         core.taskManager.waitForTerminal(item.task.id, 10_000)
       ),
     );
-    expect(completed.map((task) => task?.stdout)).toEqual([
+    expect(completed.map((task) => task?.stdout.split("\n\nEnnodia execution notice:")[0])).toEqual([
       "worker:EXACT_ALPHA_PROMPT",
       "worker:EXACT_BETA_PROMPT",
     ]);
@@ -271,7 +271,7 @@ describe("EnnodiaCore advised plans", () => {
       execution.tasks[0]!.task.id,
       10_000,
     );
-    expect(terminal?.stdout).toBe("worker:EXACT_ALPHA_PROMPT");
+    expect(terminal?.stdout?.split("\n\nEnnodia execution notice:")[0]).toBe("worker:EXACT_ALPHA_PROMPT");
 
     await core.shutdown();
   });

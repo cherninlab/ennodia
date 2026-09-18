@@ -27,6 +27,186 @@ describe("harness adapters", () => {
     expect(command?.args).not.toContain("--dangerously-skip-permissions");
   });
 
+  it("passes Codex reasoning effort through native model configuration", () => {
+    const adapter = harnessAdapters.find((candidate) => candidate.id === "codex");
+
+    expect(adapter?.supportsReasoningEffort).toBe(true);
+    const command = adapter?.buildCommand?.("/bin/codex", {
+      prompt: "review this repo",
+      model: "gpt-5.6-luna",
+      reasoningEffort: "max",
+    });
+
+    expect(command?.args).toContain("-c");
+    expect(command?.args).toContain('model_reasoning_effort="max"');
+  });
+
+  it("keeps Codex runs ephemeral by default", () => {
+    const adapter = harnessAdapters.find((candidate) => candidate.id === "codex");
+
+    const command = adapter?.buildCommand?.("/bin/codex", {
+      prompt: "review this repo",
+      cwd: "/tmp/ennodia-fixture",
+    });
+
+    expect(command?.args).toEqual([
+      "exec",
+      "--color",
+      "never",
+      "--sandbox",
+      "read-only",
+      "--skip-git-repo-check",
+      "--ephemeral",
+      "-C",
+      "/tmp/ennodia-fixture",
+      "--",
+      "review this repo",
+    ]);
+    expect(command?.args).not.toContain("--json");
+  });
+
+  it("uses read-only JSON persistence for a new Codex session", () => {
+    const adapter = harnessAdapters.find((candidate) => candidate.id === "codex");
+
+    expect(adapter?.supportsSessionContinuation).toBe(true);
+    const command = adapter?.buildCommand?.("/bin/codex", {
+      prompt: "continue the review",
+      cwd: "/tmp/ennodia-fixture",
+      model: "gpt-5.6-luna",
+      reasoningEffort: "max",
+      persistSession: true,
+      continueTaskId: "manager-task-id",
+      finalMessagePath: "/tmp/final-message.txt",
+    });
+
+    expect(command?.args).toEqual([
+      "exec",
+      "--color",
+      "never",
+      "--sandbox",
+      "read-only",
+      "--skip-git-repo-check",
+      "-C",
+      "/tmp/ennodia-fixture",
+      "--model",
+      "gpt-5.6-luna",
+      "-c",
+      'model_reasoning_effort="max"',
+      "--json",
+      "-o",
+      "/tmp/final-message.txt",
+      "--",
+      "continue the review",
+    ]);
+    expect(command?.args).not.toContain("--ephemeral");
+  });
+
+  it("resumes a Codex session with its exact native ID", () => {
+    const adapter = harnessAdapters.find((candidate) => candidate.id === "codex");
+    const nativeSessionId = "123e4567-e89b-12d3-a456-426614174000";
+
+    const command = adapter?.buildCommand?.("/bin/codex", {
+      prompt: "return the earlier finding",
+      cwd: "/tmp/ennodia-fixture",
+      model: "gpt-5.6-luna",
+      reasoningEffort: "low",
+      persistSession: true,
+      nativeSessionId,
+      finalMessagePath: "/tmp/resumed-message.txt",
+    });
+
+    expect(command?.args).toEqual([
+      "exec",
+      "--color",
+      "never",
+      "--sandbox",
+      "read-only",
+      "--skip-git-repo-check",
+      "-C",
+      "/tmp/ennodia-fixture",
+      "--model",
+      "gpt-5.6-luna",
+      "-c",
+      'model_reasoning_effort="low"',
+      "resume",
+      nativeSessionId,
+      "--json",
+      "-o",
+      "/tmp/resumed-message.txt",
+      "--",
+      "return the earlier finding",
+    ]);
+    expect(command?.args).not.toContain("--ephemeral");
+  });
+
+  it("extracts only a valid native Codex thread.started UUID", () => {
+    const adapter = harnessAdapters.find((candidate) => candidate.id === "codex");
+    const extractSessionId = adapter?.extractSessionId;
+    const nativeSessionId = "123e4567-e89b-12d3-a456-426614174000";
+
+    expect(extractSessionId?.(`A prose mention of ${nativeSessionId}`)).toBeUndefined();
+    expect(extractSessionId?.(JSON.stringify({
+      type: "thread.started",
+      thread_id: "not-a-uuid",
+    }))).toBeUndefined();
+    expect(extractSessionId?.([
+      JSON.stringify({ type: "turn.started" }),
+      JSON.stringify({ type: "thread.started", thread_id: nativeSessionId }),
+    ].join("\n"))).toBe(nativeSessionId);
+    expect(extractSessionId?.(JSON.stringify({
+      type: "thread.started",
+      thread_id: nativeSessionId,
+    }).slice(0, -3))).toBeUndefined();
+  });
+
+  it("prefers Codex token summaries written to stderr", () => {
+    const adapter = harnessAdapters.find((candidate) => candidate.id === "codex");
+
+    const completedTurn = JSON.stringify({
+      type: "turn.completed",
+      usage: {
+        input_tokens: 100,
+        cached_input_tokens: 80,
+        output_tokens: 7,
+      },
+    });
+
+    expect(adapter?.extractUsage?.([completedTurn, completedTurn].join("\n"), ""))
+      .toEqual({
+        tokensUsed: 214,
+        inputTokens: 200,
+        cachedInputTokens: 160,
+        outputTokens: 14,
+      });
+    expect(adapter?.extractUsage?.([
+      completedTurn,
+      JSON.stringify({
+        type: "turn.completed",
+        usage: { input_tokens: 5, cached_input_tokens: 6, output_tokens: 1 },
+      }),
+    ].join("\n"), "")).toBeUndefined();
+    expect(adapter?.extractUsage?.(JSON.stringify({
+      type: "turn.completed",
+      usage: { input_tokens: Number.MAX_SAFE_INTEGER + 1, output_tokens: 1 },
+    }), "")).toBeUndefined();
+
+    for (const type of ["turn.started", "turn.failed"]) {
+      expect(adapter?.extractUsage?.(
+        [completedTurn, JSON.stringify({ type })].join("\n"),
+        "tokens used\n107\n",
+      )).toBeUndefined();
+    }
+
+    expect(adapter?.extractUsage?.("tokens used\n1,000\n", "tokens used\n55,173\n"))
+      .toEqual({ tokensUsed: 55_173 });
+    expect(adapter?.extractUsage?.("answer", "user\ntokens used\n1\nnot a summary\ntokens used\n55,173\n"))
+      .toEqual({ tokensUsed: 55_173 });
+    expect(adapter?.extractUsage?.("answer", "user\ntokens used\n1\nnot a summary"))
+      .toBeUndefined();
+    expect(adapter?.extractUsage?.("tokens used\n1,000\n", ""))
+      .toEqual({ tokensUsed: 1_000 });
+  });
+
   it("runs Hermes Agent through quiet single-query chat without yolo", () => {
     const adapter = harnessAdapters.find((candidate) =>
       candidate.id === "hermes-agent"

@@ -4,10 +4,32 @@ import { type Skill } from "./skills";
 
 export type HarnessKind = "cli" | "app";
 
+export const DEFAULT_TASK_TIMEOUT_MS = 5 * 60 * 1000;
+
+export const REASONING_EFFORTS = [
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+  "max",
+  "ultra",
+] as const;
+
+export type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
+
 export type HarnessRunInput = {
   prompt: string;
   cwd?: string;
   model?: string;
+  reasoningEffort?: ReasoningEffort;
+  nativeSubagents?: "disabled";
+  nativeSandbox?: "read-only" | "workspace-write";
+  /** Request native session persistence when the selected adapter supports it. */
+  persistSession?: boolean;
+  /** Manager-resolved native session ID to resume for a continuation. */
+  nativeSessionId?: string;
+  /** TaskManager-owned task ID for continuation; adapters do not consume it. */
+  continueTaskId?: string;
   timeoutMs?: number;
   skills?: Skill[];
   /** Run the task against an ephemeral isolated copy of cwd instead of cwd
@@ -25,6 +47,12 @@ export type HarnessUsage = {
   /** Best-effort, adapter-reported token count. Not guaranteed available or
    * billing-accurate; parsed from each CLI's own text output where possible. */
   tokensUsed?: number;
+  /** Native input-token count when the adapter reports a structured breakdown. */
+  inputTokens?: number;
+  /** Native cached-input count; this is a subset of inputTokens. */
+  cachedInputTokens?: number;
+  /** Native output-token count when the adapter reports a structured breakdown. */
+  outputTokens?: number;
 };
 
 export type CommandSpec = {
@@ -46,12 +74,43 @@ export type HarnessAdapter = {
   notes?: string[];
   /** Input preparation guidance, not a guarantee of model or tool access. */
   inputGuidance?: string[];
+  /** Whether the adapter can receive an explicit reasoning effort setting. */
+  supportsReasoningEffort?: boolean;
+  supportsNativeSubagentControl?: boolean;
+  supportsNativeSandbox?: boolean;
+  /** Whether the adapter supports manager-owned native session continuation. */
+  supportsSessionContinuation?: boolean;
   buildCommand?: (commandPath: string, input: HarnessRunInput) => CommandSpec;
   /** Best-effort usage extraction from a finished task's captured output. */
   extractUsage?: (stdout: string, stderr: string) => HarnessUsage | undefined;
+  /** Extract a native session ID from captured stdout as it arrives. */
+  extractSessionId?: (stdout: string) => string | undefined;
   /** Some public CLIs report a semantic failure with exit code zero. */
   failureReason?: (stdout: string, stderr: string) => string | undefined;
 };
+
+export function assertNativeSandboxSupported(adapter: HarnessAdapter, setting?: "read-only" | "workspace-write"): void {
+  if (setting === undefined) return;
+  if (setting !== "read-only" && setting !== "workspace-write") throw new Error("Unsupported nativeSandbox setting.");
+  if (!adapter.supportsNativeSandbox) throw new Error(`${adapter.name} (${adapter.id}) does not support nativeSandbox control.`);
+}
+
+export function assertNativeSubagentsSupported(adapter: HarnessAdapter, setting?: "disabled"): void {
+  if (setting !== undefined && !adapter.supportsNativeSubagentControl) {
+    throw new Error(`${adapter.name} (${adapter.id}) does not support nativeSubagents control.`);
+  }
+}
+
+export function assertReasoningEffortSupported(
+  adapter: Pick<HarnessAdapter, "id" | "name" | "supportsReasoningEffort">,
+  reasoningEffort?: ReasoningEffort,
+): void {
+  if (reasoningEffort !== undefined && !adapter.supportsReasoningEffort) {
+    throw new Error(
+      `${adapter.name} (${adapter.id}) does not support explicit reasoningEffort.`,
+    );
+  }
+}
 
 export type HarnessDiscovery = {
   id: string;
@@ -81,6 +140,7 @@ type CaptureResult = {
 
 const DEFAULT_VERSION_TIMEOUT_MS = 2_500;
 const DEFAULT_DISCOVERY_CACHE_MS = 30_000;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 let cachedDiscovery:
   | { createdAtMs: number; harnesses: HarnessDiscovery[] }
@@ -143,16 +203,25 @@ export const harnessAdapters: HarnessAdapter[] = [
     versionArgs: ["--version"],
     capabilities: ["reasoning", "code", "agents", "mcp", "non-interactive-cli"],
     notes: ["Defaults to read-only sandboxing for Ennodia-launched tasks."],
+    supportsReasoningEffort: true,
+    supportsSessionContinuation: true,
+    supportsNativeSubagentControl: true,
+    supportsNativeSandbox: true,
     buildCommand: (commandPath, input) => {
+      const resuming = Boolean(input.nativeSessionId);
+      const persistent = Boolean(input.persistSession || resuming);
       const args = [
         "exec",
         "--color",
         "never",
         "--sandbox",
-        "read-only",
+        input.nativeSandbox ?? "read-only",
         "--skip-git-repo-check",
-        "--ephemeral",
       ];
+
+      if (!persistent) {
+        args.push("--ephemeral");
+      }
 
       if (input.cwd) {
         args.push("-C", input.cwd);
@@ -162,6 +231,18 @@ export const harnessAdapters: HarnessAdapter[] = [
         args.push("--model", input.model);
       }
 
+      if (input.reasoningEffort) {
+        args.push("-c", `model_reasoning_effort="${input.reasoningEffort}"`);
+      }
+
+      if (input.nativeSubagents === "disabled") args.push("--disable", "multi_agent", "--disable", "multi_agent_v2");
+
+      if (resuming) {
+        args.push("resume", input.nativeSessionId!, "--json");
+      } else if (persistent) {
+        args.push("--json");
+      }
+
       if (input.finalMessagePath) {
         args.push("-o", input.finalMessagePath);
       }
@@ -169,8 +250,17 @@ export const harnessAdapters: HarnessAdapter[] = [
       args.push("--", input.prompt);
       return { command: commandPath, args, cwd: input.cwd };
     },
-    extractUsage: (stdout) => {
-      const match = /tokens used\s*\n\s*([\d,]+)/i.exec(stdout);
+    extractSessionId: extractCodexSessionId,
+    extractUsage: (stdout, stderr) => {
+      const jsonUsage = extractCodexJsonUsage(stdout);
+      if (jsonUsage) {
+        return jsonUsage;
+      }
+
+      if (/"type"\s*:\s*"turn\.(?:started|completed|failed)"/.test(stdout)) return undefined;
+
+      const summary = /(?:^|\n)tokens used[ \t]*\r?\n[ \t]*([\d,]+)\s*$/i;
+      const match = summary.exec(stderr) ?? summary.exec(stdout);
       if (!match) {
         return undefined;
       }
@@ -362,6 +452,110 @@ export const harnessAdapters: HarnessAdapter[] = [
     },
   },
 ];
+
+function extractCodexSessionId(stdout: string): string | undefined {
+  for (const line of stdout.split(/\r?\n/)) {
+    const event = parseJsonObject(line);
+    if (event?.type !== "thread.started") {
+      continue;
+    }
+
+    const threadId = event.thread_id;
+    if (typeof threadId === "string" && UUID_PATTERN.test(threadId)) {
+      return threadId;
+    }
+  }
+
+  return undefined;
+}
+
+function extractCodexJsonUsage(stdout: string): HarnessUsage | undefined {
+  let inputTokens = 0;
+  let outputTokens = 0;
+  let cachedInputTokens = 0;
+  let cachedInputKnown = true;
+  let found = false;
+  let malformed = false;
+  let pendingTurn = false;
+
+  for (const line of stdout.split(/\r?\n/)) {
+    const event = parseJsonObject(line);
+    if (event?.type === "turn.started" || event?.type === "turn.failed") pendingTurn = true;
+    if (event?.type !== "turn.completed") {
+      if (
+        !event &&
+        /^\s*\{/.test(line) &&
+        /"type"\s*:\s*"turn\.completed"/.test(line)
+      ) {
+        malformed = true;
+        break;
+      }
+      continue;
+    }
+
+    if (!isRecord(event.usage)) {
+      malformed = true;
+      break;
+    }
+
+    const input = event.usage.input_tokens;
+    const output = event.usage.output_tokens;
+    if (!isTokenCount(input) || !isTokenCount(output)) {
+      malformed = true;
+      break;
+    }
+
+    found = true;
+    pendingTurn = false;
+    inputTokens += input;
+    outputTokens += output;
+    const cached = event.usage.cached_input_tokens;
+    if (cached === undefined) {
+      cachedInputKnown = false;
+    } else if (!isTokenCount(cached) || cached > input) {
+      malformed = true;
+      break;
+    } else {
+      cachedInputTokens += cached;
+    }
+  }
+
+  if (
+    malformed ||
+    pendingTurn ||
+    !found ||
+    !isTokenCount(inputTokens) ||
+    !isTokenCount(outputTokens) ||
+    !isTokenCount(inputTokens + outputTokens) ||
+    (cachedInputKnown && !isTokenCount(cachedInputTokens))
+  ) {
+    return undefined;
+  }
+
+  return {
+    tokensUsed: inputTokens + outputTokens,
+    inputTokens,
+    ...(cachedInputKnown ? { cachedInputTokens } : {}),
+    outputTokens,
+  };
+}
+
+function parseJsonObject(line: string): Record<string, unknown> | undefined {
+  try {
+    const value: unknown = JSON.parse(line);
+    return isRecord(value) ? value : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isTokenCount(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
+}
 
 export async function discoverHarnesses(
   options: DiscoverHarnessesOptions = {},

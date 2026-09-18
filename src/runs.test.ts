@@ -6,6 +6,31 @@ import { RunManager } from "./runs";
 import { TaskManager } from "./tasks";
 
 describe("RunManager", () => {
+  it("bounded waiting leaves work alive and a later wait observes cancellation", async () => {
+    const fixture = createFixture([slowDiscovery]);
+    try {
+      const run = await fixture.manager.start({prompt: "wait", harnessId: slowAdapter.id, compare: false});
+      const waiting = await fixture.manager.waitForTerminal(run.id, 5, {includeEvents: false});
+      expect(waiting?.status).toBe("executing");
+      expect(waiting?.events).toEqual([]);
+      const completion = fixture.manager.waitForTerminal(run.id, 1000);
+      fixture.manager.cancel(run.id);
+      expect((await completion)?.status).toBe("cancelled");
+    } finally {
+      await fixture.manager.shutdown();
+      await fixture.taskManager.shutdown();
+    }
+  });
+
+  it("waiting returns the completed worker answer", async () => {
+    const fixture = createFixture([echoDiscovery("agent-a", "Agent A")]);
+    const run = await fixture.manager.start({prompt: "evidence", harnessId: "agent-a", compare: false});
+    const result = await fixture.manager.waitForTerminal(run.id, 1000, {includeEvents: false});
+    expect(result?.status).toBe("succeeded");
+    expect(result?.finalAnswer?.split("\n\nEnnodia execution notice:")[0]).toBe("agent-a:evidence");
+    expect(result?.events).toEqual([]);
+  });
+
   it("runs one task and returns its output without Compare", async () => {
     const fixture = createFixture([echoDiscovery("agent-a", "Agent A")]);
 
@@ -20,7 +45,7 @@ describe("RunManager", () => {
     expect(result.status).toBe("succeeded");
     expect(result.taskIds).toHaveLength(1);
     expect(result.compareId).toBeUndefined();
-    expect(result.finalAnswer).toBe("agent-a:hello");
+    expect(result.finalAnswer?.split("\n\nEnnodia execution notice:")[0]).toBe("agent-a:hello");
     expect(result.events.map((event) => event.type)).toContain("task-succeeded");
   });
 
@@ -354,7 +379,7 @@ describe("RunManager", () => {
     expect(result.status).toBe("failed");
     expect(result.diagnosis?.summary).toContain("Slow Agent timed out");
     expect(result.diagnosis?.suggestions).toContain(
-      "Inspect the attempt before retrying. Narrow the task, adjust its execution settings, or allow more time if justified.",
+      "Review captured findings and partial changes before retrying. Check the assigned scope, deadline, tool access, and permissions; continue useful work with an adequate budget instead of repeating the investigation.",
     );
   });
 

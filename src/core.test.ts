@@ -60,15 +60,14 @@ describe("EnnodiaCore", () => {
       harnessId: "core-agent",
       model: "fixture-small",
       pragmatic: { recipe: "investigate" as const, acceptanceCriteria: "Cite the exact error" },
-      mode: "auto" as const,
-      compare: "auto" as const,
+      mode: "single" as const,
+      compare: false as const,
     };
     try {
       const estimated = await core.estimateRun(input);
       const plain = await core.estimateRun({ prompt: input.prompt, harnessId: input.harnessId, compare: false });
       expect(estimated.budget.estimate.estimatedTotalInputTokens).toBeGreaterThan(plain.budget.estimate.estimatedTotalInputTokens);
       await expect(core.startRun({ ...input, budget: { maxEstimatedInputTokens: plain.budget.estimate.estimatedTotalInputTokens } })).rejects.toThrow("Budget limit exceeded");
-      await expect(core.startRun({ ...input, model: "" })).rejects.toThrow("explicit harnessId and model");
       expect(core.listTasks()).toHaveLength(0);
       const started = await core.startRun(input);
       expect(started.budget).toEqual(estimated.budget);
@@ -89,6 +88,42 @@ describe("EnnodiaCore", () => {
     }
   });
 
+  it("propagates worker reasoning effort and keeps it in run and task receipts", async () => {
+    const core = createCodexFixtureCore();
+
+    try {
+      const raw = await core.startTasks({
+        prompt: "Inspect the log",
+        harnessId: "codex",
+        model: "gpt-5.6-luna",
+        reasoningEffort: "low",
+        timeoutMs: 5_000,
+      });
+      const rawTask = await core.taskManager.waitForTerminal(raw.tasks[0]!.id, 10_000);
+      expect(rawTask?.model).toBe("gpt-5.6-luna");
+      expect(rawTask?.reasoningEffort).toBe("low");
+
+      const started = await core.startRun({
+        prompt: "Inspect the log",
+        harnessId: "codex",
+        model: "gpt-5.6-luna",
+        reasoningEffort: "max",
+        compare: false,
+        timeoutMs: 5_000,
+      });
+      const result = await core.waitForRun(started.id, 10_000);
+
+      expect(result?.status).toBe("succeeded");
+      expect(result?.model).toBe("gpt-5.6-luna");
+      expect(result?.reasoningEffort).toBe("max");
+      const task = result?.taskIds[0] ? core.getTask(result.taskIds[0]) : undefined;
+      expect(task?.model).toBe("gpt-5.6-luna");
+      expect(task?.reasoningEffort).toBe("max");
+    } finally {
+      await core.shutdown();
+    }
+  });
+
   it("keeps manager state isolated per core instance", async () => {
     const first = createFixtureCore();
     const second = createFixtureCore();
@@ -102,7 +137,7 @@ describe("EnnodiaCore", () => {
     const finished = await waitForRun(first, started.id);
 
     expect(finished.status).toBe("succeeded");
-    expect(finished.finalAnswer).toBe("core:hello core");
+    expect(finished.finalAnswer?.split("\n\nEnnodia execution notice:")[0]).toBe("core:hello core");
     expect(first.listTasks()).toHaveLength(1);
     expect(second.listTasks()).toHaveLength(0);
 
@@ -132,7 +167,7 @@ describe("EnnodiaCore", () => {
     const finished = await core.waitForRun(started.id, 10_000);
 
     expect(finished?.status).toBe("succeeded");
-    expect(finished?.finalAnswer).toBe("core:wait for me");
+    expect(finished?.finalAnswer?.split("\n\nEnnodia execution notice:")[0]).toBe("core:wait for me");
 
     await core.shutdown();
   });
@@ -445,14 +480,22 @@ describe("EnnodiaCore", () => {
       }),
     ).rejects.toThrow("Duplicate compositional slice ID: dup");
 
-    const started = await core.startCompositional({
+    await expect(core.startCompositional({ prompt: "goal", slices: [] })).rejects.toThrow("At least one");
+    const assignment = {
       prompt: "overall goal",
+      pragmatic: { recipe: "investigate" as const, acceptanceCriteria: "Cite exact paths" },
       slices: [
-        { id: "alpha", title: "Alpha", prompt: "look at alpha" },
-        { prompt: "look at beta" },
+        { id: "alpha", title: "Alpha", prompt: "look at alpha", model: "alpha-model", skillIds: [] },
+        { prompt: "look at beta", model: "beta-model", skillIds: [] },
       ],
       timeoutMs: 5_000,
-    });
+    };
+    const estimate = await core.estimateCompositional(assignment);
+    await expect(core.startCompositional({ ...assignment, budget: { maxChildTasks: 1 } })).rejects.toThrow("Budget limit exceeded");
+    expect(core.listTasks()).toHaveLength(0);
+    const started = await core.startCompositional(assignment);
+    expect(started.budget).toEqual(estimate.budget);
+    expect(started.tasks.map(({task}) => task.model)).toEqual(["alpha-model", "beta-model"]);
 
     expect(started.tasks.map((item) => item.sliceId)).toEqual([
       "alpha",
@@ -461,7 +504,8 @@ describe("EnnodiaCore", () => {
     expect(started.compareNext.taskIds).toHaveLength(2);
 
     for (const taskId of started.compareNext.taskIds) {
-      await core.taskManager.waitForTerminal(taskId, 10_000);
+      const task = await core.taskManager.waitForTerminal(taskId, 10_000);
+      expect(task?.stdout).toContain("Cite exact paths");
     }
 
     const status = core.getCompositionalStatus({
@@ -483,15 +527,20 @@ describe("EnnodiaCore", () => {
       const first = createHistoryFixtureCore(new FileHistorySink({ dir }));
       const started = await first.startRun({
         prompt: "compare the fixture outputs",
+        pragmatic: { recipe: "investigate", acceptanceCriteria: "Cite independent evidence" },
         mode: "parallel",
         compare: true,
         judgeHarnessId: "history-a",
         synthesizerHarnessId: "history-a",
+        model: "history-model",
+        reasoningEffort: "max",
         timeoutMs: 5_000,
       });
       const finished = await first.waitForRun(started.id, 10_000);
 
       expect(finished?.status).toBe("succeeded");
+      expect(finished?.taskIds).toHaveLength(2);
+      expect(finished?.compareId).toBeDefined();
       expect(finished?.finalAnswer).toBe("synthesized history answer");
       await first.shutdown();
 
@@ -500,6 +549,10 @@ describe("EnnodiaCore", () => {
 
       expect(history).toHaveLength(1);
       expect(history[0].run.finalAnswer).toBe("synthesized history answer");
+      expect(history[0].run.model).toBe("history-model");
+      expect(history[0].run.reasoningEffort).toBe("max");
+      expect(history[0].tasks.every((task) => task.model === "history-model")).toBe(true);
+      expect(history[0].tasks.every((task) => task.reasoningEffort === "max")).toBe(true);
       expect(history[0].compare?.analysis?.consensus).toEqual([
         "Both agents completed the fixture.",
       ]);
@@ -524,6 +577,7 @@ function createCodexFixtureCore(): EnnodiaCore {
   const adapter: HarnessAdapter = {
     ...coreAdapter,
     id: "codex",
+    supportsReasoningEffort: true,
   };
   const discovery: HarnessDiscovery = {
     ...coreDiscovery,
@@ -631,6 +685,7 @@ function historyAdapter(id: string): HarnessAdapter {
     kind: "cli",
     commandCandidates: ["sh"],
     capabilities: ["core-test"],
+    supportsReasoningEffort: true,
     buildCommand: (commandPath, input) => ({
       command: commandPath,
       args: [

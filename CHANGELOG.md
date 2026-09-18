@@ -2,7 +2,27 @@
 
 This file records all notable Ennodia changes.
 
-## [0.3.0-rc.1] - Unreleased
+## [0.3.0] - 2026-09-18
+
+### Added
+
+- Optional Pragmatic beta contracts for cited investigation and unapplied patch proposals, preserving independent workers and comparison.
+- Opt-in Codex session continuation, reasoning effort, native sandbox selection and native subagent controls.
+- Bounded waits and compact run status responses.
+
+### Changed
+
+- Show execution deadlines and permission context to workers.
+- Organize independent attempts and chunked work in the Pragmatic skill. Token savings and equal quality are not established.
+- Clarify website categories and copy a complete setup prompt from the installation control.
+
+### Fixed
+
+- Treat interrupted or truncated usage as unknown rather than a complete token total.
+- Preserve cancellation evidence after child output drains.
+- Report comparison truncation and explicit Codex quota failures.
+
+### Earlier release candidate changes
 
 ### Added
 

@@ -10,6 +10,7 @@ import {
 import { renderPlanMermaid } from "./planner";
 import { formatHarnessPriorityList } from "./priority";
 import { ENNODIA_VERSION } from "./version";
+import { REASONING_EFFORTS } from "./harnesses";
 
 const defaultCore = createDefaultEnnodiaCore();
 const comparePriorityText = formatHarnessPriorityList();
@@ -18,6 +19,12 @@ const categorySchema = z
   .enum(["code", "research", "browser", "image", "general"])
   .describe(
     "Optional caller-provided route category. Pass this when you know the task category; Ennodia then skips keyword classification.",
+  );
+
+const reasoningEffortSchema = z
+  .enum(REASONING_EFFORTS)
+  .describe(
+    "Optional reasoning effort for a Codex worker. Other harnesses reject explicit effort settings; omit to preserve native defaults.",
   );
 
 const budgetSchema = z
@@ -377,7 +384,7 @@ export function createEnnodiaServer(core: EnnodiaCore = defaultCore): McpServer 
       description:
         "Estimate the input-token budget for a planned Ennodia run and report whether optional limits would be exceeded before starting child tasks.",
       inputSchema: {
-        model: z.string().optional().describe("Explicit model selection required for Pragmatic mode."),
+        model: z.string().optional().describe("Optional model override. Omit to use the selected harness default."),
         pragmatic: pragmaticSchema.optional(),
         prompt: z
           .string()
@@ -428,6 +435,7 @@ export function createEnnodiaServer(core: EnnodiaCore = defaultCore): McpServer 
       description:
         "Resolve focused compositional slices to harnesses and estimate child-task and later Judge + Result Advisor budget without starting child processes.",
       inputSchema: {
+        pragmatic: pragmaticSchema.optional(),
         prompt: z
           .string()
           .min(1)
@@ -516,6 +524,9 @@ export function createEnnodiaServer(core: EnnodiaCore = defaultCore): McpServer 
           .string()
           .optional()
           .describe("Optional model override passed through to harnesses that support it."),
+        reasoningEffort: reasoningEffortSchema.optional(),
+        nativeSubagents: z.literal("disabled").optional().describe("Disable Codex built-in subagent tools for workers. Other harnesses reject this setting. Does not block external commands or affect Judge/Advisor tasks."),
+        nativeSandbox: z.enum(["read-only", "workspace-write"]).optional().describe("Codex worker native sandbox. Defaults to read-only on every turn, including continuation. Request workspace-write only for authorized edits. Other harnesses reject this setting; Judge/Advisor settings are unchanged."),
         timeoutMs: z
           .number()
           .int()
@@ -548,6 +559,7 @@ export function createEnnodiaServer(core: EnnodiaCore = defaultCore): McpServer 
       description:
         "Start one focused child task per slice for compositional reviews. Poll the returned task IDs, then pass useful completed task IDs to ennodia_start_compare for a Judge + Result Advisor comparison.",
       inputSchema: {
+        pragmatic: pragmaticSchema.optional(),
         prompt: z
           .string()
           .min(1)
@@ -626,7 +638,7 @@ export function createEnnodiaServer(core: EnnodiaCore = defaultCore): McpServer 
     {
       title: "Run Ennodia",
       description:
-        "Start a high-level Ennodia orchestration. Set pragmatic for a bounded investigation or patch proposal using one explicit model. Use this as the default entrypoint: it plans routing, starts one or more local harness tasks, optionally compares successful outputs, and returns a run ID. Runs usually take minutes; poll ennodia_get_run with sensible spacing and trust remainingMs/etaConfidence instead of aborting early.",
+        "Start a high-level Ennodia orchestration. Set pragmatic for evidence-focused investigation or patch proposals with one or more independent workers. Use Plan Advisor for tailored model and skill assignments. Use this as the default entrypoint: it plans routing, starts one or more local harness tasks, optionally compares successful outputs, and returns a run ID. Runs usually take minutes; use ennodia_get_run with waitMs: 30000 and includeEvents: false until terminal, then consume and verify its answer. A wait timeout does not cancel or finish the run.",
       inputSchema: {
         pragmatic: pragmaticSchema.optional(),
         prompt: z
@@ -666,6 +678,11 @@ export function createEnnodiaServer(core: EnnodiaCore = defaultCore): McpServer 
           .string()
           .optional()
           .describe("Optional model override passed to the selected task harnesses."),
+        persistSession: z.boolean().optional().describe("Opt in to native Codex session persistence. Requires one explicit harness and a persistent cwd. Default tasks remain ephemeral."),
+        continueTaskId: z.string().optional().describe("Continue the latest settled persistent task owned by this server. Use its Ennodia task ID. The working directory and harness stay the same. Each follow-up gets a new task and execution allowance."),
+        reasoningEffort: reasoningEffortSchema.optional(),
+        nativeSubagents: z.literal("disabled").optional().describe("Disable Codex built-in subagent tools for workers. Other harnesses reject this setting. Does not block external commands or affect Judge/Advisor tasks."),
+        nativeSandbox: z.enum(["read-only", "workspace-write"]).optional().describe("Codex worker native sandbox. Defaults to read-only on every turn, including continuation. Request workspace-write only for authorized edits. Other harnesses reject this setting; Judge/Advisor settings are unchanged."),
         timeoutMs: z
           .number()
           .int()
@@ -787,9 +804,11 @@ export function createEnnodiaServer(core: EnnodiaCore = defaultCore): McpServer 
     {
       title: "Get Ennodia run",
       description:
-        "Inspect run status, selected harnesses, child task IDs, comparison ID, final Advisor answer, events, and ETA.",
+        "Inspect a run or wait up to waitMs for completion. Prefer waitMs: 30000, compact: true and includeEvents: false while awaiting results. A nonterminal response means work continues; do not claim its findings were consumed.",
       inputSchema: {
         runId: z.string().min(1).describe("Run ID returned by ennodia_run."),
+        compact: z.boolean().default(false).describe("Omit repeated routing, budget, prompt preview and skill metadata. Preserve status, timing, task IDs, answers and errors. Answer and event limits still apply. Use false for full diagnostics."),
+        waitMs: z.number().int().min(0).max(300000).default(0).describe("Wait for a terminal state without cancelling or extending the run. Use 30000 for ordinary polling. Longer waits require a client tool timeout greater than waitMs."),
         includeEvents: z
           .boolean()
           .default(true)
@@ -812,13 +831,20 @@ export function createEnnodiaServer(core: EnnodiaCore = defaultCore): McpServer 
           ),
       },
     },
-    async ({ runId, ...options }) => {
-      const run = core.getRun(runId, options);
+    async ({ runId, waitMs, compact, ...options }) => {
+      const run = waitMs > 0
+        ? await core.waitForRun(runId, waitMs, options)
+        : core.getRun(runId, options);
       if (!run) {
         throw new Error(`Unknown run: ${runId}`);
       }
 
-      return jsonResult(run);
+      const result = compact
+        ? Object.fromEntries(Object.entries(run).filter(([key]) =>
+          !["plan", "budget", "promptPreview", "appliedSkills", "unrequestedSkillsPresent"].includes(key)
+        ))
+        : run;
+      return jsonResult(result);
     },
   );
 

@@ -32,7 +32,7 @@ export const audioResult = audioCheck.workerReport.resultSummary;
 
 export const workflows: Workflow[] = [
   {
-    id: "developers", audience: "Developers",
+    id: "developers", audience: "Code",
     title: "The bug survived two fixes. Now what?",
     description: "Have another agent investigate the failing test and compare the attempted fixes in a separate session. Bring its findings back to your conversation.",
     illustration: { src: "/illustrations/developers.webp", alt: "A laptop beside two illustrated windows, with one code detail highlighted." },
@@ -64,7 +64,7 @@ export const workflows: Workflow[] = [
     prompt: "Use Ennodia MCP to investigate this bug with another available agent. Provide the failing test and our attempted fixes. Have that agent compare its explanation with those fixes and the source code in its own session. Have it identify the next test that can confirm or reject the explanation. Keep the investigation read-only. Bring a concise result and task IDs back here, including failed attempts and remaining uncertainty. We can inspect the captured details when needed.",
   },
   {
-    id: "audio", audience: "Audio",
+    id: "audio", audience: "Media",
     title: "When your agent cannot listen",
     description: "Give the excerpt to a model with native audio access through Ennodia. In this recorded check, Gemini returned the spoken words.",
     diagram: {

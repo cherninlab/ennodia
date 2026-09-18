@@ -107,6 +107,7 @@ bun run verify
 
 ### Experimental Pragmatic mode
 
-In `ennodia@next`, delegate bounded investigation or patch proposals to an explicitly selected model.
+Version 0.3.0 supports independent model attempts, tailored planning, skill trials and evidence comparison.
+The published `ennodia@next` recipes retain the earlier single-worker restriction.
 [Pragmatic mode](docs/guides/pragmatic-mode.md) keeps bulky evidence outside the main conversation and returns findings for verification.
 Savings are not yet validated.

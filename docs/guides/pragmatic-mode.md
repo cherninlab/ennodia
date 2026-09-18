@@ -1,47 +1,74 @@
 ---
 title: Pragmatic mode
-description: Delegate bounded investigation and patch proposals to one explicitly selected model.
+description: Organize independent model attempts and compare evidence against complete acceptance criteria.
 ---
 
-Pragmatic mode is experimental in `0.3.0-rc.2`, available through `ennodia@next`.
+Pragmatic mode is an opt-in beta in `0.3.0`, available through `ennodia`.
 It helps your main agent delegate bounded work without loading entire logs or files into the main conversation.
 It does not guarantee lower costs or select the cheapest model automatically.
 
-## Start a bounded task
+## Organize independent attempts
 
 Use this prompt in your main agent:
 
 ```text
-Use Ennodia MCP in Pragmatic mode to investigate the failing requests in /absolute/path/to/server.log.
-Select a supported lower-cost model from my configured harnesses.
-Return the affected timestamps, exact errors, likely cause, and evidence locations.
-Keep the full log outside this conversation. Verify the decisive evidence before recommending a fix.
+Use Ennodia MCP in Pragmatic mode to solve this task.
+Organize independent model attempts and tailor questions where useful.
+Discover relevant skills and compare a skill trial with a matched trial without requested skills.
+Compare the evidence with Judge and Result Advisor, then verify the complete acceptance criteria.
+Count planning, all attempts, retries, comparison and verification in the total cost.
 ```
 
-The main agent can call the existing run tool:
+Ennodia supports one main agent coordinating N independent workers.
+N=1 remains useful for a specialist or handoff.
+The main agent can delegate planning through Plan Advisor. It does not need to design every specialist question or locate every skill manually.
+
+1. Discover harnesses, supported model IDs and native skills.
+2. Start Plan Advisor with the full objective, model allowlists and explained limits.
+3. Inspect the validated plan and launch it with its exact digest.
+4. Inspect terminal task evidence and compare useful results with Judge and Result Advisor.
+5. Verify the complete task locally and include all attempts in the measurement.
+
+For caller-defined assignments, compositional tasks support a separate prompt, model and skill list per slice.
+A slice with `skillIds: []` requests no skills but can still discover native skills.
+A controlled skill trial requires matching environments and evidence of actual skill loading.
+
+## Finish difficult work in chunks
+
+Workers do not need to occupy a session for the full timeout.
+Use bounded chunks for investigation, implementation and integrated verification.
+Each chunk returns its artifacts, executed checks, remaining work and next step.
+A completed chunk is distinct from an accepted complete task.
+
+Independent workers can explore alternatives within a stage.
+Compare evidence at useful decision points and continue with owned sessions or compact handoffs.
+Count every chunk and handoff in the total cost.
+A deadline is a maximum allowance, not a target duration.
+
+## Evidence contracts in version 0.3.0
+
+`ennodia_run`, `ennodia_estimate_budget`, `ennodia_start_compositional` and `ennodia_estimate_compositional_budget` accept:
 
 ```json
 {
-  "tool": "ennodia_run",
-  "arguments": {
-    "harnessId": "claude-code",
-    "model": "<supported-model-from-your-configuration>",
-    "cwd": "/absolute/path/to/project",
-    "prompt": "Find the cause of failed requests in /absolute/path/to/server.log between 10:00 and 10:10. Do not modify files.",
-    "pragmatic": {
-      "recipe": "investigate",
-      "acceptanceCriteria": "Cite exact errors and timestamps. Distinguish confirmed causes from hypotheses. Report any unread ranges."
-    },
-    "timeoutMs": 120000,
-    "budget": { "maxChildTasks": 1 }
+  "pragmatic": {
+    "recipe": "investigate",
+    "acceptanceCriteria": "Cite decisive source evidence and executed checks. Report unresolved requirements."
   }
 }
 ```
 
-Replace the model placeholder with a supported identifier before calling the tool.
-The caller supplies both `harnessId` and `model`.
-The run uses `mode: single` and `compare: false`, including when these fields are omitted or set to `auto`.
-Explicit parallel execution or comparison is rejected before workers start.
+The contract preserves routing and comparison choices. It does not force one worker.
+Explicit models are optional. Omitted models use native harness defaults.
+
+Use discovered model IDs for reproducible comparisons. Use compositional slices for different models on the same harness.
+Version 0.3.0 preserves independent workers and comparison.
+
+### Select reasoning effort
+
+Source builds accept `reasoningEffort` on `ennodia_run` and `ennodia_start` for Codex workers. For example, select `model: "gpt-5.6-luna"` with `reasoningEffort: "max"`, or `model: "gpt-6-astra"` with `reasoningEffort: "low"`, when supported by your installed Codex and account. Ennodia forwards the setting to the native CLI. It does not infer the cheapest setting. Other adapters reject explicit effort settings. Omit the field to preserve native defaults.
+
+This setting applies to workers, not the Judge or Result Advisor. Run and task records preserve the requested setting. That does not prove the provider used it or establish its price.
 
 ## Get findings or a patch
 
@@ -50,7 +77,8 @@ Explicit parallel execution or comparison is rejected before workers start.
 | `investigate` | Return cited findings, small excerpts, coverage limits, and unresolved questions | Verify decisive evidence |
 | `patch` | Return a complete unified diff proposal without applying it | Review, apply, and test the patch |
 
-Both recipes instruct workers to avoid file changes, side effects, recursive delegation, and repeated failed approaches.
+Both recipes instruct workers to avoid file changes, side effects and repeated failed approaches.
+Additional delegation stays within caller-authorized scope and allowance and must be counted.
 These are worker instructions, not an enforced permission sandbox.
 Native harness permissions remain authoritative.
 A worker can fail to follow instructions, so use appropriate native permissions for sensitive work.
@@ -75,6 +103,7 @@ Use `ennodia_estimate_budget` with the same `pragmatic` settings and model to in
 Estimates do not measure total task spend, internal tool reads, or subscription quota consumption.
 
 The foundation does not retry automatically or track retries across separate runs.
+Plan Advisor, independent workers, Judge and Result Advisor all contribute to total task cost.
 Escalate unresolved work in a separate run after inspecting its evidence.
 Compare total elapsed time, verified outcomes, and all reported usage across attempts before claiming savings.
 
@@ -82,4 +111,12 @@ Compare total elapsed time, verified outcomes, and all reported usage across att
 
 The bundled `pragmatic` skill guides delegation from your main conversation.
 Install it through [Agent Skills](/docs/guides/agent-skills/) using `skillIds: ["pragmatic"]`.
-Do not request this skill on workers through run `skillIds`.
+A delegated coordinator can use this skill when its assignment includes orchestration.
+
+In version 0.3.0, wait for the worker with `ennodia_get_run`, `waitMs: 30000`, and `includeEvents: false`. A nonterminal response means the worker is still running. Read its terminal answer and verify the acceptance criteria before reporting completion. The wait itself never cancels the run.
+
+## Deadlines, permissions and continuation
+
+Workers receive an execution deadline and their configured permissions. Inspect partial findings before continuing. Use a normal authorized run for file edits.
+
+See [execution deadlines and session continuation](/docs/reference/mcp-tools/#execution-deadlines), [Troubleshooting](/docs/guides/troubleshooting/) and [Budgets and Limits](/docs/guides/budgets-and-limits/) for details.

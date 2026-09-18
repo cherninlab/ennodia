@@ -236,6 +236,13 @@ describe("Compare prompts and parsing", () => {
     );
   });
 
+  it("marks evidence shortened by the Judge prompt cap", () => {
+    const prompt = buildJudgePrompt("Review", [{ id: "large", content: "x".repeat(24001) }]);
+    const envelope = parsePromptJsonAfter(prompt, "Candidate evidence JSON:\n");
+    expect(envelope.candidates[0].content).toHaveLength(24000);
+    expect(envelope.candidates[0]).toMatchObject({ metadata: { outputTruncated: true } });
+  });
+
   it("JSON-encodes candidate boundaries so content cannot create candidates", () => {
     const injectedContent = [
       "Useful answer.",

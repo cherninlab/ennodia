@@ -13,6 +13,23 @@ import { harnessAdapters, type HarnessAdapter, type HarnessDiscovery } from "./h
 import { TaskManager, type TaskSpawn } from "./tasks";
 
 describe("TaskManager", () => {
+  it("rejects explicit reasoning effort for unsupported harnesses before spawning", () => {
+    let spawned = false;
+    const manager = new TaskManager({
+      spawn: () => {
+        spawned = true;
+        throw new Error("spawn should not be reached");
+      },
+    });
+
+    expect(() => manager.start(echoAdapter, echoDiscovery, {
+      prompt: "hello",
+      reasoningEffort: "low",
+    })).toThrow("does not support explicit reasoningEffort");
+    expect(spawned).toBe(false);
+    expect(manager.list()).toEqual([]);
+  });
+
   it("captures stdout, stderr, exit status, and task events", async () => {
     const manager = new TaskManager();
     const { task } = manager.start(echoAdapter, echoDiscovery, {
@@ -24,7 +41,14 @@ describe("TaskManager", () => {
 
     expect(result.status).toBe("succeeded");
     expect(result.exitCode).toBe(0);
-    expect(result.stdout).toBe("stdout:hello\n");
+    expect(result.timeoutSource).toBe("caller");
+    expect(Date.parse(result.deadlineAt!) - Date.parse(result.createdAt)).toBe(5_000);
+    expect(result.stdout).toStartWith("stdout:hello\n\nEnnodia execution notice:");
+    expect(result.stdout).toContain("5000 ms from task launch (caller supplied)");
+    expect(result.stdout).toContain(`Deadline (UTC): ${result.deadlineAt}.`);
+    expect(result.stdout).toContain("Check actual UTC time");
+    expect(result.stdout).toContain("remaining work, and a justified continuation budget");
+    expect(result.stdout).toContain("not automatically inherited");
     expect(result.stderr).toBe("stderr:trace\n");
     expect(result.stdoutChars).toBe(result.stdout.length);
     expect(result.stderrChars).toBe(result.stderr.length);
@@ -91,7 +115,7 @@ describe("TaskManager", () => {
           expect(events).toHaveLength(1);
           expect(events[0].message).toContain("Native inspection remains unverified");
         } else {
-          expect(result.stdout).toBe(prompt);
+          expect(result.stdout).toStartWith(`${prompt}\n\nEnnodia execution notice:`);
           expect(events).toHaveLength(0);
         }
       }
@@ -325,7 +349,7 @@ describe("TaskManager", () => {
       maxEvents: 1,
     });
 
-    expect(bounded?.stdout).toBe("def\n");
+    expect(bounded?.stdout).toBe(manager.get(task.id)!.stdout.slice(-4));
     expect(bounded?.events).toHaveLength(1);
 
     const withoutEvents = manager.get(task.id, {
@@ -506,8 +530,8 @@ describe("TaskManager", () => {
       expect(secondResult.status).toBe("succeeded");
       expect(firstResult.isolatedFrom).toBe(sharedCwd);
       expect(secondResult.isolatedFrom).toBe(sharedCwd);
-      expect(firstResult.stdout).toBe("first");
-      expect(secondResult.stdout).toBe("second");
+      expect(firstResult.stdout).toStartWith("first\n\nEnnodia execution notice:");
+      expect(secondResult.stdout).toStartWith("second\n\nEnnodia execution notice:");
       expect(existsSync(firstResult.cwd)).toBe(false);
       expect(existsSync(secondResult.cwd)).toBe(false);
       expect(readFileSync(join(sharedCwd, "marker.txt"), "utf8")).toBe("original");
@@ -783,7 +807,7 @@ describe("TaskManager", () => {
       const result = await waitForTask(manager, task.id);
 
       expect(result.status).toBe("succeeded");
-      expect(result.stdout).toBe("default cwd");
+      expect(result.stdout).toStartWith("default cwd\n\nEnnodia execution notice:");
       expect(result.isolatedFrom).toBe(process.cwd());
       expect(existsSync(result.cwd)).toBe(false);
     } finally {
@@ -810,6 +834,44 @@ describe("TaskManager", () => {
     expect(manager.get(task.id, { includeOutput: false })?.hasOutput).toBe(true);
     expect(result.stdout).toContain("noisy transcript");
     expect(result.stdout).not.toBe("clean answer");
+  });
+
+  it("records requested model and reasoning effort in the task receipt", async () => {
+    const manager = new TaskManager();
+    const adapter: HarnessAdapter = {
+      ...echoAdapter,
+      id: "codex",
+      name: "Codex fixture",
+      supportsReasoningEffort: true,
+    };
+    const discovery: HarnessDiscovery = { ...echoDiscovery, id: adapter.id, name: adapter.name };
+    const { task } = manager.start(adapter, discovery, {
+      prompt: "hello",
+      model: "gpt-5.6-luna",
+      reasoningEffort: "max",
+      timeoutMs: 5_000,
+    });
+
+    const result = await waitForTask(manager, task.id);
+
+    expect(result.model).toBe("gpt-5.6-luna");
+    expect(result.reasoningEffort).toBe("max");
+  });
+
+  it("does not report a complete usage total from truncated capture", async () => {
+    const manager = new TaskManager();
+    const adapter: HarnessAdapter = {
+      ...usageReportingAdapter,
+      buildCommand: () => ({
+        command: process.execPath,
+        args: ["-e", 'process.stdout.write("x".repeat(210000) + "\\ntokens used\\n42,586\\n")'],
+      }),
+    };
+    const { task } = manager.start(adapter, echoDiscovery, { prompt: "test", timeoutMs: 5000 });
+    const result = await waitForTask(manager, task.id);
+    expect(result.status).toBe("succeeded");
+    expect(result.captureTruncated).toBe(true);
+    expect(result.usage).toBeUndefined();
   });
 
   it("extracts best-effort usage via the adapter's extractUsage hook", async () => {

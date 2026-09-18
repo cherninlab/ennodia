@@ -1,6 +1,6 @@
 import { cpSync, existsSync, lstatSync, mkdtempSync, rmSync } from "node:fs";
 import { readFile } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
 import type {
@@ -10,7 +10,7 @@ import type {
   HarnessRunInput,
   HarnessUsage,
 } from "./harnesses";
-import { withInputGuidance } from "./harnesses";
+import { assertNativeSandboxSupported, assertNativeSubagentsSupported, assertReasoningEffortSupported, DEFAULT_TASK_TIMEOUT_MS, withInputGuidance } from "./harnesses";
 import { preview, tailItems } from "./internal";
 import { signalOwnedProcess } from "./process";
 import {
@@ -31,6 +31,14 @@ export type TaskView = {
   id: string;
   harnessId: string;
   harnessName: string;
+  model?: string;
+  reasoningEffort?: HarnessRunInput["reasoningEffort"];
+  nativeSubagents?: "disabled";
+  nativeSandbox?: "read-only" | "workspace-write";
+  persistSession?: boolean;
+  continueTaskId?: string;
+  continuationTaskId?: string;
+  canContinue?: boolean;
   status: TaskStatus;
   cancelRequested: boolean;
   pid?: number;
@@ -42,6 +50,9 @@ export type TaskView = {
   endedAt?: string;
   elapsedMs: number;
   timeoutMs: number;
+  /** Execution cutoff, not an estimate of task completion. */
+  deadlineAt?: string;
+  timeoutSource?: "caller" | "task-manager-default";
   remainingMs: number | null;
   etaConfidence: "timeout-budget" | "unknown" | "complete";
   lastOutputAt?: string;
@@ -65,6 +76,8 @@ export type TaskView = {
   hasOutput?: boolean;
   /** The preferred answer was truncated during capture or in this view. */
   outputTruncated?: boolean;
+  /** True when preferred answer bytes were lost during stream capture, independent of view limits. */
+  captureTruncated?: boolean;
   /** Best-effort usage metrics parsed from the adapter's own output. */
   usage?: HarnessUsage;
   /** Set when this task ran against an isolated copy of the requested cwd
@@ -105,6 +118,8 @@ type InternalTask = Omit<
   | "eventCount"
   | "finalMessageChars"
 > & {
+  nativeSessionId?: string;
+  extractSessionId?: HarnessAdapter["extractSessionId"];
   streamCaptureTruncated?: boolean;
   createdAtMs: number;
   updatedAtMs: number;
@@ -140,7 +155,6 @@ export type TaskManagerShutdownOptions = {
   deadlineMs?: number;
 };
 
-const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000;
 const DEFAULT_DRAIN_TIMEOUT_MS = 1_000;
 const DEFAULT_SHUTDOWN_DEADLINE_MS = 5_000;
 const DEFAULT_MAX_TASKS = 200;
@@ -182,6 +196,29 @@ export class TaskManager {
       throw new Error(`${adapter.name} is not runnable through Ennodia yet.`);
     }
 
+    if (input.nativeSessionId) throw new Error("Use continueTaskId, not a native session ID.");
+    let previous: InternalTask | undefined;
+    if (input.continueTaskId) {
+      previous = this.tasks.get(input.continueTaskId);
+      if (!previous || previous.status === "running" || !previous.nativeSessionId || !previous.persistSession) {
+        throw new Error("Continuation requires a settled persistent task owned by this TaskManager.");
+      }
+      if (previous.continuationTaskId) throw new Error("Continue the latest task in this session, not an earlier turn.");
+      if (previous.harnessId !== adapter.id) throw new Error("Continuation must use the same harness.");
+      if (input.cwd && resolve(input.cwd) !== resolve(previous.cwd)) throw new Error("Continuation must use the same working directory.");
+      if (input.persistSession === false) throw new Error("Continuation requires session persistence.");
+      input = { ...input, cwd: previous.cwd, model: input.model ?? previous.model,
+        reasoningEffort: input.reasoningEffort ?? previous.reasoningEffort,
+        nativeSubagents: input.nativeSubagents ?? previous.nativeSubagents, persistSession: true };
+    }
+    if (input.persistSession && (!adapter.supportsSessionContinuation || input.isolateCwd)) {
+      throw new Error("Persistent sessions require a supported harness and a persistent working directory.");
+    }
+    assertReasoningEffortSupported(adapter, input.reasoningEffort);
+    assertNativeSubagentsSupported(adapter, input.nativeSubagents);
+    assertNativeSandboxSupported(adapter, input.nativeSandbox);
+    if (adapter.supportsNativeSandbox) input = { ...input, nativeSandbox: input.nativeSandbox ?? "read-only" };
+
     const sourceCwd = input.cwd ?? process.cwd();
     if (!existsSync(sourceCwd)) {
       throw new Error(`Working directory does not exist: ${sourceCwd}`);
@@ -203,11 +240,22 @@ export class TaskManager {
     // as a no-op.
     const finalMessagePath = join(tmpdir(), `ennodia-final-${randomUUID()}.txt`);
 
-    const timeoutMs = input.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    const timeoutMs = input.timeoutMs ?? DEFAULT_TASK_TIMEOUT_MS;
+    const now = Date.now();
+    const deadlineMs = now + timeoutMs;
+    const deadlineAt = new Date(deadlineMs).toISOString();
     const guidedPrompt = withInputGuidance(input.prompt, adapter);
+    const executionPrompt = `${guidedPrompt}
+
+Ennodia execution notice:
+Execution allowance: ${timeoutMs} ms from task launch (${input.timeoutMs === undefined ? "Ennodia default" : "caller supplied"}). Deadline (UTC): ${deadlineAt}. This is a hard cutoff, not a completion estimate or a target duration.
+Check actual UTC time before attributing incomplete work to the deadline. Do not report a cutoff merely because the task is difficult or the answer is getting long. Continue within the remaining allowance unless complete or blocked by a demonstrated access or tool failure.
+Configured native sandbox: ${input.nativeSandbox ?? "harness-managed; check available permissions"}. Report any mismatch between the assignment and available access before attempting the work.
+Before the cutoff, return useful partial findings, verification performed, remaining work, and a justified continuation budget if needed. Only the caller can authorize a follow-up.
+Use only tools and permissions actually available in this session; the caller's tools are not automatically inherited. If access is missing, report the exact tool, file, or permission and its impact. Try a permitted alternative when useful; do not repeat an unchanged failed attempt or claim success without evidence.`;
     const augmentedPrompt = input.skills && input.skills.length > 0
-      ? augmentPrompt(guidedPrompt, input.skills, adapter.id)
-      : guidedPrompt;
+      ? augmentPrompt(executionPrompt, input.skills, adapter.id)
+      : executionPrompt;
     let commandSpec: CommandSpec;
     let cwd: string;
     let child: TaskProcess;
@@ -217,6 +265,7 @@ export class TaskManager {
         cwd: resolvedInputCwd,
         prompt: augmentedPrompt,
         finalMessagePath,
+        nativeSessionId: previous?.nativeSessionId,
       });
       cwd = commandSpec.cwd ?? process.cwd();
 
@@ -241,11 +290,18 @@ export class TaskManager {
       throw error;
     }
 
-    const now = Date.now();
     const task: InternalTask = {
       id: randomUUID(),
       harnessId: adapter.id,
       harnessName: adapter.name,
+      model: input.model,
+      reasoningEffort: input.reasoningEffort,
+      nativeSubagents: input.nativeSubagents,
+      nativeSandbox: input.nativeSandbox,
+      persistSession: input.persistSession,
+      continueTaskId: input.continueTaskId,
+      nativeSessionId: previous?.nativeSessionId,
+      extractSessionId: input.persistSession ? adapter.extractSessionId : undefined,
       status: "running",
       cwd,
       isolatedFrom,
@@ -258,6 +314,8 @@ export class TaskManager {
       createdAtMs: now,
       updatedAtMs: now,
       timeoutMs,
+      timeoutSource: input.timeoutMs === undefined ? "task-manager-default" : "caller",
+      deadlineAt,
       cancelRequested: false,
       drainTimedOut: false,
       timedOut: false,
@@ -278,8 +336,9 @@ export class TaskManager {
     // Publish a task only after the process exists. A synchronous spawn
     // failure must not leave a phantom running task that cannot settle.
     this.tasks.set(task.id, task);
+    if (previous) previous.continuationTaskId = task.id;
     this.pruneTasks(task.id);
-    this.pushEvent(task, { type: "started", message: "Task started." });
+    this.pushEvent(task, { type: "started", message: `Task started. Execution limit: ${timeoutMs}ms (${task.timeoutSource}); deadline: ${task.deadlineAt}. This is not a completion estimate.` });
     if (guidedPrompt !== input.prompt) {
       this.pushEvent(task, {
         type: "input-guidance",
@@ -303,7 +362,7 @@ export class TaskManager {
         message: `Timed out after ${timeoutMs}ms.`,
       });
       this.terminate(task);
-    }, timeoutMs);
+    }, Math.max(0, deadlineMs - Date.now()));
 
     task.settled = this.watchExit(task, child);
     void task.settled;
@@ -518,7 +577,7 @@ export class TaskManager {
   }
 
   private collectUsage(task: InternalTask): void {
-    if (!task.extractUsage) {
+    if (!task.extractUsage || task.streamCaptureTruncated) {
       return;
     }
 
@@ -712,6 +771,14 @@ export class TaskManager {
         }
 
         const chunk = decoder.decode(value, { stream: true });
+        if (streamName === "stdout" && task.extractSessionId && !task.nativeSessionId) {
+          try {
+            task.nativeSessionId = task.extractSessionId(task.stdout + chunk);
+          } catch (error) {
+            task.extractSessionId = undefined;
+            this.pushEvent(task, { type: "error", message: `Session ID extraction failed: ${String(error)}` });
+          }
+        }
         task.streamCaptureTruncated ||= task[streamName].length + chunk.length > MAX_CAPTURE_CHARS;
         task[streamName] = appendLimited(task[streamName], chunk);
         task.lastOutputAtMs = Date.now();
@@ -750,6 +817,14 @@ export class TaskManager {
       id: task.id,
       harnessId: task.harnessId,
       harnessName: task.harnessName,
+      model: task.model,
+      reasoningEffort: task.reasoningEffort,
+      nativeSubagents: task.nativeSubagents,
+      nativeSandbox: task.nativeSandbox,
+      persistSession: task.persistSession,
+      continueTaskId: task.continueTaskId,
+      continuationTaskId: task.continuationTaskId,
+      canContinue: Boolean(!running && task.persistSession && task.nativeSessionId && !task.continuationTaskId),
       status: task.status,
       cancelRequested: task.cancelRequested,
       pid: task.pid,
@@ -761,6 +836,8 @@ export class TaskManager {
       endedAt: task.endedAtMs ? new Date(task.endedAtMs).toISOString() : undefined,
       elapsedMs,
       timeoutMs: task.timeoutMs,
+      timeoutSource: task.timeoutSource,
+      deadlineAt: task.deadlineAt,
       remainingMs,
       etaConfidence: running ? "timeout-budget" : "complete",
       lastOutputAt: task.lastOutputAtMs
@@ -780,6 +857,7 @@ export class TaskManager {
         ? tail(task.finalMessage, maxOutputChars) : undefined,
       finalMessageChars: task.finalMessage?.length ?? 0,
       hasOutput: Boolean(task.finalMessage?.trim() || task.stdout.trim() || task.stderr.trim()),
+      captureTruncated: !task.finalMessage?.trim() && Boolean(task.streamCaptureTruncated),
       outputTruncated: task.finalMessage?.trim()
         ? !includeOutput || task.finalMessage.length > maxOutputChars
         : Boolean(task.streamCaptureTruncated ||

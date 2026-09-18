@@ -42,6 +42,9 @@ export function diagnoseTasks(tasks: TaskView[]): TaskDiagnosis | undefined {
 }
 
 function likelyCause(tasks: TaskView[]): string {
+  if (tasks.every(hasQuotaError)) {
+    return "Provider usage capacity was exhausted. This attempt does not establish solution quality or a cost saving.";
+  }
   if (tasks.every(hasAuthenticationError)) {
     return "Agent authentication failed. This attempt did not establish how the selected model would handle the task.";
   }
@@ -51,17 +54,17 @@ function likelyCause(tasks: TaskView[]): string {
     }
 
     if (tasks.some(outputChars)) {
-      return "Provider timeout after partial progress.";
+      return "Ennodia stopped the task at its execution deadline after capturing output; the value of that output is not yet assessed.";
     }
 
-    return "Provider timeout before useful output; this may be slow startup, a model hang, or provider configuration.";
+    return "Ennodia stopped the task at its execution deadline without captured output. This does not establish whether the model was investigating, blocked, or unable to solve the task.";
   }
 
   if (tasks.some((task) => task.drainTimedOut)) {
     return "Output drain timed out; captured output may be incomplete.";
   }
 
-  if (tasks.some((task) => task.exitCode !== undefined && task.exitCode !== 0)) {
+  if (tasks.some((task) => !task.timedOut && !task.cancelRequested && task.exitCode !== undefined && task.exitCode !== null && task.exitCode !== 0)) {
     return "Provider command error or bad configuration.";
   }
 
@@ -78,21 +81,25 @@ function suggestions(
 ): string[] {
   const result = new Set<string>();
 
+  if (tasks.some(hasQuotaError)) {
+    result.add("Preserve partial findings. Check capacity through the provider's supported interface before retrying; do not repeat calls against the exhausted account.");
+  }
+
   if (tasks.some(hasAuthenticationError)) {
     result.add("Sign in through the affected agent's supported CLI, then retry the same task.");
   }
 
   if (tasks.some((task) => task.timedOut)) {
-    result.add("Inspect the attempt before retrying. Narrow the task, adjust its execution settings, or allow more time if justified.");
+    result.add("Review captured findings and partial changes before retrying. Check the assigned scope, deadline, tool access, and permissions; continue useful work with an adequate budget instead of repeating the investigation.");
   }
 
   if (hasPartialOutput) {
     result.add("Inspect partial output and events with ennodia_get_task.");
   }
 
-  if (tasks.some((task) => task.exitCode !== undefined && task.exitCode !== 0)) {
+  if (tasks.some((task) => !task.timedOut && !task.cancelRequested && task.exitCode !== undefined && task.exitCode !== null && task.exitCode !== 0)) {
     result.add("Inspect stderr and task events with ennodia_get_task.");
-    if (!tasks.every(hasAuthenticationError)) {
+    if (!tasks.every(task => hasAuthenticationError(task) || hasQuotaError(task))) {
       result.add("Check the requested model and command configuration before retrying.");
     }
   }
@@ -106,6 +113,22 @@ function suggestions(
   }
 
   return [...result];
+}
+
+/** Only native error envelopes count; quoted tool output is not a quota signal. */
+export function hasCodexQuotaError(stdout: string): boolean {
+  for (const line of stdout.split("\n")) {
+    let event;
+    try { event = JSON.parse(line); } catch { continue; }
+    const message = event?.type === "error" ? event.message
+      : event?.type === "turn.failed" ? event.error?.message : undefined;
+    if (typeof message === "string" && /^You've hit your usage limit\b/i.test(message)) return true;
+  }
+  return false;
+}
+
+function hasQuotaError(task: TaskView): boolean {
+  return task.harnessId === "codex" && (hasCodexQuotaError(task.stdout) || hasCodexQuotaError(task.stderr));
 }
 
 function hasAuthenticationError(task: TaskView): boolean {

@@ -19,6 +19,34 @@ Your agent will identify any client restart or reload needed to make the new too
 After setup, [try your first useful result](#your-first-useful-result).
 For manual setup, follow the instructions below.
 
+## Your first useful result
+
+After installation, give your primary agent a small request:
+
+```text
+Use Ennodia MCP to get one additional opinion on this function.
+Choose an available agent. Keep the review read-only.
+Return one concrete issue or explain that no issue was established.
+Bring the findings back to this conversation.
+```
+
+Start with one worker and a small set of files.
+Discovery checks installed commands, not authentication, model access, or provider quota.
+A live task establishes which configuration works in your environment.
+
+Your agent can call `ennodia_list_harnesses`, then `ennodia_run` with a selected `harnessId`, `mode: "single"`, and `compare: false`.
+Poll `ennodia_get_run` with the returned run identifier (ID).
+Stop when the status is `succeeded`, `failed`, or `cancelled`.
+
+Inspect the result before starting more work.
+Use the [recipes](/docs/guides/recipes/) for a stuck task, a skill trial, or conflicting answers.
+See [Understand Results](/docs/guides/understand-results/) when the attempt is incomplete or unhelpful.
+
+Expect live runs to take time. A timeout budget is not a completion prediction.
+Compare adds a Judge pass and a Result Advisor pass after child agents finish.
+
+For a local development checkout, run `bun run verify` before relying on changes.
+
 ## Manual Setup
 
 ### Requirements
@@ -86,34 +114,6 @@ Replace `/absolute/path/to/ennodia` with your local repository path.
 Use your client's supported configuration method.
 Preserve existing server entries.
 Reload the tools or restart the client if its setup instructions require this step.
-
-## Your first useful result
-
-After installation, give your primary agent a small request:
-
-```text
-Use Ennodia MCP to get one additional opinion on this function.
-Choose an available agent. Keep the review read-only.
-Return one concrete issue or explain that no issue was established.
-Bring the findings back to this conversation.
-```
-
-Start with one worker and a small set of files.
-Discovery checks installed commands, not authentication, model access, or provider quota.
-A live task establishes which configuration works in your environment.
-
-Your agent can call `ennodia_list_harnesses`, then `ennodia_run` with a selected `harnessId`, `mode: "single"`, and `compare: false`.
-Poll `ennodia_get_run` with the returned run identifier (ID).
-Stop when the status is `succeeded`, `failed`, or `cancelled`.
-
-Inspect the result before starting more work.
-Use the [recipes](/docs/guides/recipes/) for a stuck task, a skill trial, or conflicting answers.
-See [Understand Results](/docs/guides/understand-results/) when the attempt is incomplete or unhelpful.
-
-Expect live runs to take time. A timeout budget is not a completion prediction.
-Compare adds a Judge pass and a Result Advisor pass after child agents finish.
-
-For a local development checkout, run `bun run verify` before relying on changes.
 
 ## Optional Team Advice
 

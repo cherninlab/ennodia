@@ -811,6 +811,8 @@ function candidateFromTask(task: TaskView): CompareCandidate {
       exitCode: task.exitCode,
       timedOut: task.timedOut,
       drainTimedOut: task.drainTimedOut,
+      outputTruncated: task.outputTruncated,
+      captureTruncated: task.captureTruncated,
     },
   };
 }
@@ -841,6 +843,9 @@ function candidateEnvelope(candidates: CompareCandidate[]) {
       source_id: candidate.id,
       label: candidate.label ?? candidate.id,
       content: truncate(candidate.content, MAX_PROMPT_CANDIDATE_CHARS),
+      metadata: candidate.content.length > MAX_PROMPT_CANDIDATE_CHARS
+        ? { ...candidate.metadata, outputTruncated: true }
+        : candidate.metadata,
     })),
   };
 }

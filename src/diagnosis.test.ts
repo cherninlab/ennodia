@@ -1,8 +1,21 @@
 import { describe, expect, it } from "bun:test";
-import { diagnoseTasks } from "./diagnosis";
+import { diagnoseTasks, hasCodexQuotaError } from "./diagnosis";
 import type { TaskView } from "./tasks";
 
 describe("diagnoseTasks", () => {
+  it("distinguishes native capacity errors from model and configuration failures", () => {
+    const message = "You've hit your usage limit. Try again later.";
+    for (const event of [{type: "error", message}, {type: "turn.failed", error: {message}}]) {
+      const stdout = JSON.stringify(event);
+      expect(hasCodexQuotaError(stdout)).toBe(true);
+      const diagnosis = diagnoseTasks([taskView({harnessId: "codex", stdout})]);
+      expect(diagnosis?.likelyCause).toContain("capacity was exhausted");
+      expect(diagnosis?.suggestions.join(" ")).not.toContain("Check the requested model");
+    }
+    expect(hasCodexQuotaError(JSON.stringify({type: "item.completed", item: {type: "command_execution", aggregated_output: message}}))).toBe(false);
+    expect(hasCodexQuotaError(message)).toBe(false);
+    expect(diagnoseTasks([taskView({harnessId: "codex", stderr: JSON.stringify({type:"error", message})})])?.likelyCause).toContain("capacity was exhausted");
+  });
   it("diagnoses timed-out tasks with no output", () => {
     const diagnosis = diagnoseTasks([
       taskView({
@@ -13,10 +26,16 @@ describe("diagnoseTasks", () => {
     ]);
 
     expect(diagnosis?.summary).toContain("OpenCode timed out");
-    expect(diagnosis?.likelyCause).toContain("Provider timeout");
+    expect(diagnosis?.likelyCause).toContain("Ennodia stopped the task at its execution deadline");
     expect(diagnosis?.suggestions).toContain(
-      "Inspect the attempt before retrying. Narrow the task, adjust its execution settings, or allow more time if justified.",
+      "Review captured findings and partial changes before retrying. Check the assigned scope, deadline, tool access, and permissions; continue useful work with an adequate budget instead of repeating the investigation.",
     );
+  });
+
+  it("does not diagnose deadline termination as a bad command configuration", () => {
+    const diagnosis = diagnoseTasks([taskView({ timedOut: true, exitCode: 143 })]);
+    expect(diagnosis?.suggestions.join(" ")).not.toContain("Check the requested model and command configuration");
+    expect(diagnosis?.likelyCause).not.toContain("Provider command error");
   });
 
   it("includes partial output previews for timed-out tasks with output", () => {

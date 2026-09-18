@@ -2,9 +2,67 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { describe, expect, it } from "bun:test";
 import { ENNODIA_VERSION } from "./version";
+import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { createEnnodiaServer } from "./server";
+import type { EnnodiaCore } from "./core";
 
 describe("MCP server tool surface", () => {
-  it("exposes Pragmatic contracts and rejects invalid selection through MCP", async () => {
+  it("routes bounded waits through Core and preserves immediate reads", async () => {
+    const calls: unknown[] = [];
+    const core = {
+      getRun: (id: string) => ({id, status: "executing"}),
+      waitForRun: async (...args: unknown[]) => {
+        calls.push(args);
+        return {id: args[0], status: "succeeded", finalAnswer: "verified worker evidence"};
+      },
+    } as unknown as EnnodiaCore;
+    const server = createEnnodiaServer(core);
+    const client = new Client({name: "wait-test", version: "1"});
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+    try {
+      const immediate = await client.callTool({name: "ennodia_get_run", arguments: {runId: "run"}});
+      expect(JSON.parse(resultText(immediate)).status).toBe("executing");
+      expect(calls).toHaveLength(0);
+      const waited = await client.callTool({name: "ennodia_get_run", arguments: {runId: "run", waitMs: 30000, includeEvents: false}});
+      expect(JSON.parse(resultText(waited)).finalAnswer).toBe("verified worker evidence");
+      expect(calls).toEqual([["run", 30000, {includeEvents: false, maxEvents: 100, maxAnswerChars: 80000}]]);
+      const longer = await client.callTool({name: "ennodia_get_run", arguments: {runId: "run", waitMs: 300000}});
+      expect(JSON.parse(resultText(longer)).finalAnswer).toBe("verified worker evidence");
+      expect(calls[1]).toEqual(["run", 300000, {includeEvents: true, maxEvents: 100, maxAnswerChars: 80000}]);
+      const invalid = await client.callTool({name: "ennodia_get_run", arguments: {runId: "run", waitMs: 300001}});
+      expect(invalid.isError).toBe(true);
+      expect(calls).toHaveLength(2);
+    } finally {
+      await client.close();
+      await server.close();
+    }
+  });
+
+  it("compact polling keeps answers and failure evidence without repeated setup metadata", async () => {
+    const receipt = { id: "run", status: "failed", taskIds: ["worker"], remainingMs: 0,
+      finalAnswer: "partial evidence", finalAnswerChars: 16, error: "deadline interrupted",
+      diagnosis: {summary: "worker cutoff"}, events: [], plan: {selected: "codex"},
+      budget: {estimate: "repeated setup"}, promptPreview: "request", appliedSkills: [] };
+    const core = {getRun: () => receipt} as unknown as EnnodiaCore;
+    const server = createEnnodiaServer(core);
+    const client = new Client({name: "compact-test", version: "1"});
+    const [ct, st] = InMemoryTransport.createLinkedPair();
+    await server.connect(st); await client.connect(ct);
+    try {
+      const full = JSON.parse(resultText(await client.callTool({name: "ennodia_get_run", arguments: {runId: "run"}})));
+      expect(full).toEqual(receipt);
+      const compact = JSON.parse(resultText(await client.callTool({name: "ennodia_get_run", arguments: {runId: "run", compact: true}})));
+      expect(compact.plan).toBeUndefined(); expect(compact.budget).toBeUndefined();
+      expect(compact.promptPreview).toBeUndefined(); expect(compact.appliedSkills).toBeUndefined();
+      for (const key of ["status", "taskIds", "remainingMs", "finalAnswer", "finalAnswerChars", "error", "diagnosis", "events"]) {
+        expect(compact[key]).toEqual(full[key]);
+      }
+    } finally { await client.close(); await server.close(); }
+  });
+
+  it("exposes Pragmatic contracts and rejects empty criteria through MCP", async () => {
     await withClient(async (client) => {
       const listed = await client.listTools();
       for (const name of ["ennodia_run", "ennodia_estimate_budget"]) {
@@ -12,10 +70,10 @@ describe("MCP server tool surface", () => {
         expect(properties.pragmatic).toBeDefined();
         expect(properties.model).toBeDefined();
         const result = await client.callTool({ name, arguments: {
-          prompt: "test", pragmatic: { recipe: "patch", acceptanceCriteria: "Return diff" },
+          prompt: "test", pragmatic: { recipe: "patch", acceptanceCriteria: " " },
         } });
         expect(result.isError).toBe(true);
-        expect(resultText(result)).toContain("explicit harnessId and model");
+        expect(resultText(result)).toContain("acceptanceCriteria");
       }
     });
   });
@@ -52,6 +110,27 @@ describe("MCP server tool surface", () => {
         expect(tool).toBeDefined();
         expect(inputProperties(tool).budget).toBeDefined();
       }
+    });
+  });
+
+  it("exposes reasoning effort only on raw and high-level worker tools", async () => {
+    await withClient(async (client) => {
+      const tools = await client.listTools();
+      const startEffort = inputProperties(tools.tools.find((tool) => tool.name === "ennodia_start")).reasoningEffort;
+      const runEffort = inputProperties(tools.tools.find((tool) => tool.name === "ennodia_run")).reasoningEffort;
+
+      expect(startEffort).toMatchObject({
+        type: "string",
+        enum: expect.arrayContaining(["low", "max"]),
+      });
+      expect(runEffort).toMatchObject({
+        type: "string",
+        enum: expect.arrayContaining(["low", "max"]),
+      });
+      expect(inputProperties(tools.tools.find((tool) => tool.name === "ennodia_start_compositional")).reasoningEffort)
+        .toBeUndefined();
+      expect(inputProperties(tools.tools.find((tool) => tool.name === "ennodia_start_plan_advice")).reasoningEffort)
+        .toBeUndefined();
     });
   });
 

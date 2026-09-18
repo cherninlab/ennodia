@@ -37,8 +37,10 @@ import {
 import {
   discoverHarnesses as defaultDiscoverHarnesses,
   findHarnessAdapter as defaultFindHarnessAdapter,
+  assertNativeSandboxSupported, assertNativeSubagentsSupported, assertReasoningEffortSupported,
   type HarnessAdapter,
   type HarnessDiscovery,
+  type ReasoningEffort,
 } from "./harnesses";
 import {
   createDefaultHistorySink,
@@ -136,6 +138,9 @@ export type TaskBatchStartInput = {
   cwd?: string;
   isolateCwd?: boolean;
   model?: string;
+  reasoningEffort?: ReasoningEffort;
+  nativeSubagents?: "disabled";
+  nativeSandbox?: "read-only" | "workspace-write";
   timeoutMs?: number;
   refresh?: boolean;
   skillIds?: string[];
@@ -154,6 +159,7 @@ export type TaskBatchStart = {
 
 export type CompositionalEstimateInput = {
   prompt: string;
+  pragmatic?: PragmaticOptions;
   slices: CompositionalSliceInput[];
   cwd?: string;
   isolateCwd?: boolean;
@@ -602,6 +608,14 @@ export class EnnodiaCore {
     }
 
     this.assertHarnessesRunnable(selectedHarnessIds, harnesses);
+    for (const harnessId of selectedHarnessIds) {
+      const adapter = this.findHarnessAdapter(harnessId);
+      if (adapter) {
+        assertReasoningEffortSupported(adapter, input.reasoningEffort);
+        assertNativeSubagentsSupported(adapter, input.nativeSubagents);
+        assertNativeSandboxSupported(adapter, input.nativeSandbox);
+      }
+    }
     const budget = checkBudgetLimits(
       estimateRunBudget({
         prompt: input.prompt,
@@ -627,6 +641,9 @@ export class EnnodiaCore {
           cwd: input.cwd,
           isolateCwd: input.isolateCwd,
           model: input.model,
+          reasoningEffort: input.reasoningEffort,
+          nativeSubagents: input.nativeSubagents,
+          nativeSandbox: input.nativeSandbox,
           timeoutMs: input.timeoutMs,
           skills,
         }).task);
@@ -734,6 +751,10 @@ export class EnnodiaCore {
   }
 
   async startRun(input: RunStartWithSkillIdsInput): Promise<RunView> {
+    if (input.continueTaskId && !input.cwd) {
+      const previous = this.taskManager.get(input.continueTaskId, { includeOutput: false, includeEvents: false });
+      if (previous) input = { ...input, cwd: previous.cwd };
+    }
     const { skillIds, ...runInput } = input;
     const skills = runInput.skills ??
       (skillIds?.length
@@ -1000,6 +1021,9 @@ export class EnnodiaCore {
       this.planRoute,
       input.skillIds,
     );
+    for (const slice of resolvedSlices) {
+      slice.prompt = preparePragmaticRun({ prompt: slice.prompt, pragmatic: input.pragmatic }).prompt;
+    }
     const selectedHarnessIds = resolvedSlices.map((slice) => slice.harnessId);
     this.assertHarnessesRunnable(selectedHarnessIds, harnesses);
     const requestedSkillIds = [

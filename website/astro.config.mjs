@@ -83,6 +83,7 @@ export default defineConfig({
         },
         {
           label: "Concepts",
+          collapsed: true,
           items: [
             { label: "How Ennodia Works", slug: "docs/concepts/how-ennodia-works" },
             { label: "Interfaces and Core", slug: "docs/concepts/interfaces-and-core" },
@@ -93,6 +94,7 @@ export default defineConfig({
         },
         {
           label: "Reference",
+          collapsed: true,
           items: [
             { label: "MCP Tools", slug: "docs/reference/mcp-tools" },
             { label: "Supported Harnesses", slug: "docs/reference/supported-harnesses" },
@@ -103,6 +105,7 @@ export default defineConfig({
         },
         {
           label: "Comparisons",
+          collapsed: true,
           items: [
             { label: "Overview", slug: "docs/comparisons" },
             { label: "Ennodia vs OpenRouter", slug: "docs/comparisons/openrouter" },

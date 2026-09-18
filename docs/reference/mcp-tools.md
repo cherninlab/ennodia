@@ -51,6 +51,10 @@ tokens, cache behavior, harness-internal context, or private subscription quota.
 
 ### Routing hints
 
+Development versions of `ennodia_run` and `ennodia_start` accept optional `reasoningEffort` for Codex workers, forwarded through the native `model_reasoning_effort` configuration. Other adapters reject an explicit setting. Omission preserves native defaults. This field does not configure comparison agents.
+
+Task and run views record the requested value. Model and CLI support remain authoritative.
+
 Ennodia uses `category` before keyword classification. Valid categories are
 `code`, `research`, `browser`, `image`, and `general`. The fallback classifier
 uses strong browser, image, code, and research signals. Bare words such as
@@ -375,12 +379,13 @@ Poll it with
 
 ### `ennodia_get_run`
 
-Returns the current run state.
+Returns the current run state. Set `waitMs` to wait for completion without repeated immediate polls. A wait timeout leaves the run running.
 
 | Input | Default | Meaning |
 | --- | --- | --- |
 | `runId` | required | ID returned by `ennodia_run`. |
-| `includeEvents` | `true` | Include run event history. |
+| `waitMs` | `0` | Wait up to 300000 milliseconds for a terminal state. Does not cancel or extend the run. Longer waits require a client tool timeout greater than this value. |
+| `includeEvents` | `true` | Include run event history. Set false for compact waiting responses. |
 | `maxEvents` | `100` | Maximum run events to return. Capped at 300. |
 | `maxAnswerChars` | `80000` | Maximum final-answer characters. Capped at 200000. |
 
@@ -604,9 +609,108 @@ server process.
 
 ## Pragmatic run settings
 
-`ennodia_run` and `ennodia_estimate_budget` accept optional `pragmatic: {recipe, acceptanceCriteria}` and require explicit `harnessId` and `model` with it.
+In version 0.3.0, `ennodia_run`, `ennodia_estimate_budget`, `ennodia_start_compositional` and `ennodia_estimate_compositional_budget` accept optional `pragmatic: {recipe, acceptanceCriteria}`. Model and harness overrides remain optional.
 Recipes are `investigate` and `patch`. Both instruct workers to avoid file changes.
-Pragmatic runs use one worker without automatic comparison or retries. Native harness permissions still apply.
+
+Pragmatic preserves routing and comparison choices for one or more independent workers. Plan Advisor can propose tailored model and skill assignments. Retries are not automatic. Native harness permissions still apply.
 
 Run views include the requested `model` and `pragmatic` settings.
 See [Pragmatic mode](/docs/guides/pragmatic-mode/) for examples, evidence retrieval, and measurement limits.
+
+### Execution deadlines
+
+Task receipts include `deadlineAt` and `timeoutSource` (`caller` or
+`task-manager-default`). The deadline is the process cutoff, not a prediction
+of completion. Every child prompt receives its execution allowance and source.
+It asks for useful partial findings before the cutoff and reports of
+missing tools or permissions. Caller tools are not
+automatically inherited. This notice does not grant access or extend deadlines.
+
+A timed-out task is an interrupted attempt. Review its captured
+output, events, partial changes, scope, and access before deciding how to proceed.
+A timeout does not establish model inability.
+
+Opt-in Codex continuation is described below.
+
+Cancellation is visible immediately. In version 0.3.0, the history snapshot
+is saved after child processes finish and their output drains. Use a bounded
+`ennodia_get_run.waitMs` call when you need to wait for the saved evidence.
+The wait limit does not stop the child process or extend its execution limit.
+
+### Persistent Codex workers
+
+Set `persistSession: true` on `ennodia_run` to retain a native Codex session.
+Use an explicit `harnessId: "codex"` and a persistent working directory.
+Persistence cannot be combined with `isolateCwd`, parallel mode, or comparison.
+The Codex adapter defaults to its read-only sandbox on each turn.
+
+After the worker settles, inspect its task receipt. If `canContinue` is true,
+pass that task ID as `continueTaskId` in the next run. The follow-up keeps the
+harness and directory. It inherits the model and reasoning effort unless you
+supply new values. Each follow-up has a new task ID and execution allowance.
+An earlier turn cannot be used once a follow-up has started.
+
+Continuation requires a task still held by the same running Ennodia server.
+It does not import arbitrary native session IDs or restore ownership after
+a server restart. Native session files remain under the harness's retention
+policy. Ordinary runs remain ephemeral.
+
+Preflight input estimates exclude the retained native context. Use each
+turn's reported usage to assess cost. Persistence does not prove a cache hit
+or a cost saving. An interrupted session may fail to resume, so preserve its
+partial findings and files as evidence too.
+
+### Compact status reads
+
+Set `compact: true` on `ennodia_get_run` to omit the routing plan, budget
+explanation, prompt preview, and skill metadata from repeated status reads.
+Status, timing, task IDs, answers, errors, and diagnoses remain available.
+The existing answer and event limits still apply. Use `compact: false` for
+the full receipt. The default remains false.
+
+For pending runs, use `waitMs: 30000`, `compact: true`, and
+`includeEvents: false` when the installed schema supports these options.
+A compact response is not a summary of the worker's findings. Inspect the
+answer and any partial task evidence before drawing conclusions.
+
+### Native subagent controls
+
+`ennodia_run` and `ennodia_start` accept `nativeSubagents: "disabled"` for Codex
+workers. Codex receives native feature flags disabling its built-in subagent
+tools. Task receipts record the setting, and persistent follow-ups inherit it.
+Other harnesses reject this setting before workers start. Omitting it preserves
+native defaults. Judge and Advisor tasks do not receive this worker setting.
+
+This controls built-in delegation tools. It does not prevent a shell command
+from starting another program, grant file permissions, or account for nested
+agent usage. Do not infer a complete cost total from a parent-only receipt.
+
+
+### Native worker permissions
+
+Set `nativeSandbox: "workspace-write"` on a normal Codex worker run only
+when its assignment permits edits. Use `nativeSandbox: "read-only"` for
+investigation. Omission defaults to read-only on every turn, including
+continuations of write-enabled sessions. Write access is not inherited.
+
+The setting uses the supported Codex sandbox option. Native configuration
+still defines sandbox behavior and writable locations. This option does
+not grant caller tools, deployment access, or permission bypasses.
+Other adapters reject explicit sandbox settings. Pragmatic recipes reject
+workspace-write. Judge and Advisor tasks keep their existing defaults.
+
+Task receipts record the selected sandbox. Run receipts record the requested
+setting.
+
+### Evidence and operation limits in version 0.3.0
+
+Compositional status separates lost stream capture (`captureTruncated`) from shortened output previews (`outputTruncated`).
+Lost captures are listed in `truncatedTaskIds` and excluded from ready task IDs.
+A compact preview can omit a complete retained answer without making the task unready.
+Compare metadata identifies truncated evidence, including its prompt limit.
+Preserve full patch artifacts and verify them before application.
+
+`maxChildTasks` limits workers selected by the current operation.
+A later Compare call and its Judge and Result Advisor have separate limits.
+`includeCompareEstimate` includes an estimate, not a reserved spending balance.
+Count these stages, retries and verification when reporting whole-task cost.

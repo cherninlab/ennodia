@@ -109,6 +109,9 @@ export type CompositionalTaskSnapshot = {
   etaConfidence: TaskView["etaConfidence"];
   stdoutChars: number;
   stderrChars: number;
+  outputTruncated?: boolean;
+  captureTruncated?: boolean;
+  finalMessageChars?: number;
   stdout?: string;
   stderr?: string;
 };
@@ -121,6 +124,7 @@ export type CompositionalStatusView = {
   failedTaskIds: string[];
   cancelledTaskIds: string[];
   emptySucceededTaskIds: string[];
+  truncatedTaskIds: string[];
   compareReady: boolean;
   counts: {
     requested: number;
@@ -130,6 +134,7 @@ export type CompositionalStatusView = {
     failed: number;
     cancelled: number;
     emptySucceeded: number;
+    truncated: number;
     missing: number;
   };
   tasks: CompositionalTaskSnapshot[];
@@ -139,6 +144,7 @@ export type CompositionalStatusView = {
 export function assertUniqueSliceIds(
   slices: CompositionalSliceInput[],
 ): void {
+  if (slices.length === 0) throw new Error("At least one compositional slice is required.");
   const seen = new Set<string>();
 
   for (const slice of slices) {
@@ -249,7 +255,7 @@ export function summarizeCompositionalTasks(input: {
     !knownIds.has(taskId)
   );
   const readyTaskIds = tasks
-    .filter((task) => task.status === "succeeded" && hasTaskEvidence(task))
+    .filter((task) => task.status === "succeeded" && !task.captureTruncated && hasTaskEvidence(task))
     .map((task) => task.id);
   const runningTaskIds = tasks
     .filter((task) => task.status === "running")
@@ -263,6 +269,7 @@ export function summarizeCompositionalTasks(input: {
   const emptySucceededTaskIds = tasks
     .filter((task) => task.status === "succeeded" && !hasTaskEvidence(task))
     .map((task) => task.id);
+  const truncatedTaskIds = tasks.filter(task => task.captureTruncated).map(task => task.id);
   const compareReady = readyTaskIds.length >=
     (input.minSuccessfulTasksForCompare ?? 2);
 
@@ -274,6 +281,7 @@ export function summarizeCompositionalTasks(input: {
     failedTaskIds,
     cancelledTaskIds,
     emptySucceededTaskIds,
+    truncatedTaskIds,
     compareReady,
     counts: {
       requested: input.requestedTaskIds.length,
@@ -283,6 +291,7 @@ export function summarizeCompositionalTasks(input: {
       failed: failedTaskIds.length,
       cancelled: cancelledTaskIds.length,
       emptySucceeded: emptySucceededTaskIds.length,
+      truncated: truncatedTaskIds.length,
       missing: missingTaskIds.length,
     },
     tasks: tasks.map((task) => ({
@@ -295,6 +304,9 @@ export function summarizeCompositionalTasks(input: {
       etaConfidence: task.etaConfidence,
       stdoutChars: task.stdoutChars,
       stderrChars: task.stderrChars,
+      outputTruncated: task.outputTruncated,
+      captureTruncated: task.captureTruncated,
+      finalMessageChars: task.finalMessageChars,
       stdout: input.includeOutput ? task.stdout : undefined,
       stderr: input.includeOutput ? task.stderr : undefined,
     })),

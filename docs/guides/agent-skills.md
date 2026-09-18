@@ -96,5 +96,5 @@ exact tool parameters.
 ## Main-agent delegation skill
 
 The bundled `pragmatic` skill guides the main agent through bounded delegation and result verification.
-Install it using `skillIds: ["pragmatic"]`. Do not pass it to workers through run `skillIds`.
+Install it using `skillIds: ["pragmatic"]`. A delegated coordinator can use it when orchestration is part of its assignment.
 See [Pragmatic mode](/docs/guides/pragmatic-mode/) for the experimental recipes.

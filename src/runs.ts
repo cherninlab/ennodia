@@ -12,7 +12,9 @@ import type {
   DiscoverHarnessesOptions,
   HarnessAdapter,
   HarnessDiscovery,
+  ReasoningEffort,
 } from "./harnesses";
+import { assertNativeSandboxSupported, assertNativeSubagentsSupported, assertReasoningEffortSupported } from "./harnesses";
 import {
   noopHistorySink,
   type HistorySink,
@@ -66,6 +68,8 @@ export type RunEvent = {
 };
 
 export type RunStartInput = {
+  persistSession?: boolean;
+  continueTaskId?: string;
   pragmatic?: PragmaticOptions;
   prompt: string;
   category?: RouteCategory;
@@ -75,6 +79,9 @@ export type RunStartInput = {
   cwd?: string;
   isolateCwd?: boolean;
   model?: string;
+  reasoningEffort?: ReasoningEffort;
+  nativeSubagents?: "disabled";
+  nativeSandbox?: "read-only" | "workspace-write";
   timeoutMs?: number;
   refresh?: boolean;
   judgeHarnessId?: string;
@@ -97,6 +104,9 @@ export type RunView = {
   compareMode: RunCompareMode;
   pragmatic?: PragmaticOptions;
   model?: string;
+  reasoningEffort?: ReasoningEffort;
+  nativeSubagents?: "disabled";
+  nativeSandbox?: "read-only" | "workspace-write";
   promptPreview: string;
   createdAt: string;
   updatedAt: string;
@@ -171,6 +181,9 @@ type InternalRun = {
   compareMode: RunCompareMode;
   pragmatic?: PragmaticOptions;
   model?: string;
+  reasoningEffort?: ReasoningEffort;
+  nativeSubagents?: "disabled";
+  nativeSandbox?: "read-only" | "workspace-write";
   prompt: string;
   plan: RoutePlan;
   harnessOverridden: boolean;
@@ -226,7 +239,12 @@ export class RunManager {
       throw new Error("RunManager is shutting down.");
     }
 
+    if ((input.persistSession || input.continueTaskId) && (!input.harnessId || input.mode === "parallel" || input.compare === true)) {
+      throw new Error("Persistent runs require an explicit harness and one worker without comparison.");
+    }
+    if (input.persistSession || input.continueTaskId) input = { ...input, mode: "single", compare: false };
     input = preparePragmaticRun(input);
+    if (input.pragmatic && input.nativeSandbox === "workspace-write") throw new Error("Pragmatic recipes do not permit nativeSandbox workspace-write. Use a normal run for authorized edits.");
     validateRunAdvisorAliases(input);
 
     const harnesses = await this.dependencies.discoverHarnesses({
@@ -241,6 +259,15 @@ export class RunManager {
 
     if (selectedHarnessIds.length === 0) {
       throw new Error("No runnable harnesses were found.");
+    }
+
+    for (const harnessId of selectedHarnessIds) {
+      const adapter = this.dependencies.findHarnessAdapter(harnessId);
+      if (adapter) {
+        assertReasoningEffortSupported(adapter, input.reasoningEffort);
+        assertNativeSubagentsSupported(adapter, input.nativeSubagents);
+        assertNativeSandboxSupported(adapter, input.nativeSandbox);
+      }
     }
 
     if (input.skills && input.skills.length > 0) {
@@ -273,6 +300,9 @@ export class RunManager {
       compareMode,
       pragmatic: input.pragmatic,
       model: input.model,
+      reasoningEffort: input.reasoningEffort,
+      nativeSubagents: input.nativeSubagents,
+      nativeSandbox: input.nativeSandbox,
       prompt: input.prompt,
       plan,
       harnessOverridden: Boolean(input.harnessId),
@@ -349,12 +379,15 @@ export class RunManager {
       return undefined;
     }
 
+    const deadline = timeoutMs === undefined ? undefined : Date.now() + timeoutMs;
+    const remaining = () => deadline === undefined ? undefined : Math.max(0, deadline - Date.now());
+
     if (!isTerminalRun(run) && run.settled) {
-      await settleWithDeadline(run.settled, timeoutMs);
+      await settleWithDeadline(run.settled, remaining());
     }
 
     if (run.historyRecorded) {
-      await settleWithDeadline(run.historyRecorded, timeoutMs);
+      await settleWithDeadline(run.historyRecorded, remaining());
     }
 
     return this.toView(run, options);
@@ -395,9 +428,14 @@ export class RunManager {
     try {
       const started = this.dependencies.taskManager.start(adapter, discovery, {
         prompt: input.prompt,
+        persistSession: input.persistSession,
+        continueTaskId: input.continueTaskId,
         cwd: input.cwd,
         isolateCwd: input.isolateCwd,
         model: input.model,
+        reasoningEffort: input.reasoningEffort,
+        nativeSubagents: input.nativeSubagents,
+        nativeSandbox: input.nativeSandbox,
         timeoutMs: input.timeoutMs,
         skills: input.skills,
       }).task;
@@ -602,6 +640,9 @@ export class RunManager {
       compareMode: run.compareMode,
       pragmatic: run.pragmatic,
       model: run.model,
+      reasoningEffort: run.reasoningEffort,
+      nativeSubagents: run.nativeSubagents,
+      nativeSandbox: run.nativeSandbox,
       promptPreview: preview(run.prompt),
       createdAt: new Date(run.createdAtMs).toISOString(),
       updatedAt: new Date(run.updatedAtMs).toISOString(),
@@ -712,8 +753,6 @@ export class RunManager {
     run.status = "cancelled";
     run.endedAtMs = Date.now();
     this.pushEvent(run, { type: "cancelled", message });
-    this.recordHistory(run);
-    this.pruneRuns(run.id);
 
     for (const taskId of run.taskIds) {
       const task = this.dependencies.taskManager.get(taskId, {
@@ -728,6 +767,8 @@ export class RunManager {
     if (run.compareId) {
       this.dependencies.compareManager.cancel(run.compareId);
     }
+    this.recordHistory(run, true);
+    this.pruneRuns(run.id);
   }
 
   private succeedRun(run: InternalRun, finalAnswer: string): void {
@@ -759,7 +800,25 @@ export class RunManager {
     this.pruneRuns(run.id);
   }
 
-  private recordHistory(run: InternalRun): void {
+  private recordHistory(run: InternalRun, settleChildren = false): void {
+    if (settleChildren) {
+      const compare = run.compareId ? this.dependencies.compareManager.get(run.compareId) : undefined;
+      const ids = [...new Set([...run.taskIds, ...(compare ? compareTaskIds(compare) : [])])]
+        .filter(id => this.dependencies.taskManager.get(id, { includeOutput: false, includeEvents: false }));
+      // Cancellation is visible immediately, but its durable evidence must
+      // include output drained during termination. Retain it until capture.
+      for (const id of ids) this.dependencies.taskManager.retain(id);
+      run.historyRecorded = Promise.all(ids.map(id =>
+        this.dependencies.taskManager.waitForTerminal(id)
+      )).then(() => this.captureHistory(run)).catch(() => undefined).finally(() => {
+        for (const id of ids) this.dependencies.taskManager.release(id);
+      });
+      return;
+    }
+    run.historyRecorded = this.captureHistory(run).catch(() => undefined);
+  }
+
+  private async captureHistory(run: InternalRun): Promise<void> {
     const tasks = run.taskIds
       .map((taskId) =>
         this.dependencies.taskManager.get(taskId, {
@@ -778,8 +837,7 @@ export class RunManager {
         })
       : undefined;
 
-    run.historyRecorded = Promise.resolve(
-      this.historySink.recordRun({
+    await this.historySink.recordRun({
         version: 1,
         kind: "run",
         recordedAt: new Date().toISOString(),
@@ -790,8 +848,7 @@ export class RunManager {
         }),
         tasks,
         compare,
-      }),
-    ).catch(() => undefined);
+      });
   }
 
   private pruneRuns(protectedRunId?: string): void {

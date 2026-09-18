@@ -1,6 +1,6 @@
 {
   "name": "ennodia",
-  "version": "0.3.0-rc.2",
+  "version": "0.3.0",
   "mcpName": "io.github.cherninlab/ennodia",
   "description": "Try other agents, models, and skills from your familiar AI workflow through a local MCP server",
   "license": "MIT",

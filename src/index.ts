@@ -100,12 +100,14 @@ export {
   discoverHarnesses,
   findHarnessAdapter,
   harnessAdapters,
+  REASONING_EFFORTS,
   type CommandSpec,
   type DiscoverHarnessesOptions,
   type HarnessAdapter,
   type HarnessDiscovery,
   type HarnessKind,
   type HarnessRunInput,
+  type ReasoningEffort,
 } from "./harnesses";
 export { planRoute, renderPlanMermaid, type RoutePlan } from "./planner";
 export {

@@ -1,10 +1,12 @@
 ---
 import { Check, Copy } from "@lucide/astro";
+const setupPrompt = "Set up Ennodia for use in this conversation using the instructions at https://try-ennodia.cherninlab.com. Check that it works. If you find a useful application to our current task, demonstrate it within the task’s existing permissions.";
 ---
 <div class="install-link">
+  <p>Paste this into your agent.</p>
   <div class="install-address">
     <code>try-ennodia.cherninlab.com</code>
-    <button type="button" data-copy-value="try-ennodia.cherninlab.com" aria-label="Copy installation address">
+    <button type="button" data-copy-value={setupPrompt} aria-label="Copy setup prompt" title="Copy address and setup instructions">
       <Copy class="copy-icon" size={20} aria-hidden="true" />
       <Check class="copied-icon" size={20} aria-hidden="true" />
     </button>

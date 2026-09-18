@@ -65,6 +65,8 @@ export const DEFAULT_COMPARE_MAX_OUTPUT_CHARS = 80_000;
 const COMPARE_JUDGE_OVERHEAD_CHARS = 2_400;
 const COMPARE_ADVISOR_OVERHEAD_CHARS = 1_600;
 const NATIVE_SKILL_PROMPT_OVERHEAD_CHARS = 220;
+// Reserve covers the shared execution notice, including the numeric allowance.
+const EXECUTION_NOTICE_OVERHEAD_CHARS = 1600;
 
 export function estimateRunBudget(
   input: EstimateRunBudgetInput,
@@ -75,7 +77,7 @@ export function estimateRunBudget(
   const maxOutputCharsPerCandidate = compareCandidateChars(input.maxOutputChars);
   const estimatedChildTaskInputTokens = selectedHarnessIds.reduce((total, id) =>
     total + estimateTokensFromChars(
-      withInputGuidance(input.prompt, findAdapter(id)).length + NATIVE_SKILL_PROMPT_OVERHEAD_CHARS,
+      withInputGuidance(input.prompt, findAdapter(id)).length + NATIVE_SKILL_PROMPT_OVERHEAD_CHARS + EXECUTION_NOTICE_OVERHEAD_CHARS,
     ), 0);
   const estimatedPromptTokensPerTask = selectedHarnessCount === 0 ? 0
     : Math.ceil(estimatedChildTaskInputTokens / selectedHarnessCount);
@@ -99,7 +101,7 @@ export function estimateRunBudget(
     tokenEstimateRatio: `1 token ~= ${CHARS_PER_TOKEN} characters`,
     assumptions: [
       "Budgeting is a preflight input-token estimate, not a provider bill.",
-      "Child-task estimates include the user prompt, applicable media input guidance, and Ennodia skill pointer; harness system prompts, file reads, tool calls, and provider-side context are excluded and can make real usage higher.",
+      "Child-task estimates include the user prompt, applicable media input guidance, an execution notice reserve, and Ennodia skill pointer; harness system prompts, file reads, tool calls, and provider-side context are excluded and can make real usage higher.",
       "Output tokens, tool calls, cache behavior, and provider pricing are not known before a run starts.",
       `Compare estimates cap each task candidate at ${MAX_PROMPT_CANDIDATE_CHARS} characters because that is the judge prompt truncation bound.`,
       "Subscription quota checks use supported CLI/API surfaces only; Ennodia does not inspect private account pages or provider-private APIs.",
@@ -118,7 +120,7 @@ export function estimateTaskBatchBudget(
   const uniqueHarnessIds = [...new Set(selectedHarnessIds)];
   const maxOutputCharsPerCandidate = compareCandidateChars(input.maxOutputChars);
   const perTaskTokenEstimates = tasks.map((task) =>
-    estimateTokensFromChars(withInputGuidance(task.prompt, findAdapter(task.harnessId)).length + NATIVE_SKILL_PROMPT_OVERHEAD_CHARS)
+    estimateTokensFromChars(withInputGuidance(task.prompt, findAdapter(task.harnessId)).length + NATIVE_SKILL_PROMPT_OVERHEAD_CHARS + EXECUTION_NOTICE_OVERHEAD_CHARS)
   );
   const estimatedChildTaskInputTokens = perTaskTokenEstimates.reduce(
     (total, tokens) => total + tokens,
@@ -149,7 +151,7 @@ export function estimateTaskBatchBudget(
       "Budgeting is a preflight input-token estimate, not a provider bill.",
       "Task-batch estimates count one child task per resolved slice and harness.",
       "estimatedPromptTokensPerTask is the average across slices because slice prompts can differ.",
-      "Child-task estimates include slice prompts, applicable media input guidance, and Ennodia skill pointers; harness system prompts, file reads, tool calls, and provider-side context are excluded and can make real usage higher.",
+      "Child-task estimates include slice prompts, applicable media input guidance, an execution notice reserve, and Ennodia skill pointers; harness system prompts, file reads, tool calls, and provider-side context are excluded and can make real usage higher.",
       "Output tokens, tool calls, cache behavior, and provider pricing are not known before a run starts.",
       `Compare estimates cap each task candidate at ${MAX_PROMPT_CANDIDATE_CHARS} characters because that is the judge prompt truncation bound.`,
       "Subscription quota checks use supported CLI/API surfaces only; Ennodia does not inspect private account pages or provider-private APIs.",
@@ -243,9 +245,9 @@ function estimateCompareInputTokens(input: {
   candidateChars: number;
 }): number {
   const judgeChars =
-    input.promptChars + input.candidateChars + COMPARE_JUDGE_OVERHEAD_CHARS;
+    input.promptChars + input.candidateChars + COMPARE_JUDGE_OVERHEAD_CHARS + EXECUTION_NOTICE_OVERHEAD_CHARS;
   const advisorChars =
-    input.promptChars + input.candidateChars + COMPARE_ADVISOR_OVERHEAD_CHARS;
+    input.promptChars + input.candidateChars + COMPARE_ADVISOR_OVERHEAD_CHARS + EXECUTION_NOTICE_OVERHEAD_CHARS;
 
   return estimateTokensFromChars(judgeChars) +
     estimateTokensFromChars(advisorChars);

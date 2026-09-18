@@ -1,7 +1,7 @@
 {
   "manifest_version": "0.2",
   "name": "ennodia",
-  "version": "0.3.0-rc.2",
+  "version": "0.3.0",
   "description": "Try other agents, models, and skills from your familiar AI workflow through a local MCP server",
   "author": {
     "name": "Cherninlab"
@@ -684,7 +684,7 @@
         "type": "object",
         "properties": {
           "model": {
-            "description": "Explicit model selection required for Pragmatic mode.",
+            "description": "Optional model override. Omit to use the selected harness default.",
             "type": "string"
           },
           "pragmatic": {
@@ -710,7 +710,7 @@
               "acceptanceCriteria"
             ],
             "additionalProperties": false,
-            "description": "Experimental bounded delegation: requires explicit harnessId and model, forces one worker with no automatic comparison or retry. This is workflow guidance, not a permission sandbox or a savings guarantee."
+            "description": "Experimental evidence contract for one or more independent workers. Preserves routing and comparison choices. Use Plan Advisor for tailored model and skill assignments. This is workflow guidance, not a permission sandbox or a savings guarantee."
           },
           "prompt": {
             "type": "string",
@@ -829,6 +829,31 @@
       "inputSchema": {
         "type": "object",
         "properties": {
+          "pragmatic": {
+            "type": "object",
+            "properties": {
+              "recipe": {
+                "type": "string",
+                "enum": [
+                  "investigate",
+                  "patch"
+                ],
+                "description": "investigate returns cited findings; patch returns a unified diff proposal. Both instruct workers not to edit files. Native harness permissions still apply."
+              },
+              "acceptanceCriteria": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 8000,
+                "description": "Concrete completion checks for this bounded assignment, including required evidence."
+              }
+            },
+            "required": [
+              "recipe",
+              "acceptanceCriteria"
+            ],
+            "additionalProperties": false,
+            "description": "Experimental evidence contract for one or more independent workers. Preserves routing and comparison choices. Use Plan Advisor for tailored model and skill assignments. This is workflow guidance, not a permission sandbox or a savings guarantee."
+          },
           "prompt": {
             "type": "string",
             "minLength": 1,
@@ -1024,6 +1049,31 @@
             "description": "Optional model override passed through to harnesses that support it.",
             "type": "string"
           },
+          "reasoningEffort": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "xhigh",
+              "max",
+              "ultra"
+            ],
+            "description": "Optional reasoning effort for a Codex worker. Other harnesses reject explicit effort settings; omit to preserve native defaults."
+          },
+          "nativeSubagents": {
+            "description": "Disable Codex built-in subagent tools for workers. Other harnesses reject this setting. Does not block external commands or affect Judge/Advisor tasks.",
+            "type": "string",
+            "const": "disabled"
+          },
+          "nativeSandbox": {
+            "description": "Codex worker native sandbox. Defaults to read-only on every turn, including continuation. Request workspace-write only for authorized edits. Other harnesses reject this setting; Judge/Advisor settings are unchanged.",
+            "type": "string",
+            "enum": [
+              "read-only",
+              "workspace-write"
+            ]
+          },
           "timeoutMs": {
             "description": "Per-task timeout in milliseconds. Defaults to the task manager timeout and is capped at one hour.",
             "type": "integer",
@@ -1105,6 +1155,31 @@
       "inputSchema": {
         "type": "object",
         "properties": {
+          "pragmatic": {
+            "type": "object",
+            "properties": {
+              "recipe": {
+                "type": "string",
+                "enum": [
+                  "investigate",
+                  "patch"
+                ],
+                "description": "investigate returns cited findings; patch returns a unified diff proposal. Both instruct workers not to edit files. Native harness permissions still apply."
+              },
+              "acceptanceCriteria": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 8000,
+                "description": "Concrete completion checks for this bounded assignment, including required evidence."
+              }
+            },
+            "required": [
+              "recipe",
+              "acceptanceCriteria"
+            ],
+            "additionalProperties": false,
+            "description": "Experimental evidence contract for one or more independent workers. Preserves routing and comparison choices. Use Plan Advisor for tailored model and skill assignments. This is workflow guidance, not a permission sandbox or a savings guarantee."
+          },
           "prompt": {
             "type": "string",
             "minLength": 1,
@@ -1265,7 +1340,7 @@
     },
     {
       "name": "ennodia_run",
-      "description": "Start a high-level Ennodia orchestration. Set pragmatic for a bounded investigation or patch proposal using one explicit model. Use this as the default entrypoint: it plans routing, starts one or more local harness tasks, optionally compares successful outputs, and returns a run ID. Runs usually take minutes; poll ennodia_get_run with sensible spacing and trust remainingMs/etaConfidence instead of aborting early.",
+      "description": "Start a high-level Ennodia orchestration. Set pragmatic for evidence-focused investigation or patch proposals with one or more independent workers. Use Plan Advisor for tailored model and skill assignments. Use this as the default entrypoint: it plans routing, starts one or more local harness tasks, optionally compares successful outputs, and returns a run ID. Runs usually take minutes; use ennodia_get_run with waitMs: 30000 and includeEvents: false until terminal, then consume and verify its answer. A wait timeout does not cancel or finish the run.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -1292,7 +1367,7 @@
               "acceptanceCriteria"
             ],
             "additionalProperties": false,
-            "description": "Experimental bounded delegation: requires explicit harnessId and model, forces one worker with no automatic comparison or retry. This is workflow guidance, not a permission sandbox or a savings guarantee."
+            "description": "Experimental evidence contract for one or more independent workers. Preserves routing and comparison choices. Use Plan Advisor for tailored model and skill assignments. This is workflow guidance, not a permission sandbox or a savings guarantee."
           },
           "prompt": {
             "type": "string",
@@ -1348,6 +1423,39 @@
           "model": {
             "description": "Optional model override passed to the selected task harnesses.",
             "type": "string"
+          },
+          "persistSession": {
+            "description": "Opt in to native Codex session persistence. Requires one explicit harness and a persistent cwd. Default tasks remain ephemeral.",
+            "type": "boolean"
+          },
+          "continueTaskId": {
+            "description": "Continue the latest settled persistent task owned by this server. Use its Ennodia task ID. The working directory and harness stay the same. Each follow-up gets a new task and execution allowance.",
+            "type": "string"
+          },
+          "reasoningEffort": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "xhigh",
+              "max",
+              "ultra"
+            ],
+            "description": "Optional reasoning effort for a Codex worker. Other harnesses reject explicit effort settings; omit to preserve native defaults."
+          },
+          "nativeSubagents": {
+            "description": "Disable Codex built-in subagent tools for workers. Other harnesses reject this setting. Does not block external commands or affect Judge/Advisor tasks.",
+            "type": "string",
+            "const": "disabled"
+          },
+          "nativeSandbox": {
+            "description": "Codex worker native sandbox. Defaults to read-only on every turn, including continuation. Request workspace-write only for authorized edits. Other harnesses reject this setting; Judge/Advisor settings are unchanged.",
+            "type": "string",
+            "enum": [
+              "read-only",
+              "workspace-write"
+            ]
           },
           "timeoutMs": {
             "description": "Per-task timeout in milliseconds. Defaults to the task manager timeout and is capped at one hour.",
@@ -1566,7 +1674,7 @@
     },
     {
       "name": "ennodia_get_run",
-      "description": "Inspect run status, selected harnesses, child task IDs, comparison ID, final Advisor answer, events, and ETA.",
+      "description": "Inspect a run or wait up to waitMs for completion. Prefer waitMs: 30000, compact: true and includeEvents: false while awaiting results. A nonterminal response means work continues; do not claim its findings were consumed.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -1574,6 +1682,18 @@
             "type": "string",
             "minLength": 1,
             "description": "Run ID returned by ennodia_run."
+          },
+          "compact": {
+            "default": false,
+            "description": "Omit repeated routing, budget, prompt preview and skill metadata. Preserve status, timing, task IDs, answers and errors. Answer and event limits still apply. Use false for full diagnostics.",
+            "type": "boolean"
+          },
+          "waitMs": {
+            "default": 0,
+            "description": "Wait for a terminal state without cancelling or extending the run. Use 30000 for ordinary polling. Longer waits require a client tool timeout greater than waitMs.",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 300000
           },
           "includeEvents": {
             "default": true,
