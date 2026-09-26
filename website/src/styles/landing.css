@@ -77,335 +77,673 @@
   max-width: 30em;
 }
 
-/* Figure 1. Agents are the nodes and Ennodia is the paths between them, so
-   Ennodia has no node of its own. Your agent sits above and below the row
-   it hands work to: the work fans out and comes back to the same chat. */
+/* Figure 1. Agents are the nodes and Ennodia is the path between them: the
+   only olive in the drawing. The figure spans the column, so one loop reads
+   at a glance: out of your chat, through an agent, and back in. */
 
-.graph-controls {
+.abilities {
   display: grid;
-  gap: var(--space-5);
-  width: 100%;
-  margin-top: var(--space-2);
+  gap: var(--space-6);
+  padding-block: var(--space-8) var(--space-9);
+  border-top: 1px solid var(--line);
 }
 
-.graph-controls fieldset {
+.abilities-head {
   display: grid;
-  gap: var(--space-2);
-  min-width: 0;
-  margin: 0;
-  padding: 0;
-  border: 0;
+  gap: var(--space-4);
+  max-width: 40em;
 }
 
-.graph-controls legend {
-  padding: 0;
-  margin-bottom: var(--space-2);
+.abilities-head h2 {
+  font: 400 var(--size-title)/1.2 var(--sans);
+  letter-spacing: -0.03em;
 }
 
-/* Controls are things to press, so they use the text face at the small
-   size. Mono uppercase stays for labels that only name things. */
-.choice-list {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+/* Tasks carry pictograms, and one switch holds the comparison the figure
+   is for. Controls use the text face. Mono uppercase only names things. */
+.fig-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-5);
+}
+
+.fig-tasks,
+.fig-mode {
+  display: flex;
+  flex-wrap: wrap;
   gap: var(--space-1);
 }
 
-.choice-list button,
-.graph-tasks button {
-  display: flex;
+.fig-toolbar button,
+.fig-you button {
+  display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: var(--space-2);
-  min-height: 36px;
-  padding: var(--space-1) var(--space-3);
+  min-height: 40px;
+  padding: 0 var(--space-4);
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--subtle);
-  font: 400 var(--size-small)/1.3 var(--sans);
-  text-align: left;
+  font: 400 var(--size-small)/1 var(--sans);
   cursor: pointer;
 }
 
-.choice-list button:hover,
-.graph-tasks button:hover {
+.fig-toolbar button:hover,
+.fig-you button:hover {
   border-color: var(--field-line);
   color: var(--ink);
 }
 
-.choice-list button[aria-pressed="true"],
-.graph-tasks button[aria-pressed="true"] {
+.fig-toolbar button[aria-pressed="true"],
+.fig-you button[aria-pressed="true"] {
   border-color: var(--ink);
   background: var(--card);
   color: var(--ink);
 }
 
-.graph-tasks {
+.fig {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--space-1);
-}
-
-.graph-tasks button {
-  justify-content: center;
-  text-align: center;
-}
-
-.graph-switch {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  color: var(--ink);
-  font-size: var(--size-small);
-  cursor: pointer;
-}
-
-.graph-switch input {
-  width: 16px;
-  height: 16px;
-  margin: 0;
-  accent-color: var(--ink);
-}
-
-.graph {
+  gap: var(--space-5);
   margin: 0;
 }
 
-/* The selected task's capability, as raw material. On a phone the strip
-   keeps a readable height and crops its sides. */
-.graph-strip {
-  margin-bottom: var(--space-6);
+/* The stage: one fixed frame, scaled to the column. Boxes and paths share
+   the frame in data/graph-layout.ts, so they meet at every width. */
+.fig-stage {
+  position: relative;
+  aspect-ratio: 1000 / 640;
 }
 
-.graph-strip[hidden] {
+.fig-stage > * {
+  position: absolute;
+  margin: 0;
+}
+
+.fig-paths {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.fig-paths path {
+  fill: none;
+  vector-effect: non-scaling-stroke;
+  stroke-linejoin: round;
+}
+
+.fig-idle {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.fig-route {
+  stroke: var(--stage-2);
+  stroke-width: 2;
+}
+
+.fig.is-off .fig-route {
+  stroke: var(--ink);
+  stroke-width: 1.5;
+  stroke-dasharray: 5 5;
+}
+
+.fig-join {
+  fill: var(--stage-2);
+}
+
+.fig-join[hidden] {
   display: none;
 }
 
-.graph-strip-credit {
-  margin-top: var(--space-2);
-  color: var(--muted);
-  font-size: var(--size-small);
-  line-height: 1.4;
+.fig-legend {
+  top: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--subtle);
+  font: 400 11px/1.5 var(--mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
-.graph-strip-credit a {
+.fig-key {
+  width: 28px;
+  border-top: 2px solid var(--stage-2);
+}
+
+.fig.is-off .fig-key {
+  border-top: 1.5px dashed var(--ink);
+}
+
+.fig.is-self .fig-legend {
+  visibility: hidden;
+}
+
+/* Your chat: one window, with your message at the top, your agent's tool
+   call where the path leaves, and the answer where it comes back. */
+.fig-chat {
+  top: 0;
+  bottom: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+}
+
+.fig-chat-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--line);
+}
+
+.fig-you {
+  display: flex;
+  gap: 2px;
+}
+
+.fig-you button {
+  width: 32px;
+  min-height: 32px;
+  padding: 0;
+}
+
+.fig-you-name {
+  margin: var(--space-3) var(--space-4) 0;
+  color: var(--subtle);
+  font-size: var(--size-small);
+}
+
+.fig-you-name b {
+  margin-right: var(--space-1);
+  color: var(--ink);
+  font-size: var(--size-body);
+  font-weight: 600;
+}
+
+.fig-request,
+.fig-answer {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0 var(--space-4);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  font-size: var(--size-small);
+  line-height: 1.45;
+}
+
+.fig-request {
+  margin-top: var(--space-3);
+  background: var(--hover);
+}
+
+.fig-call,
+.fig-history,
+.fig-answer {
+  position: absolute;
+  left: 0;
+  right: 0;
+}
+
+.fig-call {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 34px;
+  padding: 0 var(--space-4);
+  border-block: 1px solid var(--line);
+  color: var(--ink);
+  font: 400 12px/1 var(--mono);
+}
+
+/* Your chat waits for the answer: a dashed line from the call down to it,
+   with the one thing that never leaves your chat written beside it. */
+.fig-chat::after {
+  content: "";
+  position: absolute;
+  left: calc(var(--space-4) + 14px);
+  top: calc(var(--call) + 17px);
+  bottom: calc(100% - var(--answer) + 30px);
+  border-left: 1px dashed var(--field-line);
+}
+
+.fig-history {
+  top: calc((var(--call) + var(--answer)) / 2 - 10px);
+  padding: 0 var(--space-4) 0 calc(var(--space-4) + 26px);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.fig-history[hidden] {
+  display: none;
+}
+
+.fig-answer {
+  min-height: 60px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+}
+
+/* The other agents: quiet line work until one does the work. A dot marks
+   where the path enters and leaves each one. */
+.fig-agents {
+  top: 0;
+  bottom: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fig-agents li {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: grid;
+  padding-left: var(--space-3);
+  color: var(--muted);
+  font-size: var(--size-small);
+  line-height: 1.35;
+}
+
+.fig-agents li[hidden] {
+  display: none;
+}
+
+.fig-agent-name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 24px;
+  color: var(--subtle);
+  font-size: var(--size-body);
+  font-weight: 600;
+}
+
+.fig-agent-runs {
+  display: none;
+  font-size: 12px;
+}
+
+.fig-agents li.is-active {
+  color: var(--subtle);
+}
+
+.fig-agents li.is-active .fig-agent-name,
+.fig-agents li.is-active .fig-agent-strength {
+  color: var(--ink);
+}
+
+.fig-agents li.is-active .fig-agent-runs {
+  display: block;
+}
+
+/* Ports: where the path enters and leaves each agent. */
+.fig-port {
+  fill: var(--line);
+}
+
+.fig-port.is-active {
+  fill: var(--stage-2);
+}
+
+.fig.is-off .fig-port.is-active {
+  fill: var(--ink);
+}
+
+/* Compare joins two reviews on the way back. */
+.fig-compare {
+  padding: 1px 6px;
+  border: 1px solid var(--stage-2);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  color: var(--stage-2);
+  transform: translate(-50%, -50%);
+}
+
+.fig-compare[hidden] {
+  display: none;
+}
+
+/* What travels, written on the path. */
+.fig-label {
+  display: grid;
+  gap: 2px;
+  max-width: 26%;
+  color: var(--stage-2);
+  font: 400 11px/1.4 var(--mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.fig-label[hidden] {
+  display: none;
+}
+
+.fig-note,
+.fig-label-back {
+  color: var(--muted);
+  font: 400 12px/1.4 var(--sans);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.fig-label-back {
+  max-width: 58%;
+  color: var(--stage-2);
+}
+
+/* The strip rides the return path: what comes back. */
+.fig-strip video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  object-fit: cover;
+  object-position: left center;
+  cursor: pointer;
+}
+
+.fig-strip video[hidden] {
+  display: none;
+}
+
+.fig.is-off .fig-strip {
+  opacity: 0.35;
+}
+
+/* Without Ennodia, you carry the work: four numbered steps on the loop. */
+.fig-steps {
+  inset: 0;
+  padding: 0;
+  list-style: none;
+  pointer-events: none;
+}
+
+.fig-steps[hidden] {
+  display: none;
+}
+
+.fig-steps li {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.3;
+  white-space: nowrap;
+  transform: translate(-12px, -12px);
+}
+
+.fig-steps li[data-side="left"] {
+  flex-direction: row-reverse;
+  transform: translate(calc(-100% + 12px), -12px);
+}
+
+.fig-step-dot {
+  display: grid;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border: 2px solid var(--paper);
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--paper);
+  font: 400 11px/1 var(--mono);
+}
+
+.fig-steps [data-step-text] {
+  padding: 1px 4px;
+  background: var(--paper);
+}
+
+.fig-caption {
+  display: grid;
+  gap: var(--space-2);
+  max-width: 44em;
+}
+
+.fig-summary {
+  color: var(--ink);
+  font-size: var(--size-lead);
+  line-height: 1.45;
+}
+
+.fig-evidence {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  font-size: var(--size-small);
+}
+
+.fig-credit {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.fig-credit[hidden] {
+  display: none;
+}
+
+.fig-credit a {
   color: inherit;
   text-decoration-color: var(--line);
   text-underline-offset: 2px;
 }
 
-.graph-strip video {
-  display: block;
-  width: 100%;
-  height: auto;
-  aspect-ratio: 1260 / 170;
-  border-radius: var(--radius-sm);
-  background: var(--card);
-  object-fit: cover;
-}
-
-/* A phone keeps the strip's left part, where its tags sit. */
-@media (max-width: 720px) {
-  .graph-strip video {
-    height: 72px;
-    aspect-ratio: auto;
-    object-position: left center;
+/* Narrower than the stage's text allows, the same parts stack along a rail
+   in reading order: your message, the tool call, the agents, what comes
+   back, and the answer. */
+@media (max-width: 880px) {
+  .fig-toolbar {
+    display: grid;
   }
-}
 
-.graph-canvas {
-  position: relative;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  column-gap: var(--space-4);
-}
+  .fig-tasks {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 
-.graph-row {
-  display: contents;
-}
+  .fig-tasks button {
+    flex-direction: column;
+    gap: var(--space-1);
+    min-height: 56px;
+    padding: var(--space-2) var(--space-1);
+  }
 
-.graph-node {
-  position: relative;
-  display: grid;
-  align-content: start;
-  gap: 2px;
-  padding: var(--space-3);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--card);
-  color: var(--subtle);
-  font-size: var(--size-small);
-  line-height: 1.4;
-  transition: border-color 0.2s, color 0.2s, opacity 0.2s;
-}
+  .fig-mode button {
+    flex: 1;
+  }
 
-.graph-node .label {
-  margin-bottom: var(--space-1);
-}
+  .fig-stage {
+    display: grid;
+    aspect-ratio: auto;
+  }
 
-/* A dot where each path meets a node, like a pin on a board. */
-.graph-node::before,
-.graph-node::after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  width: 5px;
-  height: 5px;
-  margin-left: -2.5px;
-  border-radius: 50%;
-  background: var(--field-line);
-}
+  .fig-stage > *,
+  .fig-stage > .fig-chat > *,
+  .fig-agents li {
+    position: static;
+    width: auto !important;
+    height: auto !important;
+  }
 
-.graph-node::before {
-  top: -3px;
-}
+  .fig-paths,
+  .fig-legend {
+    display: none;
+  }
 
-.graph-node::after {
-  bottom: -3px;
-}
+  .fig-chat {
+    display: contents;
+  }
 
-.graph-you::before,
-.graph-back::after {
-  display: none;
-}
+  .fig-chat::after {
+    display: none;
+  }
 
-.graph-you,
-.graph-back {
-  grid-column: 2;
-}
+  .fig-chat-head {
+    order: 1;
+    border: 1px solid var(--line);
+    border-bottom: 0;
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+    background: var(--card);
+  }
 
-.graph-agent[hidden] {
-  display: none;
-}
+  .fig-you-name {
+    order: 2;
+    margin: 0;
+    padding: var(--space-3) var(--space-4) 0;
+    border-inline: 1px solid var(--line);
+    background: var(--card);
+  }
 
-.graph-name {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  color: var(--ink);
-  font-size: var(--size-body);
-  font-weight: 600;
-  line-height: 1.3;
-}
+  .fig-request {
+    order: 3;
+    margin: 0;
+    padding: var(--space-3) var(--space-4) var(--space-4);
+    border: 1px solid var(--line);
+    border-top: 0;
+    border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+    background: var(--card);
+  }
 
-.graph-name [hidden] {
-  display: none;
-}
+  /* The rail: one line down the left, from the tool call to the answer. */
+  .fig-call,
+  .fig-history,
+  .fig-label-out,
+  .fig-agents,
+  .fig-compare,
+  .fig-strip,
+  .fig-label-back,
+  .fig-steps {
+    margin-left: 11px;
+    padding-left: var(--space-5);
+    border-left: 2px solid var(--stage-2);
+  }
 
-.graph-strength {
-  margin-top: var(--space-1);
-}
+  .fig.is-off .fig-call,
+  .fig.is-off .fig-agents,
+  .fig.is-off .fig-strip,
+  .fig.is-off .fig-steps {
+    border-left: 2px dashed var(--ink);
+  }
 
-.graph-paths {
-  grid-column: 1 / -1;
-  display: block;
-  width: 100%;
-  height: var(--space-7);
-  overflow: visible;
-}
+  .fig.is-self .fig-call,
+  .fig.is-self .fig-agents,
+  .fig.is-self .fig-strip {
+    border-left-color: transparent;
+  }
 
-.graph-paths path {
-  fill: none;
-  stroke: var(--line);
-  stroke-width: 1;
-  vector-effect: non-scaling-stroke;
-  transition: stroke 0.2s, opacity 0.2s;
-}
+  .fig-call {
+    order: 4;
+    height: auto;
+    padding-block: var(--space-4) var(--space-2);
+    border-block: 0;
+  }
 
-.graph-paths path.is-active {
-  stroke: var(--accent);
-  stroke-width: 1.5;
-}
+  .fig-history {
+    order: 5;
+  }
 
-.graph-agent.is-active,
-.is-self .graph-you {
-  border-color: var(--accent);
-  color: var(--ink);
-}
+  .fig-label-out {
+    order: 6;
+    max-width: none;
+    padding-block: var(--space-2);
+  }
 
-.graph-agent.is-active::before,
-.graph-agent.is-active::after,
-.graph-you.is-sending::after,
-.graph-back.is-receiving::before {
-  background: var(--accent);
-}
+  .fig-steps {
+    order: 7;
+    display: grid;
+    gap: var(--space-2);
+    padding-block: var(--space-2);
+  }
 
-/* Compare appears where the answers meet, just above your chat. */
-.graph-compare {
-  position: absolute;
-  top: 0;
-  left: 50%;
-  padding: 0 var(--space-2);
-  background: var(--paper);
-  color: var(--accent);
-  transform: translate(-50%, -50%);
-}
+  .fig-steps li,
+  .fig-steps li[data-side="left"] {
+    position: static;
+    flex-direction: row;
+    white-space: normal;
+    transform: none;
+  }
 
-.graph-compare[hidden] {
-  display: none;
-}
+  .fig-agents {
+    order: 8;
+    display: grid;
+    gap: var(--space-3);
+    padding-block: var(--space-3);
+  }
 
-/* Without Ennodia, the paths go, and the other agents sit out of reach. */
-.is-off .graph-paths path {
-  opacity: 0;
-}
+  /* Rows keep a position for their rail dot, without the stage offset. */
+  .fig-agents li {
+    position: relative;
+    top: 0 !important;
+    padding-left: 0;
+  }
 
-.is-off .graph-agent {
-  opacity: 0.4;
-}
+  /* On the rail, each agent has one dot where the rail passes it. */
+  .fig-agents li::before {
+    content: "";
+    position: absolute;
+    top: 9px;
+    left: calc(-1 * var(--space-5) - 4px);
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--line);
+  }
 
-.is-off .graph-node::before,
-.is-off .graph-node::after {
-  opacity: 0;
-}
+  .fig:not(.is-off) .fig-agents li.is-active::before {
+    background: var(--stage-2);
+  }
 
-.graph-panel {
-  display: grid;
-  gap: var(--space-4);
-  margin-top: var(--space-6);
-  padding-top: var(--space-5);
-  border-top: 1px solid var(--line);
-}
+  .fig.is-off .fig-agents li.is-active::before {
+    background: var(--ink);
+  }
 
-.graph-summary {
-  color: var(--ink);
-  font-size: var(--size-lead);
-  line-height: 1.5;
-}
+  .fig-agent-strength {
+    display: none;
+  }
 
-.graph-request {
-  max-width: 34em;
-  color: var(--ink);
-}
+  .fig-agents li.is-active .fig-agent-strength {
+    display: block;
+  }
 
-.graph-facts {
-  display: grid;
-  gap: var(--space-2);
-  margin: 0;
-}
+  .fig-compare {
+    order: 9;
+    justify-self: start;
+    margin-block: var(--space-1);
+    transform: none;
+  }
 
-.graph-facts > div {
-  display: grid;
-  grid-template-columns: 56px minmax(0, 1fr);
-  gap: var(--space-4);
-}
+  .fig-strip {
+    order: 10;
+    padding-block: var(--space-2);
+  }
 
-.graph-facts dt {
-  padding-top: 3px;
-}
+  .fig-strip video {
+    height: 72px;
+  }
 
-.graph-facts dd {
-  margin: 0;
-}
+  .fig-label-back {
+    order: 11;
+    max-width: none;
+    padding-block: var(--space-1) var(--space-4);
+  }
 
-.graph-facts[hidden] {
-  display: none;
-}
-
-.graph-evidence {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1) var(--space-3);
-  font-size: var(--size-small);
+  .fig-answer {
+    order: 12;
+    margin: 0;
+    padding: var(--space-3) var(--space-4);
+  }
 }
 
 .recorded-dot {
@@ -869,24 +1207,6 @@
 
   .copy-address p {
     padding: var(--space-3) var(--space-4);
-  }
-
-  .graph-canvas {
-    column-gap: var(--space-2);
-  }
-
-  .graph-node {
-    padding: var(--space-2);
-  }
-
-  .graph-name {
-    font-size: var(--size-small);
-  }
-
-  /* The names already sit in the node. On a phone the icon would crowd them. */
-  .graph-agent .graph-name .agent-icon,
-  .graph-agent .graph-name .agent-icon-mask {
-    display: none;
   }
 
   .leader,

@@ -93,9 +93,15 @@ export type RouteText = {
   sent: string;
   runs: string;
   back: string;
-  /** The line inside the "back in your chat" node. */
+  /** The answer as it lands in your chat. */
   backShort: string;
   alone: string;
+  /** What leaves your chat, written on the outbound path. */
+  item: string;
+  /** What comes back, written on the return path. */
+  backLabel: string;
+  /** The four things you do by hand without Ennodia. */
+  steps: string[];
 };
 
 /** Every sentence the panel shows for one state. */
@@ -104,11 +110,16 @@ export function routeText(from: GraphAgentId, task: TaskId): RouteText {
   const { workers, compare } = route(from, task);
   if (workers.length === 0) {
     const self = `${you} does this itself. No handoff is needed.`;
-    return { summary: self, sent: "", runs: "", back: "", backShort: `Done in ${you}`, alone: self };
+    return { summary: self, sent: "", runs: "", back: "", backShort: `Done in ${you}`, alone: self, item: "", backLabel: "", steps: [] };
   }
   const names = workers.map((id) => agent(id).app);
   const list = names.join(" and ");
   return {
+    item: what[task].item,
+    backLabel: `${what[task].back}, with a receipt`,
+    steps: task === "review"
+      ? ["Open two other chats", "Paste the patch into each", "Wait for both", `Compare them in ${you}`]
+      : [`Open ${list}`, "Repeat the request", "Wait for the answer", `Copy it back into ${you}`],
     summary: `${you} hands ${what[task].item} to ${list}${compare ? ", then compares the answers" : ""}.`,
     sent: `Your prompt, ${what[task].item}, the chosen model, and a time allowance. Your conversation history stays in ${you}.`,
     runs: `${list} ${workers.length > 1 ? "each start" : "starts"} a fresh session with ${workers.length > 1 ? "their own" : "its own"} tools and account.`,

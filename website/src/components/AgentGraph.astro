@@ -1,12 +1,15 @@
 ---
-import { ArrowUpRight } from "@lucide/astro";
+import { ArrowUpRight, BookOpen, Brush, Ear, Files } from "@lucide/astro";
 import AgentIcon from "./AgentIcon.astro";
 import { agent, graphAgents, graphTasks, middleRow, route, routeText, type GraphAgentId, type TaskId } from "../data/agents";
+import { AGENTS, ANSWER_Y, CALL_Y, CHAT, STAGE, STRIP, backPath, comparePoint, idlePath, manualSteps, outPath, percent } from "../data/graph-layout";
 
-// Figure 1. Agents are the nodes and Ennodia is the paths between them.
-// The server renders the default state, so the figure reads without script.
-// scripts/agent-graph.ts switches the agent you work in, the task, and
-// whether Ennodia is there at all.
+// Figure 1. Agents are the nodes, and Ennodia is the path between them: the
+// only olive in the drawing. Your chat is one window. The path leaves from
+// your agent's tool call, runs through the agent that does the work, and
+// comes back into the same window. scripts/agent-graph.ts switches the
+// agent you work in, the task, and whether Ennodia is there at all. The
+// server renders the first state, so the figure reads without script.
 const from: GraphAgentId = "codex";
 const taskId: TaskId = "listen";
 const task = graphTasks.find((entry) => entry.id === taskId)!;
@@ -14,15 +17,14 @@ const row = middleRow(from);
 const { workers, compare } = route(from, taskId);
 const text = routeText(from, taskId);
 const you = agent(from);
+const rows = workers.map((id) => row.indexOf(id));
 
-// Paths run from the center column to each column and back. The view box is
-// stretched to the figure, and strokes keep their width while it stretches.
-const columns = [100, 300, 500];
-const out = columns.map((x) => (x === 300 ? "M300 0 L300 56" : `M300 0 C300 28 ${x} 28 ${x} 56`));
-const back = columns.map((x) => (x === 300 ? "M300 0 L300 56" : `M${x} 0 C${x} 28 300 28 300 56`));
+const x = (value: number) => percent(value, STAGE.width);
+const y = (value: number) => percent(value, STAGE.height);
+const icons = { listen: Ear, draw: Brush, review: Files, long: BookOpen };
 
 // Each task shows its capability as raw material, drawn with pyqtgraph from a
-// real run: decoration that shows and does not explain. Listen is clip 27 of
+// real run. It rides the return path: what comes back. Listen is clip 27 of
 // the audio study (bench/audio-routing/scope.py). The others come from
 // bench/strips: GPT Image textures from Codex, two reviews of an Ennodia
 // patch under Compare, and Kimi K3 reading RFC 9110.
@@ -38,104 +40,122 @@ const strips: Strip[] = [
   { task: "review", name: "review-strip" },
   { task: "long", name: "read-strip" },
 ];
+const credit = strips.find((strip) => strip.task === taskId)?.credit;
+const join = comparePoint(rows.length ? rows : [0]);
+const steps = manualSteps(rows.length ? rows : [0]);
 ---
-<section class="split wrap abilities" id="abilities" aria-labelledby="abilities-title" data-graph>
-  <div class="split-head">
+<section class="wrap abilities" id="abilities" aria-labelledby="abilities-title" data-graph>
+  <div class="abilities-head">
     <h2 id="abilities-title">Each agent adds its abilities to the others</h2>
-    <p>Pick the agent you work in and a task. The path shows who does the work and what comes back.</p>
-    <div class="graph-controls">
-      <fieldset>
-        <legend class="label">You work in</legend>
-        <div class="choice-list">
-          {graphAgents.map((entry) => (
-            <button type="button" data-from={entry.id} aria-pressed={entry.id === from ? "true" : "false"}>
-              <AgentIcon name={entry.id} size={16} />{entry.app}
-            </button>
-          ))}
-        </div>
-      </fieldset>
-      <fieldset>
-        <legend class="label">Task</legend>
-        <div class="graph-tasks">
-          {graphTasks.map((entry) => (
-            <button type="button" data-task={entry.id} aria-pressed={entry.id === taskId ? "true" : "false"}>{entry.tab}</button>
-          ))}
-        </div>
-      </fieldset>
-      <label class="graph-switch"><input type="checkbox" data-off /> Without Ennodia</label>
+    <p>Pick a task and the agent you work in. The path shows who does the work and what comes back.</p>
+  </div>
+
+  <div class="fig-toolbar">
+    <div class="fig-tasks" role="group" aria-label="Task">
+      {graphTasks.map((entry) => {
+        const Icon = icons[entry.id];
+        return (
+          <button type="button" data-task={entry.id} aria-pressed={entry.id === taskId ? "true" : "false"}>
+            <Icon size={18} stroke-width={1.5} aria-hidden="true" /><span>{entry.tab}</span>
+          </button>
+        );
+      })}
+    </div>
+    <div class="fig-mode" role="group" aria-label="Ennodia">
+      <button type="button" data-mode="on" aria-pressed="true">With Ennodia</button>
+      <button type="button" data-mode="off" aria-pressed="false">Without</button>
     </div>
   </div>
 
-  <figure class="graph" aria-labelledby="abilities-title">
-    {strips.map((strip) => (
-      <div class="graph-strip" data-strip={strip.task} hidden={strip.task !== taskId}>
-        <video aria-hidden="true" width="630" height="85" poster={`/studies/${strip.name}.jpg`} muted loop playsinline preload={strip.task === taskId ? "metadata" : "none"} autoplay={strip.task === taskId}>
-          <source src={`/studies/${strip.name}.mp4`} type="video/mp4" />
-          <source src={`/studies/${strip.name}.webm`} type="video/webm" />
-        </video>
-        {strip.credit && <p class="graph-strip-credit"><a href={strip.credit.href}>{strip.credit.text}</a></p>}
-      </div>
-    ))}
-    <div class="graph-canvas">
-      <div class={`graph-node graph-you${workers.length ? " is-sending" : ""}`}>
-        <span class="label">Your chat</span>
-        <span class="graph-name">
-          {graphAgents.map((entry) => <span data-icon={entry.id} hidden={entry.id !== from}><AgentIcon name={entry.id} size={16} /></span>)}
-          <span data-you-app>{you.app}</span>
-        </span>
-        <span data-you-model>{you.model}</span>
-      </div>
-
-      <svg class="graph-paths" viewBox="0 0 600 56" preserveAspectRatio="none" aria-hidden="true">
-        {out.map((d, index) => <path d={d} data-out={index} class={workers.includes(row[index]!) ? "is-active" : undefined} />)}
+  <figure class={`fig${workers.length ? "" : " is-self"}`} aria-labelledby="abilities-title">
+    <div class="fig-stage" style={`--call: ${y(CALL_Y)}; --answer: ${y(ANSWER_Y)}`}>
+      <svg class="fig-paths" viewBox={`0 0 ${STAGE.width} ${STAGE.height}`} aria-hidden="true">
+        <path class="fig-idle" d={idlePath()} />
+        <path class="fig-route" data-out d={rows.length ? outPath(rows) : ""} />
+        <path class="fig-route" data-back d={rows.length ? backPath(rows) : ""} />
+        <circle class="fig-join" data-join cx={join.x} cy={join.y} r="4" hidden={!compare} />
+        {AGENTS.rows.map((rowY, index) => [AGENTS.x, AGENTS.x + AGENTS.width].map((portX) => (
+          <circle class={`fig-port${rows.includes(index) ? " is-active" : ""}`} data-port={index} cx={portX} cy={rowY} r="3" />
+        )))}
       </svg>
 
-      <div class="graph-row">
+      <p class="fig-legend" aria-hidden="true">
+        <span class="fig-key fig-key-route"></span><span data-legend>Ennodia’s path</span>
+      </p>
+
+      <div class="fig-chat" style={`left: ${x(CHAT.x)}; width: ${x(CHAT.width)}`}>
+        <div class="fig-chat-head">
+          <span class="label">Your chat</span>
+          <div class="fig-you" role="group" aria-label="You work in">
+            {graphAgents.map((entry) => (
+              <button type="button" data-from={entry.id} aria-pressed={entry.id === from ? "true" : "false"} aria-label={entry.app} title={entry.app}>
+                <AgentIcon name={entry.id} size={16} />
+              </button>
+            ))}
+          </div>
+        </div>
+        <p class="fig-you-name"><b data-you-app>{you.app}</b> <span data-you-model>{you.model}</span></p>
+        <p class="fig-request"><span class="label">You</span><span data-request>{task.request}</span></p>
+        <p class="fig-call" style={`top: calc(${y(CALL_Y)} - 17px)`}>
+          <span class="label" data-call-label>Tool</span><span data-call>{workers.length === 1 ? `ennodia_run: ${agent(workers[0]!).app}` : workers.length ? `ennodia_run: ${workers.length} agents` : `${you.app}’s own tools`}</span>
+        </p>
+        <p class="fig-history" data-history hidden={!workers.length}>Your history stays in {you.app}</p>
+        <p class="fig-answer" style={`top: calc(${y(ANSWER_Y)} - 30px)`}>
+          <span class="label" data-answer-from>{you.app}</span><span data-answer>{text.backShort}</span>
+        </p>
+      </div>
+
+      <p class="fig-label fig-label-out" data-out-label style={`left: ${x(CHAT.width + 18)}; top: calc(${y(CALL_Y)} - 44px)`} hidden={!workers.length}>
+        <span data-item>{text.item}</span><span class="fig-note">with the model and a time limit</span>
+      </p>
+
+      <ul class="fig-agents" style={`left: ${x(AGENTS.x)}; width: ${x(AGENTS.width)}`}>
         {graphAgents.map((entry) => {
-          const column = row.indexOf(entry.id);
+          const index = row.indexOf(entry.id);
           return (
-            <div
-              class={`graph-node graph-agent${workers.includes(entry.id) ? " is-active" : ""}`}
+            <li
               data-agent={entry.id}
-              hidden={column < 0}
-              style={column < 0 ? undefined : `grid-column: ${column + 1}`}
+              class={workers.includes(entry.id) ? "is-active" : undefined}
+              hidden={index < 0}
+              style={index < 0 ? undefined : `top: calc(${y(AGENTS.rows[index]!)} - 12px)`}
             >
-              <span class="graph-name"><AgentIcon name={entry.id} size={16} />{entry.app}</span>
-              <span>{entry.model}</span>
-              <span class="graph-strength">{entry.strength}</span>
-            </div>
+              <span class="fig-agent-name"><AgentIcon name={entry.id} size={16} />{entry.app}</span>
+              <span class="fig-agent-model">{entry.model}</span>
+              <span class="fig-agent-strength">{entry.strength}</span>
+              <span class="fig-agent-runs">Fresh session, its own account</span>
+            </li>
           );
         })}
+      </ul>
+
+      <span class="fig-compare label" data-compare style={`left: ${x(join.x)}; top: ${y(join.y)}`} hidden={!compare}>Compare</span>
+
+      <div class="fig-strip" style={`left: ${x(STRIP.x)}; top: ${y(STRIP.y)}; width: ${x(STRIP.width)}; height: ${y(STRIP.height)}`}>
+        {strips.map((strip) => (
+          <video data-strip={strip.task} data-credit-text={strip.credit?.text} data-credit-href={strip.credit?.href} hidden={strip.task !== taskId} aria-hidden="true" width="630" height="85" poster={`/studies/${strip.name}.jpg`} muted playsinline preload={strip.task === taskId ? "metadata" : "none"}>
+            <source src={`/studies/${strip.name}.mp4`} type="video/mp4" />
+            <source src={`/studies/${strip.name}.webm`} type="video/webm" />
+          </video>
+        ))}
       </div>
 
-      <svg class="graph-paths" viewBox="0 0 600 56" preserveAspectRatio="none" aria-hidden="true">
-        {back.map((d, index) => <path d={d} data-back={index} class={workers.includes(row[index]!) ? "is-active" : undefined} />)}
-      </svg>
+      <p class="fig-label fig-label-back" data-back-label style={`left: ${x(STRIP.x)}; top: calc(${y(ANSWER_Y)} + 10px)`} hidden={!workers.length}>{text.backLabel}</p>
 
-      <div class={`graph-node graph-back${workers.length ? " is-receiving" : ""}`}>
-        <span class="label graph-compare" data-compare hidden={!compare}>Compare</span>
-        <span class="label">Back in your chat</span>
-        <span class="graph-name">
-          {graphAgents.map((entry) => <span data-icon={entry.id} hidden={entry.id !== from}><AgentIcon name={entry.id} size={16} /></span>)}
-          <span data-you-app>{you.app}</span>
-        </span>
-        <span data-back-short>{text.backShort}</span>
-      </div>
+      <ol class="fig-steps" data-steps hidden>
+        {steps.map((point, index) => (
+          <li data-step={index} data-side={index === 1 || index === 2 ? "left" : "right"} style={`left: ${x(point.x)}; top: ${y(point.y)}`}><span class="fig-step-dot">{index + 1}</span><span data-step-text>{text.steps[index] ?? ""}</span></li>
+        ))}
+      </ol>
     </div>
 
-    <figcaption class="graph-panel" aria-live="polite">
-      <p class="graph-summary" data-summary>{text.summary}</p>
-      <p class="graph-request">“<span data-request>{task.request}</span>”</p>
-      <dl class="graph-facts" data-facts hidden={!workers.length}>
-        <div><dt class="label">Sent</dt><dd data-sent>{text.sent}</dd></div>
-        <div><dt class="label">Runs</dt><dd data-runs>{text.runs}</dd></div>
-        <div><dt class="label">Back</dt><dd data-back>{text.back}</dd></div>
-      </dl>
-      <p class="graph-evidence" data-evidence>
+    <figcaption class="fig-caption" aria-live="polite">
+      <p class="fig-summary" data-summary>{text.summary}</p>
+      <p class="fig-evidence" data-evidence>
         {task.recorded && task.recorded.from === from
           ? <><span><span class="recorded-dot" aria-hidden="true"></span>{task.recorded.text}</span><a class="text-link" href={task.recorded.href}>Read the write-up <ArrowUpRight size={14} aria-hidden="true" /></a></>
           : <span>Example request. Model access depends on your installed agents and accounts.</span>}
       </p>
+      <p class="fig-credit" data-credit hidden={!credit}>{credit && <a href={credit.href}>{credit.text}</a>}</p>
     </figcaption>
   </figure>
 </section>
