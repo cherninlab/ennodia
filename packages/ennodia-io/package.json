@@ -1,6 +1,6 @@
 {
   "name": "@cherninlab/ennodia-io",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Experimental OpenAI-compatible local HTTP surface for Ennodia",
   "license": "MIT",
   "type": "module",
@@ -52,7 +52,7 @@
     "publish:dry-run": "npm publish --dry-run --tag next"
   },
   "dependencies": {
-    "ennodia": "0.3.0",
+    "ennodia": "0.4.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {

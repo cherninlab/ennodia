@@ -2,6 +2,30 @@
 
 This file records all notable Ennodia changes.
 
+## [0.4.0] - 2026-09-26
+
+### Added
+
+- Marked tools that only read with the MCP read-only annotation, so clients such as Codex run them without an approval prompt.
+- Let the Compare Result Advisor name, in `chosenSourceId`, one candidate that answers the prompt as it stands. `ennodia_run` then returns that candidate's own text, unchanged, after the Advisor's reason. A choice of an unlisted candidate, or of one the Advisor saw only in part, is dropped with an `advisor-choice-ignored` event.
+
+### Changed
+
+- Loaded six core tools by default: about 10,000 characters of tool definitions in each agent session, down from 45,000. Set `ENNODIA_TOOLS=all` or pass `--tools all` for the full set.
+- Redesigned the website around an interactive agent graph, with capability strips drawn from recorded runs.
+
+### Removed
+
+- Removed the bug-recall benchmark, the docs-drift and skill-trial examples, and their evidence pages. Studies on public benchmarks will replace them.
+
+### Fixed
+
+- Tagged Ennodia's execution notice and media guidance as separate blocks, so workers do not read them as task content. Claude Code receives them as operator instructions through `--append-system-prompt`.
+- Reported an agent CLI that is too old for the requested model as its own cause, not as a bad configuration.
+- Named every unsupported harness setting in one error, so a caller fixes them in one retry, not one per setting.
+- Reported a tool that a headless agent could not get permission for as its own cause, with the narrow fix, not as a provider failure.
+- Restarted an OpenCode task that stopped at startup because another OpenCode run held its local database. A conflict that outlasts three restarts is reported as its own cause.
+
 ## [0.3.0] - 2026-09-18
 
 ### Added
