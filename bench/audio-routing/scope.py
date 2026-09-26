@@ -37,7 +37,7 @@ args = parser.parse_args()
 
 PALETTES = {
     # The website's paper, ink, and olive, with the ramp's light step for marks.
-    "site": {"paper": "#f6f4ee", "ink": "#000000", "subtle": "#666666", "line": "#d8dad0", "deep": "#2c3625", "mid": "#7f975a", "light": "#fffefa", "accent": "#4f6339", "tag": "#000000", "tagText": "#f6f4ee"},
+    "site": {"paper": "#f6f4ee", "ink": "#000000", "subtle": "#666666", "line": "#d8dad0", "deep": "#2c3625", "mid": "#7f975a", "light": "#fffefa", "accent": "#4f6339", "tag": "#fffefa", "tagText": "#000000", "tagBorder": "#000000"},
     # The reference video's ultramarine and orange.
     "reference": {"paper": "#e9eaf0", "ink": "#101218", "subtle": "#5b6070", "line": "#c9ccd8", "deep": "#1a2fd4", "mid": "#6d7ff0", "light": "#f4f5fa", "accent": "#f2641d", "tag": "#1d2233", "tagText": "#e9eaf0"},
 }
@@ -169,6 +169,9 @@ scan = pg.InfiniteLine(angle=0, pen=pg.mkPen(C["accent"], width=2))
 spec_plot.addItem(scan)
 caps = pg.ScatterPlotItem(symbol="s", size=10, pen=pg.mkPen(C["accent"]), brush=pg.mkBrush(C["accent"]))
 spec_plot.addItem(caps)
+# The site palette outlines its tags. A solid ink tag would be the darkest
+# mark on the page.
+border = pg.mkPen(C["tagBorder"], width=1.5) if C.get("tagBorder") else None
 scan_label = pg.TextItem("", color=C["accent"], fill=pg.mkBrush(C["paper"]), anchor=(1, 1.15))
 scan_label.setFont(mono(9 if PORTRAIT else 10))
 spec_plot.addItem(scan_label)
@@ -191,14 +194,14 @@ for t, f, db in peaks:
     near_edge = t > duration * (0.5 if args.layout == "strip" else 0.7)
     readings = [f"t {t:5.2f} s", f"f {hz / 1000:4.2f} kHz", f"{db:+5.1f} dB rel"]
     # A short strip has room for one line of readings.
-    tag = pg.TextItem("  ".join(readings[:2]) if args.layout == "strip" else "\n".join(readings), color=C["tagText"], fill=pg.mkBrush(C["tag"]), anchor=(1.08, 1.1) if near_edge else (-0.08, 1.1))
+    tag = pg.TextItem("  ".join(readings[:2]) if args.layout == "strip" else "\n".join(readings), color=C["tagText"], fill=pg.mkBrush(C["tag"]), border=border, anchor=(1.08, 1.1) if near_edge else (-0.08, 1.1))
     tag.setFont(mono(9 if PORTRAIT else 10))
     tag.setPos(t - box_w / 2 if near_edge else t + box_w / 2, y0 + box_h)
     tag.setVisible(False)
     spec_plot.addItem(tag)
     boxes.append((t, box, center, tag))
 STRIP = args.layout == "strip"
-chip = pg.TextItem(" PERCEPTION · " + clip_id.upper() + " " if STRIP else " LISTENING · GEMINI 3.8 FLASH ", color=C["tagText"], fill=pg.mkBrush(C["tag"]), anchor=(0, 0) if STRIP else (1, 0))
+chip = pg.TextItem(" PERCEPTION · " + clip_id.upper() + " " if STRIP else " LISTENING · GEMINI 3.8 FLASH ", color=C["tagText"], fill=pg.mkBrush(C["tag"]), border=border, anchor=(0, 0) if STRIP else (1, 0))
 chip.setFont(mono(10))
 chip.setPos(duration * 0.01 if STRIP else duration * 0.98, ROWS * 0.97)
 spec_plot.addItem(chip)

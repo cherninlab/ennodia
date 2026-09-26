@@ -56,9 +56,10 @@ def canvas(pixels: bool = False) -> tuple[pg.GraphicsLayoutWidget, pg.PlotItem]:
 
 
 def label(plot: pg.PlotItem, text: str, x: float, y: float, anchor=(0, 0), dark: bool = True) -> pg.TextItem:
-    """A tag: ink on paper-light, or paper on ink when dark."""
-    item = pg.TextItem(f" {text} ", color=PALETTE["paper"] if dark else PALETTE["ink"],
-                       fill=pg.mkBrush(PALETTE["ink"] if dark else PALETTE["card"]), anchor=anchor)
+    """A tag: ink on card, outlined in ink when it names the strip. A solid
+    ink tag would be the darkest mark on the page, so none is solid."""
+    item = pg.TextItem(f" {text} ", color=PALETTE["ink"], fill=pg.mkBrush(PALETTE["card"]),
+                       border=pg.mkPen(PALETTE["ink"], width=1.5) if dark else None, anchor=anchor)
     item.setFont(mono(10))
     item.setPos(x, y)
     plot.addItem(item)
