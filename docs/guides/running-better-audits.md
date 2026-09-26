@@ -1,5 +1,5 @@
 ---
-title: Better Audits
+title: Better audits
 description: How Ennodia audits can detect product problems that users see, not only consistency issues.
 ---
 
@@ -11,7 +11,7 @@ This pass can find broken links, mismatched documentation, release metadata erro
 errors, and copy drift. It does not prove that the page is clear to a first-time
 visitor.
 
-## Quick Recipe
+## Quick recipe
 
 Use a source-grounded audit for answers that depend on documentation,
 standards, package behavior, or another product's public surface:
@@ -31,7 +31,7 @@ standards, package behavior, or another product's public surface:
 Install the skill first if the harness does not have it. See
 [Agent Skills](/docs/guides/agent-skills/).
 
-## Pick the Audit Mode
+## Pick the audit mode
 
 Name the failure mode you want reviewers to catch.
 
@@ -50,7 +50,7 @@ For a large review, split the work into focused slices. Do not send the entire
 prompt to each reviewer. See
 [Compositional Audits](/docs/concepts/compositional-audits/).
 
-## Landing Page Rubric
+## Landing page rubric
 
 For landing pages, require each reviewer to answer these questions:
 
@@ -64,7 +64,7 @@ For landing pages, require each reviewer to answer these questions:
 For Ennodia, use `mode: "parallel"` and `compare: true` for this type of review.
 A single source-only answer is not sufficient for product pages.
 
-## Include Rendered Evidence
+## Include rendered evidence
 
 Source-only review misses visual problems. Before an Ennodia website review,
 include desktop and mobile screenshots. You can also use a harness with browser
@@ -79,7 +79,7 @@ Then inspect the child outputs for access errors.
 If a harness cannot read the files, put them in an accessible location and run
 the task again. Do not treat that failure as a normal design review.
 
-## Ground Standards in Sources
+## Ground standards in sources
 
 Include primary sources when an audit depends on an external standard, registry
 convention, or product behavior. Require reviewers to separate facts from
@@ -99,7 +99,7 @@ The bundled `source-grounded-audit` skill supports this case. Install it in the
 harnesses that perform standards-sensitive audits. Then tell Ennodia to use the
 skill when the answer depends on external documentation.
 
-## Good Prompt Shape
+## Good prompt shape
 
 ```text
 Audit this landing page as a first-time visitor, not as a code consistency

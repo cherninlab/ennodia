@@ -3,6 +3,8 @@ title: Pragmatic mode
 description: Organize independent model attempts and compare evidence against complete acceptance criteria.
 ---
 
+The tools on this page are in the [full tool set](/docs/reference/mcp-tools/#tool-sets). Add `--tools all` to the Ennodia server arguments to load them.
+
 Pragmatic mode is an opt-in beta in `0.3.0`, available through `ennodia`.
 It helps your main agent delegate bounded work without loading entire logs or files into the main conversation.
 It does not guarantee lower costs or select the cheapest model automatically.

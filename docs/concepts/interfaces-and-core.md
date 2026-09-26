@@ -3,7 +3,7 @@ title: Interfaces and Core
 description: How Ennodia's Model Context Protocol (MCP) interface and shared core behavior relate to each other.
 ---
 
-## Current Shape
+## Current shape
 
 Ennodia has a Model Context Protocol (MCP) interface and a shared Core.
 

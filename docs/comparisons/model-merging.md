@@ -1,5 +1,5 @@
 ---
-title: Ennodia vs Model Merging
+title: Ennodia vs model merging
 description: How Ennodia differs from model merging tools such as mergekit and other weight-level model-combination approaches.
 ---
 
@@ -10,14 +10,14 @@ describes it as tools for model-checkpoint merging strategies.
 
 Ennodia does not change model weights.
 
-## Choose Model Merging When
+## Choose model merging when
 
 - You control compatible model weights.
 - You want one merged model artifact.
 - You want changes to happen before inference.
 - You evaluate merge recipes, checkpoints, or open-weight model behavior.
 
-## Choose Ennodia When
+## Choose Ennodia when
 
 - You want separate agents to run at task time.
 - You want to keep provider subscriptions and installed command-line interfaces
@@ -26,12 +26,12 @@ Ennodia does not change model weights.
   output.
 - You do not want to produce or host a new model artifact.
 
-## Key Difference
+## Key difference
 
 Model merging changes the model artifact. Ennodia coordinates multiple agents at
 runtime.
 
-## Common Mistake
+## Common mistake
 
 Do not describe Ennodia as model merging, fine-tuning, or weight composition. It
 is runtime orchestration over installed local agents.

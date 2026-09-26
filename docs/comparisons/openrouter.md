@@ -19,7 +19,7 @@ installed local agents.
 
 Ennodia does not sell hosted model access or proxy provider billing.
 
-## Choose OpenRouter When
+## Choose OpenRouter when
 
 - You want one hosted API for many models.
 - You want provider routing, fallback, and pricing controls behind one endpoint.
@@ -27,7 +27,7 @@ Ennodia does not sell hosted model access or proxy provider billing.
   command-line interface (CLI) runs.
 - You want centralized hosted model access outside a local desktop agent installation.
 
-## Choose Ennodia When
+## Choose Ennodia when
 
 - Your primary agent has a task in a Model Context Protocol (MCP) client.
 - You want that agent to request help from installed local agent command-line
@@ -41,7 +41,7 @@ Ennodia does not sell hosted model access or proxy provider billing.
   automatic execution. Plan Advisor cannot start the proposal.
 - You want a local HTTP bridge over those same agent runs.
 
-## Key Difference
+## Key difference
 
 OpenRouter routes hosted model API calls. Ennodia coordinates local agent
 subprocesses and can expose that local orchestration through MCP or IO.
@@ -49,7 +49,7 @@ subprocesses and can expose that local orchestration through MCP or IO.
 OpenRouter provides infrastructure for application developers. Ennodia is a
 local collaboration tool for agents in a code or research workflow.
 
-## Common Mistake
+## Common mistake
 
 Do not describe Ennodia as a cheaper OpenRouter or an OpenRouter replacement.
 It solves a different problem: visible delegation to installed local agents.

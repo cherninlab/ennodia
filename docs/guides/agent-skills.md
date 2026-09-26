@@ -3,6 +3,8 @@ title: Agent Skills
 description: Install bundled Ennodia skills in native harness locations and tell child agents to use them during a run.
 ---
 
+Listing skills is in the core tool set. Installing them needs the [full tool set](/docs/reference/mcp-tools/#tool-sets).
+
 A new Agent Skill can help a task, add irrelevant advice, or make no difference.
 Try the skill in a separate Ennodia task and bring useful findings back to your main conversation.
 
@@ -11,9 +13,8 @@ Ennodia discovers that folder and requests the selected skill by name.
 It does not inline the full instructions into each delegated prompt.
 
 The primary agent can keep useful partial findings without adopting every recommendation.
-The [skill trial example](/docs/evidence/skill-trial/) shows a controlled small exercise.
 
-## List Available Skills
+## List available skills
 
 ```json
 {
@@ -27,7 +28,7 @@ The [skill trial example](/docs/evidence/skill-trial/) shows a controlled small 
 The response includes bundled skills, installed native skills, searched
 directories, and load warnings.
 
-## Preview Installation
+## Preview installation
 
 Bundled skills use dry-run installation by default. The caller can inspect the
 planned writes before any change:
@@ -47,7 +48,7 @@ planned writes before any change:
 
 Review the planned paths. If they are correct, repeat with `dryRun: false`.
 
-## Use a Skill in a Run
+## Use a skill in a run
 
 ```json
 {
@@ -81,7 +82,7 @@ Bundled skills include:
 | `release-readiness` | Public release candidate checks. |
 | `benchmark-critic` | Benchmark credibility and reproducibility review. |
 
-## Native Install Locations
+## Native install locations
 
 | Harness | Project path | User path |
 | --- | --- | --- |

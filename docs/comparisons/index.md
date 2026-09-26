@@ -17,7 +17,7 @@ interface (API) subset to the same agents.
 Some adjacent tools have similar descriptions. They usually have different
 purposes.
 
-## Choose the Right Page
+## Choose the right page
 
 | Question | Page |
 | --- | --- |
@@ -30,7 +30,7 @@ purposes.
 | Is Ennodia model merging? | [Ennodia vs Model Merging](./model-merging/) |
 | What is the broader pattern? | [Second Opinions as Infrastructure](/docs/concepts/second-opinions/) |
 
-## What Ennodia Is
+## What Ennodia is
 
 Ennodia is:
 
@@ -47,7 +47,7 @@ Ennodia is:
   Result Advisor recommends an answer
 - a native Agent Skills bridge for harnesses that support `SKILL.md` folders
 
-## What Ennodia Is Not
+## What Ennodia is not
 
 Ennodia is not:
 
@@ -64,7 +64,7 @@ Durable model and skill preference memory is roadmap work. By default, Ennodia
 stores terminal run history locally. In-progress run and task state remains
 process-local.
 
-## Other Related Work
+## Other related work
 
 Some related ideas do not need a full page yet:
 

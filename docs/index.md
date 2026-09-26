@@ -3,8 +3,6 @@ title: What is Ennodia?
 description: Try other agents, models, and skills while staying in your familiar conversation.
 ---
 
-# Keep your agent. Get another way forward.
-
 Ennodia lets your primary artificial intelligence (AI) agent try another agent, model, or skill on a focused task.
 The findings return to your existing conversation.
 
@@ -17,7 +15,7 @@ Even an unsuccessful attempt can show which approach was tested under the record
 - [Get your first result](/docs/getting-started/).
 - [Choose a recipe](/docs/guides/recipes/).
 - [Understand the result](/docs/guides/understand-results/).
-- [Read a development case](/docs/evidence/building-ennodia/).
+- [Read a recorded run](/articles/can-gemini-hear-this-file/).
 
 ## Your existing tools
 
@@ -33,7 +31,7 @@ A native agent can also choose unrequested skills from its environment.
 - [Agent skills](/docs/guides/agent-skills/)
 - [Troubleshooting](/docs/guides/troubleshooting/)
 - [Data movement and history](/docs/concepts/data-governance/)
-- [Examples and evidence](/docs/evidence/)
+- [Evidence](/docs/evidence/)
 - [Roadmap](/docs/roadmap/)
 - [Technical reference](/docs/reference/mcp-tools/)
 

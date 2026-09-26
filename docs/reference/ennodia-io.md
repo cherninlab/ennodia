@@ -57,7 +57,7 @@ Environment variables:
 | `ENNODIA_IO_MAX_REQUEST_BODY_SIZE` | Default request body byte cap. |
 | `ENNODIA_IO_MAX_CONCURRENT_CHAT_COMPLETIONS` | Default in-flight chat completion cap. |
 
-## Security and Browser Access
+## Security and browser access
 
 IO binds to loopback by default and refuses non-loopback hosts unless an API key
 is configured. Bearer tokens are compared with a timing-safe comparison.
@@ -94,7 +94,7 @@ boundary.
 | `GET /v1/models` | Supported | Returns local virtual model IDs for compatible clients. |
 | `POST /v1/chat/completions` | Supported subset | Non-streaming text messages only. Requires a JSON media type. |
 
-## Provider Options
+## Provider options
 
 Use provider options when building a settings screen:
 
@@ -135,7 +135,7 @@ Option statuses:
 
 Add `?includeUnavailable=false` to return only ready options.
 
-## Virtual Models
+## Virtual models
 
 `GET /v1/models` returns local virtual models for OpenAI-compatible clients:
 
@@ -148,7 +148,7 @@ Add `?includeUnavailable=false` to return only ready options.
 Older aliases `ennodia-auto`, `ennodia/auto`, and `ennodia/compare` are accepted
 for compatibility. Prefer `local/*` IDs in new app integrations.
 
-## Chat Completions
+## Chat completions
 
 Minimal request:
 
@@ -234,7 +234,7 @@ HTTP error response:
 - timeout, disappeared run, or start failure -> `502 ennodia_run_error`
 - failed run or run with `cancelled` status -> `502 ennodia_run_failed` plus run metadata
 
-## Library Use
+## Library use
 
 Apps can import the same primitives without running the HTTP server:
 
@@ -249,7 +249,7 @@ const providerOptions = await listAppProviderOptions(core);
 The app stays in control of its settings UI, labels, persistence, and consent
 flow. Ennodia supplies local discovery and execution primitives.
 
-## Smoke Test
+## Smoke test
 
 From a checkout:
 
@@ -260,7 +260,7 @@ bun run io:smoke
 The smoke test starts a local IO server and checks `/health`,
 `/v1/provider-options`, and `/v1/models` without launching child agents.
 
-## Not Implemented
+## Not implemented
 
 IO deliberately rejects or omits:
 

@@ -1,14 +1,16 @@
 ---
-title: Compositional Audits
+title: Compositional audits
 description: Split large reviews into focused slices, route them to local agents, and combine the results without losing traceability.
 ---
+
+The tools on this page are in the [full tool set](/docs/reference/mcp-tools/#tool-sets). Add `--tools all` to the Ennodia server arguments to load them.
 
 Large reviews work better when each agent gets a small, explicit slice. Ennodia
 supports this pattern with `ennodia_start_compositional`, existing task polling,
 and `ennodia_start_compare`. The `compositional-audit` skill gives reviewers a
 consistent rubric.
 
-## When To Use It
+## When to use it
 
 Use a compositional audit when the request mixes multiple risk types, such as:
 
@@ -20,7 +22,7 @@ Use a compositional audit when the request mixes multiple risk types, such as:
 One broad prompt can make every reviewer repeat the same surface-level answer.
 Slices make each response easier to verify and combine.
 
-## Good Slice Shape
+## Good slice shape
 
 A useful slice includes:
 
@@ -48,7 +50,7 @@ Return under 450 words:
 4. concrete recommendation
 ```
 
-## Current Workflow
+## Current workflow
 
 Install the skill into the harnesses you want to use:
 
@@ -150,14 +152,14 @@ When `compareReady` is true, pass the returned `readyTaskIds` to
 }
 ```
 
-## What To Avoid
+## What to avoid
 
 - Do not send the entire plan to every shard if the goal is faster, deeper review.
 - Do not mix unrelated evidence in one slice.
 - Do not treat failed, empty, or access-limited shard output as a normal review.
 - Do not claim consensus when the slices disagree.
 
-## Current Boundary
+## Current boundary
 
 `ennodia_estimate_compositional_budget` resolves and budgets slices without
 starting child agents. `ennodia_start_compositional` starts and budgets the shard

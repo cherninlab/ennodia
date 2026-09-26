@@ -1,5 +1,5 @@
 ---
-title: Model Context Protocol (MCP) Tools
+title: Model Context Protocol (MCP) tools
 description: The public Model Context Protocol (MCP) tool surface exposed by Ennodia.
 ---
 
@@ -8,20 +8,58 @@ This page describes the tools exposed by the Ennodia Model Context Protocol
 orchestration and returns a run ID. Use `ennodia_get_run` to poll status,
 events, child task IDs, Judge + Result Advisor state, and the final answer.
 
-## Common Workflows
+## Tool sets
 
-| Goal | Tool sequence |
-| --- | --- |
-| Check local setup | `ennodia_list_harnesses` |
-| Preview route and cost | `ennodia_estimate_budget` |
-| Preview compositional shard cost | `ennodia_estimate_compositional_budget` |
-| Request a tailored team, inspect it, then launch it | `ennodia_start_plan_advice` -> `ennodia_get_plan_advice` -> `ennodia_start_advised_plan` |
-| Start a visible end-to-end run | `ennodia_run` -> `ennodia_get_run` |
-| Start focused review shards | `ennodia_start_compositional` -> `ennodia_get_compositional_status` |
-| Debug raw child tasks | `ennodia_start` -> `ennodia_get_task` |
-| Judge completed outputs and advise on the result | `ennodia_start_compare` -> `ennodia_get_compare` |
-| Install bundled skills | `ennodia_list_skills` -> `ennodia_install_skills` |
-| Inspect terminal receipts after restart | `ennodia_history` |
+An agent loads every tool definition into each session where Ennodia is configured, even when the session never calls Ennodia.
+By default, Ennodia loads six core tools, about 10,000 characters of definitions.
+They cover handing work to one agent or a team, Compare, waiting, cancelling, and run history.
+
+The full set adds 20 tools for raw tasks, compositional slices, Plan Advisor, budget estimates, separate Compare calls, and skill installation.
+It loads about 46,000 characters of definitions.
+Set `ENNODIA_TOOLS=all` in the server's environment, or add `--tools all` to its arguments:
+
+```json
+{
+  "mcpServers": {
+    "ennodia": {
+      "command": "npx",
+      "args": ["-y", "ennodia", "--tools", "all"]
+    }
+  }
+}
+```
+
+An unknown `--tools` value stops the server with an error. An unknown `ENNODIA_TOOLS` value prints a warning and loads the core set.
+
+### Approvals
+
+Tools that only read declare the MCP `readOnlyHint` annotation. Clients such as Codex run them without an approval prompt, so polling a run never waits for approval.
+Tools that start agents declare `openWorldHint`, because their workers call model providers. Their workers can change files when the caller allows it, so they claim neither read-only nor harmless.
+
+Headless Codex, such as `codex exec`, never asks for approval. It refuses any tool that needs one.
+To let it start Ennodia runs, add this to `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.ennodia.tools.ennodia_run]
+approval_mode = "approve"
+```
+
+This setting approves Ennodia runs only. Codex's sandbox and its other tools keep their settings.
+
+## Common workflows
+
+| Goal | Tool sequence | Tool set |
+| --- | --- | --- |
+| Check local setup | `ennodia_list_harnesses` | core |
+| Start a visible end-to-end run | `ennodia_run` -> `ennodia_get_run` | core |
+| Inspect terminal receipts after restart | `ennodia_history` | core |
+| Preview route and cost | `ennodia_estimate_budget` | full |
+| Preview compositional shard cost | `ennodia_estimate_compositional_budget` | full |
+| Request a tailored team, inspect it, then launch it | `ennodia_start_plan_advice` -> `ennodia_get_plan_advice` -> `ennodia_start_advised_plan` | full |
+| Start focused review shards | `ennodia_start_compositional` -> `ennodia_get_compositional_status` | full |
+| Debug raw child tasks | `ennodia_start` -> `ennodia_get_task` | full |
+| Judge completed outputs and advise on the result | `ennodia_start_compare` -> `ennodia_get_compare` | full |
+| Install bundled skills | `ennodia_list_skills` -> `ennodia_install_skills` | full |
 
 For harness IDs and setup notes, see
 [Supported Harnesses](/docs/reference/supported-harnesses/). For budget request
@@ -83,6 +121,10 @@ and character counts.
 For task views, `maxOutputChars` bounds each of `stdout`, `stderr`, and `finalMessage`.
 `includeOutput: false` omits their text. `hasOutput` and `finalMessageChars` remain available in compact views.
 `hasOutput` includes captured diagnostic output. It does not establish correctness or a useful answer.
+
+A worker CLI can stop at startup when another instance holds its local state, as OpenCode does with its database.
+Ennodia restarts that start up to three times, records a `restart` task event, and reports `startupRestarts` in the task view.
+Restarts keep the original deadline.
 
 On macOS and Linux, tasks own process groups. Cancellation sends TERM, then KILL after a bounded grace period.
 Cleanup also removes descendants that remain in the owned group after the parent exits.
@@ -573,6 +615,14 @@ blind spots, and risks. The Result Advisor uses that analysis plus the original
 candidates to return a typed answer, basis, confidence, and open questions.
 This is model-led comparison, not formal voting.
 
+When one candidate fully answers the prompt as it stands, such as a complete
+file, the Result Advisor names it in `chosenSourceId`. A caller can then use
+that candidate's own text, not a rewrite. `ennodia_run` does this for you: its
+final answer is the Advisor's reason, then the chosen candidate unchanged.
+Ennodia keeps the field only when it names a listed candidate that the Advisor
+saw in full. Otherwise it records an `advisor-choice-ignored` event. A blank
+or null value means no choice.
+
 ### `ennodia_get_compare`
 
 Returns comparison status, candidate inputs, Judge analysis, and typed Result
@@ -621,10 +671,14 @@ See [Pragmatic mode](/docs/guides/pragmatic-mode/) for examples, evidence retrie
 
 Task receipts include `deadlineAt` and `timeoutSource` (`caller` or
 `task-manager-default`). The deadline is the process cutoff, not a prediction
-of completion. Every child prompt receives its execution allowance and source.
+of completion. Every child task receives its execution allowance and source.
 It asks for useful partial findings before the cutoff and reports of
 missing tools or permissions. Caller tools are not
 automatically inherited. This notice does not grant access or extend deadlines.
+
+Claude Code receives the notice as operator instructions through `--append-system-prompt`.
+Other agents receive it as a tagged block after the task, marked as coming from Ennodia.
+The task command shows the notice as `<ennodia-notice>`.
 
 A timed-out task is an interrupted attempt. Review its captured
 output, events, partial changes, scope, and access before deciding how to proceed.

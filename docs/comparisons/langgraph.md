@@ -10,14 +10,14 @@ manage, and deploy long-running, stateful agents.
 Ennodia is intentionally narrower. It does not require a custom graph,
 state machine, durable agent state, or application runtime.
 
-## Choose LangGraph When
+## Choose LangGraph when
 
 - You create an agentic application.
 - You need custom graph nodes, edges, state, persistence, or deployment control.
 - You want to model a workflow as programmable application infrastructure.
 - You own the application code and want a framework embedded in that code.
 
-## Choose Ennodia When
+## Choose Ennodia when
 
 - You have a primary agent in a Model Context Protocol (MCP) client.
 - You want that agent to request help from other installed local agent
@@ -28,7 +28,7 @@ state machine, durable agent state, or application runtime.
   validated start request.
 - You want a small MCP surface without a full application framework.
 
-## Key Difference
+## Key difference
 
 LangGraph helps developers create agent systems. Ennodia lets one agent delegate
 work to other local agents during a task.
@@ -36,7 +36,7 @@ work to other local agents during a task.
 Plan Advisor does not change this boundary: it can propose explicit worker
 assignments, but it cannot define arbitrary graph behavior or execute the plan.
 
-## Common Mistake
+## Common mistake
 
 Do not treat Ennodia as a lighter LangGraph runtime. Ennodia does not replace a
 programmable graph framework. It gives an active agent a simple way to request

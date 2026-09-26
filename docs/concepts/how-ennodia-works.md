@@ -1,5 +1,5 @@
 ---
-title: How Ennodia Works
+title: How Ennodia works
 description: A visible orchestration pipeline for optional plan advice, routing, budget checks, task watching, recovery, Judge, and Result Advisor passes.
 ---
 
@@ -8,7 +8,7 @@ turns one request into a visible orchestration. The normal entrypoint is
 `ennodia_run`. Lower-level task and Compare tools stay available for debugging
 and manual control.
 
-## Pipeline at a Glance
+## Pipeline at a glance
 
 | Stage | What happens | Main tools |
 | --- | --- | --- |

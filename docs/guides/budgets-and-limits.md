@@ -1,7 +1,9 @@
 ---
-title: Budgets and Limits
+title: Budgets and limits
 description: How Ennodia estimates preflight input-token budgets and enforces local run limits before child agents start.
 ---
+
+The tools on this page are in the [full tool set](/docs/reference/mcp-tools/#tool-sets). Add `--tools all` to the Ennodia server arguments to load them.
 
 Ennodia can estimate the input-token budget before a costly run starts. The
 estimate is a budget limit check, not a provider invoice. Child-task estimates
@@ -13,7 +15,7 @@ not visible before the run.
 Use it before parallel work or long reviews. Also use it when the user limits
 cost, subscription use, or child-task count.
 
-## What the Estimate Includes
+## What the estimate includes
 
 `ennodia_estimate_budget` reports:
 
@@ -29,7 +31,7 @@ cost, subscription use, or child-task count.
 The estimate does not claim to know provider billing, output tokens, tool-call
 cost, cache behavior, harness-internal context, or private subscription quota.
 
-## Estimate Before a Run
+## Estimate before a run
 
 ```json
 {
@@ -54,7 +56,7 @@ If the estimate is too high, use one or more of these changes:
 - Decrease `maxOutputChars`.
 - Use a narrower first pass.
 
-## Enforce Limits on a Run
+## Enforce limits on a run
 
 The same budget object can be passed to `ennodia_run`:
 
@@ -78,7 +80,7 @@ Ennodia checks these local limits before child tasks start. The run fails early
 if estimated input tokens or the child-task count exceed a cap. Ennodia does
 not start the excess model work.
 
-## Subscription Limits
+## Subscription limits
 
 Subscription quota checks are conservative by design. Ennodia uses only
 supported local command-line interface (CLI) and application programming
@@ -93,7 +95,7 @@ supported local surface exposes a reliable account limit. An older fail-closed
 quota gate has been retired until at least one current harness exposes a real
 supported quota surface.
 
-## Practical Defaults
+## Practical defaults
 
 - Start with one agent and a narrow task. Add attempts when they address a specific uncertainty.
 - Use `maxOutputChars` to keep Compare input bounded.

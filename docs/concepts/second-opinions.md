@@ -1,5 +1,5 @@
 ---
-title: Second Opinions as Infrastructure
+title: Second opinions as infrastructure
 description: How to use Ennodia for independent artificial intelligence (AI) panels, decomposed reviews, and red-team prompts.
 ---
 
@@ -11,7 +11,7 @@ delegation to installed local agents with a visible trace. Compare turns
 multiple answers into a disagreement map and one usable result. The Judge maps
 the evidence, and the Result Advisor recommends the answer.
 
-## Three Patterns
+## Three patterns
 
 ### Replicate
 
@@ -79,7 +79,7 @@ Fan out prompts that argue against a proposal from different angles.
 Use this when the primary agent has a plausible plan and you want
 independent pressure before committing.
 
-## Staging Pattern
+## Staging pattern
 
 For larger reviews, have the primary agent stage a folder containing the case
 file: relevant paths, screenshots, dataset summaries, contracts, or decision
@@ -87,7 +87,7 @@ criteria. Then pass `cwd` to Ennodia so child agents can inspect the same local
 context independently. Keep staged material deliberate. Do not give every agent
 an unbounded workspace when a smaller evidence bundle will do.
 
-## Skills Carry Expertise
+## Skills carry expertise
 
 Use Agent Skills as reusable rubrics. A skill can define the review standard,
 expected evidence, output shape, and escalation rules. Ennodia installs bundled
@@ -104,7 +104,7 @@ run without inlining the full instructions into every prompt.
 - Exam or rubric QA: send the same staged rubric to multiple agents. Compare
   where their grading differs.
 
-## Honest Constraints
+## Honest constraints
 
 Ennodia supports careful review. A run usually takes minutes, not seconds.
 Compare adds two serial model passes after the child agents finish.

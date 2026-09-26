@@ -3,9 +3,7 @@ title: Recipes
 description: Three small ways to get useful help from Ennodia.
 ---
 
-# Start with one useful attempt
-
-A focused request is easier to check and integrate.
+Start with one useful attempt. A focused request is easier to check and integrate.
 Give your primary agent the relevant files, attempted fixes, and the result you need.
 
 ## A task is stuck
@@ -30,7 +28,6 @@ Show which skill and model were requested and what remains unverified.
 
 Check native installation with your agent before the task starts.
 A requested skill is not proof that the worker loaded it.
-Use the [small skill trial](/docs/evidence/skill-trial/) to practice comparing two attempts.
 
 ## Two answers disagree
 

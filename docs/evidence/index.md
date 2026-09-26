@@ -1,18 +1,11 @@
 ---
-title: Examples and evidence
-description: Try small examples and inspect what Ennodia contributed to its own development.
+title: Evidence
+description: What Ennodia can show with recorded runs, and how it will measure the rest.
 ---
 
-# Examples and evidence
+Ennodia publishes a claim only with a recorded run behind it.
 
-Ennodia helps your primary agent try another approach and bring the findings back.
-These examples show the workflow and its limits.
+- [Can Gemini hear this file?](/articles/can-gemini-hear-this-file/) follows a Codex conversation that handed an audio file to Gemini through Antigravity.
+- The [measurement plan](./measurement.md) defines how Ennodia will compare single agents with teams on public benchmarks.
 
-- [Building Ennodia with Ennodia](./building-ennodia.md) follows a real development task, including an authentication failure and the primary agent’s corrections.
-- [Find stale documentation](./docs-drift.md) provides a small reproducible review exercise.
-- [Try a skill separately](./skill-trial.md) compares two reviews of the same function.
-- [Measurement plan](./measurement.md) defines the next comparative experiment.
-
-The examples are not a speed or cost benchmark.
-The [existing deterministic benchmark](../reference/benchmarks.md) checks saved answers against known findings.
-It does not measure live task completion time.
+For which models lead which kinds of work, see the [leaderboard figure](/#evidence) on the home page. Its values come from the public sources it links.

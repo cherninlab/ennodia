@@ -1,5 +1,5 @@
 ---
-title: Supported Harnesses
+title: Supported harnesses
 description: Current Ennodia adapter IDs, local command-line interface (CLI) surfaces, and setup notes for each supported harness.
 ---
 
@@ -20,7 +20,7 @@ installed and runnable on the current machine.
 | `hermes-agent` | <span class="agent-logo agent-logo--hermes-agent" aria-hidden="true"></span>Hermes Agent | Uses the supported Hermes Agent CLI surface when available. |
 | `antigravity` | <span class="agent-logo agent-logo--antigravity" aria-hidden="true"></span>Antigravity | Runs through `agy` and supports browser-oriented review tasks. |
 
-## First Check
+## First check
 
 ```json
 {
@@ -42,7 +42,7 @@ Discovery checks installed commands, not active authentication or model access.
 A stalled version probe stops at its deadline and adds an adapter note.
 Use a small real task to check the selected agent before sending larger work.
 
-## Media Inputs
+## Media inputs
 
 Ennodia sends a text prompt through the selected CLI. Include local file paths and requested ranges in that prompt.
 The harness must read those files through its available tools and normal permissions.
@@ -54,11 +54,13 @@ For audio comparisons, match excerpts, playback level, and reference material ac
 Native audio findings need evidence of successful media ingestion and observations tied to the requested excerpt.
 Transcription, digital signal processing (DSP), and text-only judging provide distinct evidence. Label each method explicitly.
 
-## Claude Code Models
+## Claude Code models
 
 Claude Code model aliases can change. When exact model selection matters, pass
 the full model ID, such as `claude-sonnet-5` or `claude-fable-5`, rather than an
 alias like `sonnet` or `fable`.
+
+Ennodia passes its execution notice through `--append-system-prompt`, so workers read it as their session's limits.
 
 Do not add permission-bypass flags by default.
 
@@ -74,6 +76,9 @@ profile. Ennodia passes the requested model through the `model` field.
 
 OpenCode model IDs use the provider/model format reported by `opencode models`,
 such as `opencode-go/kimi-k2.7-code`.
+
+OpenCode runs that start at the same moment can fail with `database is locked`.
+Ennodia restarts those starts automatically. A task that still fails reports the conflict as its likely cause.
 
 ## Antigravity
 

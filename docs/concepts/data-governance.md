@@ -1,5 +1,5 @@
 ---
-title: Data Governance
+title: Data governance
 description: What Ennodia stores, what it does not store, and where data can leave the machine.
 ---
 
@@ -8,7 +8,7 @@ task output, or telemetry to an Ennodia-hosted service. The selected child agent
 CLIs can still contact their own model providers according to their own
 configuration, subscriptions, and policies.
 
-## What Ennodia Stores
+## What Ennodia stores
 
 Live process state is held in memory while the server runs. It includes run
 status, task IDs, command summaries, stdout/stderr captures, failures, timing,
@@ -44,7 +44,7 @@ A concurrent append in the short compaction window can also be lost.
 Set `ENNODIA_HISTORY=0` to disable durable history. Set
 `ENNODIA_HISTORY_DIR=/path/to/dir` to move the history file.
 
-## What Ennodia Does Not Know
+## What Ennodia does not know
 
 Budget estimates are preflight input-token estimates, not provider bills. They
 exclude provider-side system prompts, file reads performed inside a child
@@ -52,17 +52,13 @@ agent, tool loops, output tokens, cache behavior, and private subscription
 state. Subscription quota is reported as unknown unless a supported local
 surface exposes a reliable value.
 
-## Explicit Writes
+## Explicit writes
 
 `ennodia_install_skills` can write bundled `SKILL.md` folders into project or
 user skill locations. It defaults to `dryRun: true`, and project-scope installs
 require an explicit `cwd`.
 
-Benchmark runs write under `bench/results/bug-recall/` unless `--out` is
-provided. Those results are ignored by default because live outputs can include
-model text and environment metadata.
-
-## Practical Guidance
+## Practical guidance
 
 Use Ennodia for work that you are willing to send to the selected local agent
 CLIs. Use `cwd` deliberately. Prefer short staged case files over broad prompts.

@@ -47,7 +47,7 @@ Compare adds a Judge pass and a Result Advisor pass after child agents finish.
 
 For a local development checkout, run `bun run verify` before relying on changes.
 
-## Manual Setup
+## Manual setup
 
 ### Requirements
 
@@ -72,7 +72,7 @@ To use Bun directly, run `bunx ennodia`.
 The JSR package `@cherninlab/ennodia` exposes TypeScript modules for import.
 Use the npm package for the stdio MCP executable.
 
-### Local Checkout
+### Local checkout
 
 Use a checkout to modify Ennodia:
 
@@ -83,7 +83,7 @@ bun install
 bun run verify
 ```
 
-### MCP Client Config
+### MCP client config
 
 ```json
 {
@@ -111,12 +111,15 @@ For a local checkout, use the source file:
 
 Replace `/absolute/path/to/ennodia` with your local repository path.
 
+Ennodia loads six core tools by default. For Plan Advisor, compositional slices, raw tasks, and skill installation, add `"--tools", "all"` to `args`. See [tool sets](/docs/reference/mcp-tools/#tool-sets).
+
 Use your client's supported configuration method.
 Preserve existing server entries.
 Reload the tools or restart the client if its setup instructions require this step.
 
-## Optional Team Advice
+## Optional team advice
 
+Team advice uses the [full tool set](/docs/reference/mcp-tools/#tool-sets).
 For a proposed work split, call `ennodia_start_plan_advice`. The Plan Advisor
 proposes explicit harness, model, and skill assignments. It cannot execute them.
 
@@ -138,7 +141,7 @@ completed answers. Then the Result Advisor recommends one answer.
 If Judge analysis is not available, the Result Advisor can use only the
 candidate outputs. The Compare result shows this condition.
 
-## Next Pages
+## Next pages
 
 - [Budgets and Limits](/docs/guides/budgets-and-limits/) explains
   `ennodia_estimate_budget` and run limits.
@@ -148,7 +151,7 @@ candidate outputs. The Compare result shows this condition.
   and installation notes.
 - [MCP Tools](/docs/reference/mcp-tools/) is the full parameter reference.
 
-## Expected Behavior
+## Expected behavior
 
 An Ennodia run is visible. You can inspect:
 

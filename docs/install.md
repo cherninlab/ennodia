@@ -1,5 +1,5 @@
 ---
-title: Installation for Agents
+title: Installation for agents
 description: A copy-paste installation page for agents that install Ennodia in Codex, Claude Code, OpenCode, Antigravity, and other Model Context Protocol (MCP) clients.
 ---
 
@@ -7,7 +7,7 @@ This page gives setup instructions to the user's agent.
 Install Ennodia as a local Model Context Protocol (MCP) server.
 Then connect it to the user's preferred compatible client.
 
-## Copy-Paste Prompt
+## Copy-Paste prompt
 
 ```text
 try-ennodia.cherninlab.com
@@ -16,7 +16,7 @@ try-ennodia.cherninlab.com
 The user can send this address in a new or existing agent conversation.
 The agent handles the setup steps below.
 
-## Check the Environment
+## Check the environment
 
 1. Identify the user's client and the machine where Ennodia will run.
 2. Check that the client can launch a local standard input/output (stdio) MCP server.
@@ -31,7 +31,7 @@ If the current client cannot launch a local MCP server, explain the missing capa
 Use a compatible local client for Ennodia.
 See [Supported Harnesses](/docs/reference/supported-harnesses/) for the worker agents Ennodia can call.
 
-## Install Command
+## Install command
 
 Use the npm package for normal MCP client installation:
 
@@ -42,7 +42,7 @@ npx -y ennodia
 Ennodia requires Bun `1.3.14` or newer. `npx` downloads Ennodia. Bun runs it.
 If the client supports Bun directly, use `bunx ennodia`.
 
-## MCP Configuration
+## MCP configuration
 
 Add this server to the user's MCP client configuration:
 
@@ -70,12 +70,14 @@ For a local Ennodia checkout, use:
 }
 ```
 
+Ennodia loads six core tools by default. For Plan Advisor, compositional slices, raw tasks, and skill installation, add `"--tools", "all"` to `args`. See [tool sets](/docs/reference/mcp-tools/#tool-sets).
+
 The configuration above shows the server command and arguments.
 Adapt its format to the client's documented configuration method.
 Reload the tools or restart the client only when its setup instructions require this step.
 Tell the user which step is needed before trying to call Ennodia.
 
-## Get One Useful Result
+## Get one useful result
 
 After the client exposes Ennodia's tools, start with one small task:
 
@@ -98,7 +100,7 @@ The first run does not require separate planning, budget estimation, or Compare 
 These tools remain available for larger tasks.
 See [MCP Tools](/docs/reference/mcp-tools/) for exact parameters and identifiers (IDs).
 
-## Installed Components
+## Installed components
 
 Ennodia is a local MCP server. It lets the user's main agent request help from
 other installed agent CLI programs during the same task.
@@ -123,7 +125,7 @@ answer.
 Tell the user a real run can take minutes. Compare adds two serial model passes
 after the selected child agents finish.
 
-## Example Requests
+## Example requests
 
 Use Ennodia when the user permits more model work to get a better answer than
 one agent usually gives.
@@ -148,7 +150,7 @@ Compare the results before you recommend the final documentation edit.
 Compare is model-led. The user does not normally need to judge the parallel
 answers. The trace remains available for inspection.
 
-## Optional Next Steps
+## Optional next steps
 
 - Use [Budgets and Limits](/docs/guides/budgets-and-limits/) before costly
   parallel runs.

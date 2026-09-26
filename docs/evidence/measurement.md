@@ -3,8 +3,6 @@ title: How we will measure usefulness
 description: A planned comparison of complete tasks, including unsuccessful attempts and human intervention.
 ---
 
-# How we will measure usefulness
-
 Status: proposed experiment. Results are not available yet.
 
 The primary comparison uses the same main agent with and without Ennodia.
@@ -32,9 +30,12 @@ Compare time together with correctness. Excluding failures from timing can hide 
 Report model tokens, estimated provider charges, and subscription payments separately.
 A token estimate is not a measured provider bill.
 
-[Terminal-Bench](https://github.com/harbor-framework/terminal-bench) is a candidate for terminal tasks.
-[SWE-bench](https://github.com/SWE-bench/SWE-bench) provides a separate direction for repository bug fixes.
+Two public sets fit a first pilot on one computer:
+
+- [Aider polyglot](https://github.com/Aider-AI/polyglot-benchmark): Exercism exercises in Python and JavaScript, graded by each exercise's own tests.
+- [MMAU test-mini](https://huggingface.co/datasets/gamma-lab-umd/MMAU-test-mini): multiple-choice questions about audio clips. It tests routing audio away from agents that cannot hear it.
+
+[Terminal-Bench](https://github.com/harbor-framework/terminal-bench) and [SWE-bench](https://github.com/SWE-bench/SWE-bench) need a container runtime for grading.
 Pin the exact dataset version and evaluation environment.
-Use small custom fixtures for skill trials and manual workflow measurements.
 
 This pilot can reveal useful patterns. It cannot establish universal superiority.

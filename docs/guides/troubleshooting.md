@@ -3,8 +3,6 @@ title: Troubleshooting
 description: Resolve failed starts without confusing configuration errors with model quality.
 ---
 
-# When an attempt cannot finish
-
 Start with the task’s failure reason and captured output.
 Use `ennodia_get_task` for details and `ennodia_list_harnesses` to inspect supported commands.
 

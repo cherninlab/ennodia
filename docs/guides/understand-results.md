@@ -3,8 +3,6 @@ title: Understand results
 description: Distinguish useful findings, disagreement, missing evidence, and failed execution.
 ---
 
-# Understand the result
-
 Process completion is one signal. A useful answer also needs evidence that fits your task.
 
 | Result | Meaning | Next step |

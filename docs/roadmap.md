@@ -3,8 +3,6 @@ title: Roadmap
 description: Reduce the work of choosing, trying, and maintaining agent tools.
 ---
 
-# Make the next useful attempt easier
-
 The roadmap follows the work a user wants to avoid.
 Future items are proposals, not available behavior or release dates.
 

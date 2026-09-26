@@ -3,15 +3,13 @@ title: Controlled English
 description: Ennodia terminology and writing rules for ASD-STE100 Issue 9.
 ---
 
-# Controlled English
-
 Ennodia documentation uses ASD-STE100 Issue 9 as its writing standard.
 This policy applies to the README, documentation, website text, and visible asset text.
 
 Commands, API fields, status values, model IDs, and quoted interface text are data.
 Keep this data exact, even when its text does not use controlled English.
 
-## Writing Rules
+## Writing rules
 
 - Use American English.
 - Use active voice when the agent is known.
