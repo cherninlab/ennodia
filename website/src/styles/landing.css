@@ -33,7 +33,9 @@
   color: var(--muted);
 }
 
-/* The point starts its own line, so it never begins at a line's end. */
+/* The point starts its own line, so it never begins at a line's end. "It"
+   stays quiet, so the ink words read as one sentence: "Ennodia connects
+   the agents you use". */
 .intro h1 .claim {
   display: block;
 }
