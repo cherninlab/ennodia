@@ -1,131 +1,953 @@
-  @font-face {
-    font-family: "Martian Mono";
-    src: url("/fonts/martian-mono-regular.ttf") format("truetype");
-    font-style: normal;
-    font-weight: 400;
-    font-display: swap;
+/* Landing page. Every section uses one grid: a title column and a content
+   column in a 1 : 1.7 ratio, so all edges line up. Sizes come from the type
+   scale and spacing from the 4px scale in site.css. */
+
+.agent-icon {
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
+.agent-icon-mask {
+  display: inline-block;
+  background: currentColor;
+  -webkit-mask: var(--icon) center / contain no-repeat;
+  mask: var(--icon) center / contain no-repeat;
+}
+
+/* The claim, the mechanism in one breath, then the action. The claim's first
+   sentence is quiet: it clears space for the second, which is the point. */
+
+.intro {
+  padding-block: 72px var(--space-9);
+}
+
+.intro h1 {
+  max-width: 990px;
+  color: var(--ink);
+  font: 400 var(--size-display)/1.06 var(--sans);
+  letter-spacing: -0.045em;
+  text-wrap: balance;
+}
+
+.intro h1 .quiet {
+  color: var(--muted);
+}
+
+/* The point starts its own line, so it never begins at a line's end. */
+.intro h1 .claim {
+  display: block;
+}
+
+.intro-letter {
+  max-width: 650px;
+  margin-top: var(--space-6);
+  font-size: var(--size-lead);
+  line-height: 1.6;
+}
+
+.intro .try-prompt {
+  max-width: 650px;
+  margin-top: var(--space-6);
+}
+
+/* The shared grid */
+
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.7fr);
+  column-gap: var(--column-gap);
+  row-gap: var(--space-7);
+  padding-block: var(--space-8) var(--space-9);
+  border-top: 1px solid var(--line);
+}
+
+.split-head {
+  display: grid;
+  align-content: start;
+  justify-items: start;
+  gap: var(--space-4);
+}
+
+.split-head h2 {
+  font: 400 var(--size-title)/1.2 var(--sans);
+  letter-spacing: -0.03em;
+}
+
+.split-head p {
+  max-width: 30em;
+}
+
+/* Figure 1. Agents are the nodes and Ennodia is the paths between them, so
+   Ennodia has no node of its own. Your agent sits above and below the row
+   it hands work to: the work fans out and comes back to the same chat. */
+
+.graph-controls {
+  display: grid;
+  gap: var(--space-5);
+  width: 100%;
+  margin-top: var(--space-2);
+}
+
+.graph-controls fieldset {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.graph-controls legend {
+  padding: 0;
+  margin-bottom: var(--space-2);
+}
+
+/* Controls are things to press, so they use the text face at the small
+   size. Mono uppercase stays for labels that only name things. */
+.choice-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-1);
+}
+
+.choice-list button,
+.graph-tasks button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 36px;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--subtle);
+  font: 400 var(--size-small)/1.3 var(--sans);
+  text-align: left;
+  cursor: pointer;
+}
+
+.choice-list button:hover,
+.graph-tasks button:hover {
+  border-color: var(--field-line);
+  color: var(--ink);
+}
+
+.choice-list button[aria-pressed="true"],
+.graph-tasks button[aria-pressed="true"] {
+  border-color: var(--ink);
+  background: var(--card);
+  color: var(--ink);
+}
+
+.graph-tasks {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-1);
+}
+
+.graph-tasks button {
+  justify-content: center;
+  text-align: center;
+}
+
+.graph-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--ink);
+  font-size: var(--size-small);
+  cursor: pointer;
+}
+
+.graph-switch input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--ink);
+}
+
+.graph {
+  margin: 0;
+}
+
+/* The selected task's capability, as raw material. On a phone the strip
+   keeps a readable height and crops its sides. */
+.graph-strip {
+  margin-bottom: var(--space-6);
+}
+
+.graph-strip[hidden] {
+  display: none;
+}
+
+.graph-strip-credit {
+  margin-top: var(--space-2);
+  color: var(--muted);
+  font-size: var(--size-small);
+  line-height: 1.4;
+}
+
+.graph-strip-credit a {
+  color: inherit;
+  text-decoration-color: var(--line);
+  text-underline-offset: 2px;
+}
+
+.graph-strip video {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1260 / 170;
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  object-fit: cover;
+}
+
+/* A phone keeps the strip's left part, where its tags sit. */
+@media (max-width: 720px) {
+  .graph-strip video {
+    height: 72px;
+    aspect-ratio: auto;
+    object-position: left center;
+  }
+}
+
+.graph-canvas {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  column-gap: var(--space-4);
+}
+
+.graph-row {
+  display: contents;
+}
+
+.graph-node {
+  position: relative;
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--subtle);
+  font-size: var(--size-small);
+  line-height: 1.4;
+  transition: border-color 0.2s, color 0.2s, opacity 0.2s;
+}
+
+.graph-node .label {
+  margin-bottom: var(--space-1);
+}
+
+/* A dot where each path meets a node, like a pin on a board. */
+.graph-node::before,
+.graph-node::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  width: 5px;
+  height: 5px;
+  margin-left: -2.5px;
+  border-radius: 50%;
+  background: var(--field-line);
+}
+
+.graph-node::before {
+  top: -3px;
+}
+
+.graph-node::after {
+  bottom: -3px;
+}
+
+.graph-you::before,
+.graph-back::after {
+  display: none;
+}
+
+.graph-you,
+.graph-back {
+  grid-column: 2;
+}
+
+.graph-agent[hidden] {
+  display: none;
+}
+
+.graph-name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--ink);
+  font-size: var(--size-body);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.graph-name [hidden] {
+  display: none;
+}
+
+.graph-strength {
+  margin-top: var(--space-1);
+}
+
+.graph-paths {
+  grid-column: 1 / -1;
+  display: block;
+  width: 100%;
+  height: var(--space-7);
+  overflow: visible;
+}
+
+.graph-paths path {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+  transition: stroke 0.2s, opacity 0.2s;
+}
+
+.graph-paths path.is-active {
+  stroke: var(--accent);
+  stroke-width: 1.5;
+}
+
+.graph-agent.is-active,
+.is-self .graph-you {
+  border-color: var(--accent);
+  color: var(--ink);
+}
+
+.graph-agent.is-active::before,
+.graph-agent.is-active::after,
+.graph-you.is-sending::after,
+.graph-back.is-receiving::before {
+  background: var(--accent);
+}
+
+/* Compare appears where the answers meet, just above your chat. */
+.graph-compare {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  padding: 0 var(--space-2);
+  background: var(--paper);
+  color: var(--accent);
+  transform: translate(-50%, -50%);
+}
+
+.graph-compare[hidden] {
+  display: none;
+}
+
+/* Without Ennodia, the paths go, and the other agents sit out of reach. */
+.is-off .graph-paths path {
+  opacity: 0;
+}
+
+.is-off .graph-agent {
+  opacity: 0.4;
+}
+
+.is-off .graph-node::before,
+.is-off .graph-node::after {
+  opacity: 0;
+}
+
+.graph-panel {
+  display: grid;
+  gap: var(--space-4);
+  margin-top: var(--space-6);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--line);
+}
+
+.graph-summary {
+  color: var(--ink);
+  font-size: var(--size-lead);
+  line-height: 1.5;
+}
+
+.graph-request {
+  max-width: 34em;
+  color: var(--ink);
+}
+
+.graph-facts {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.graph-facts > div {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  gap: var(--space-4);
+}
+
+.graph-facts dt {
+  padding-top: 3px;
+}
+
+.graph-facts dd {
+  margin: 0;
+}
+
+.graph-facts[hidden] {
+  display: none;
+}
+
+.graph-evidence {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  font-size: var(--size-small);
+}
+
+.recorded-dot {
+  display: inline-block;
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  margin: 0 var(--space-1) 1px 0;
+  border-radius: 50%;
+  background: var(--accent);
+  vertical-align: middle;
+}
+
+/* Figure 2. One row per capability. The icon column changes from row to
+   row, and that change is the finding. */
+
+.leader-list {
+  border-top: 1px solid var(--line);
+}
+
+.leader {
+  display: grid;
+  grid-template-columns: 136px minmax(0, 1fr) auto;
+  column-gap: var(--space-4);
+  row-gap: var(--space-1);
+  align-items: baseline;
+  padding-block: var(--space-4);
+  border-bottom: 1px solid var(--line);
+}
+
+.leader-capability {
+  padding-top: 2px;
+}
+
+.leader-name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--ink);
+  font-size: var(--size-body);
+}
+
+.leader-name strong {
+  font-weight: 600;
+}
+
+.leader-through {
+  color: var(--subtle);
+  font-size: var(--size-small);
+}
+
+/* A measured value is data, so it takes the mono face and aligned digits. */
+.leader-value {
+  color: var(--ink);
+  font: 400 var(--size-body)/1.4 var(--mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.leader-unit {
+  color: var(--subtle);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.leader-detail {
+  grid-column: 2 / -1;
+  font-size: var(--size-small);
+  line-height: 1.5;
+}
+
+.leader-detail a {
+  margin-left: var(--space-1);
+}
+
+.leaders-caption {
+  padding-top: var(--space-3);
+  font-size: var(--size-small);
+}
+
+.mixing {
+  display: grid;
+  gap: var(--space-4);
+  margin-top: var(--space-7);
+}
+
+.mixing ul {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.mixing li {
+  display: grid;
+  grid-template-columns: 136px minmax(0, 1fr);
+  column-gap: var(--space-4);
+  align-items: baseline;
+}
+
+.mixing li a {
+  font-size: var(--size-small);
+}
+
+.mixing-lesson {
+  max-width: 34em;
+  color: var(--ink);
+}
+
+/* Where prompts go. Both setups share one three-column frame, so the only
+   difference to find is the middle column. */
+
+.data-path .figure-title {
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--line);
+}
+
+.path-columns,
+.path-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  column-gap: var(--space-6);
+}
+
+.path-columns {
+  padding-top: var(--space-4);
+}
+
+.path-case {
+  padding-block: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--line);
+}
+
+.path-name {
+  margin-bottom: var(--space-3);
+  font: 600 var(--size-body)/1.5 var(--sans);
+}
+
+/* Rows align to their last node: the agents that call a provider. */
+.path-row {
+  align-items: end;
+}
+
+.path-cell {
+  position: relative;
+  display: grid;
+  min-width: 0;
+}
+
+.path-stack {
+  gap: var(--space-4);
+}
+
+/* Inside the stack, each step points down to the next. */
+.path-stack > .node + .node::before,
+.path-stack > .node + .node::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+}
+
+.path-stack > .node + .node::before {
+  top: calc(-1 * var(--space-4) - 1px);
+  width: 1px;
+  height: calc(var(--space-4) - 5px);
+  background: var(--ink);
+}
+
+.path-stack > .node + .node::after {
+  top: -7px;
+  margin-left: -3.5px;
+  border-top: 6px solid var(--ink);
+  border-right: 3.5px solid transparent;
+  border-left: 3.5px solid transparent;
+}
+
+/* Nothing sits between the agents and their providers, so the line passes
+   straight through, labeled on the line itself. */
+.path-pass {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+}
+
+.path-pass::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 0;
+  left: calc(-1 * var(--space-6));
+  height: 1px;
+  background: var(--ink);
+}
+
+.path-pass span {
+  position: relative;
+  padding-inline: var(--space-2);
+  background: var(--paper);
+  color: var(--subtle);
+  font-size: var(--size-small);
+  line-height: 1.3;
+}
+
+/* A connector crosses each gutter at the row's middle, ending in an arrowhead. */
+.path-link::before,
+.path-link::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+}
+
+.path-link::before {
+  left: calc(-1 * var(--space-6));
+  width: var(--space-6);
+  height: 1px;
+  background: var(--ink);
+}
+
+.path-link::after {
+  left: -6px;
+  margin-top: -3px;
+  border-top: 3.5px solid transparent;
+  border-bottom: 3.5px solid transparent;
+  border-left: 6px solid var(--ink);
+}
+
+.node {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 36px;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--ink);
+  font-size: var(--size-small);
+  line-height: 1.3;
+  text-align: center;
+}
+
+.node-between {
+  border-color: var(--ink);
+  background: var(--hover);
+  font-weight: 600;
+}
+
+.node-ennodia {
+  border-color: var(--accent);
+  background: var(--accent-wash);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.node-icons {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.path-facts {
+  max-width: 34em;
+  margin-top: var(--space-4);
+}
+
+.path-facts-ennodia {
+  color: var(--ink);
+}
+
+/* A flex row, so the link wraps to the line's start instead of an indent. */
+.path-caption {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+  padding-top: var(--space-4);
+  font-size: var(--size-small);
+}
+
+
+/* Token estimate, inside the question it answers. */
+
+.budget {
+  margin: var(--space-2) 0 var(--space-5);
+  padding-block: var(--space-5);
+  border-block: 1px solid var(--line);
+}
+
+.budget-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-5);
+}
+
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-5);
+  margin-top: var(--space-4);
+  font-size: var(--size-small);
+}
+
+.chart-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.chart-key {
+  display: inline-block;
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+.budget-plot {
+  height: 248px;
+  margin-top: var(--space-2);
+}
+
+.budget-plot svg {
+  overflow: visible;
+}
+
+.chart-total {
+  fill: var(--ink);
+  font: 400 var(--size-small) var(--sans);
+}
+
+.chart-tooltip {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  box-shadow: 0 8px 24px -12px rgb(0 0 0 / 0.25);
+  font-size: var(--size-small);
+}
+
+.chart-tooltip p {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.chart-tooltip b {
+  color: var(--ink);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-tooltip-total {
+  padding-top: var(--space-1);
+  border-top: 1px solid var(--line);
+}
+
+.budget-caption {
+  max-width: 34em;
+  margin-top: var(--space-4);
+  color: var(--ink);
+}
+
+
+/* Keep details available at the point readers need them. */
+
+.questions {
+  padding-bottom: var(--space-9);
+}
+
+.question-list {
+  margin-top: calc(-1 * var(--space-5));
+}
+
+.question-list details {
+  border-bottom: 1px solid var(--line);
+}
+
+.question-list summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-5);
+  padding: var(--space-5) 0;
+  color: var(--ink);
+  line-height: 1.5;
+  list-style: none;
+  cursor: pointer;
+}
+
+.question-list summary::-webkit-details-marker {
+  display: none;
+}
+
+.question-list summary svg {
+  flex-shrink: 0;
+  color: var(--subtle);
+  transition: transform 0.2s;
+}
+
+.question-list details[open] summary svg {
+  transform: rotate(180deg);
+}
+
+.answer {
+  padding-bottom: var(--space-5);
+}
+
+.answer > p {
+  max-width: 34em;
+  margin-bottom: var(--space-4);
+  line-height: 1.7;
+}
+
+.agent-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4) var(--space-5);
+  margin: var(--space-5) 0;
+}
+
+.agent-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+@media (max-width: 900px) {
+  .split {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-6);
+    padding-block: var(--space-7) var(--space-8);
   }
 
-:root {
-  color-scheme: light;
-  --paper: #fbfbf9;
-  --ink: #20231f;
-  --muted: #5b6159;
-  --line: #dedfd8;
-  --accent: #315ab4;
-  --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-  --page-width: 880px;
-  --reading-width: 640px;
-  --column-gap: 64px;
-  --section-gap: 72px;
-  --section-inset: 48px;
-  font-family: "Helvetica Neue", Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
+  .question-list {
+    margin-top: calc(-1 * var(--space-3));
+  }
+
+  /* One column: a list's closing rule would double the next section's rule. */
+  .question-list details:last-child {
+    border-bottom: 0;
+  }
 }
-* { box-sizing: border-box; }
-html { scroll-behavior: smooth; scroll-padding-top: 40px; }
-body { margin: 0; color: var(--ink); background: var(--paper); line-height: 1.65; }
-[hidden] { display: none !important; }
-a { color: inherit; text-decoration: none; }
-button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent; }
-button,summary { cursor: pointer; }
-img { display: block; max-width: 100%; object-fit: contain; }
-svg { flex-shrink: 0; }
-h1,h2,h3,p,figure,blockquote { margin: 0; }
-h1,h2,h3 { text-wrap: balance; font-family: "Martian Mono", var(--mono); font-weight: 400; letter-spacing: 0; }
-a:focus-visible,button:focus-visible,summary:focus-visible,[tabindex]:focus-visible { outline: 2px solid var(--accent); outline-offset: 5px; }
-.wrap { width: min(var(--page-width), calc(100% - 64px)); margin-inline: auto; }
-.skip-link { position: fixed; left: 18px; top: -100px; padding: 12px 18px; background: white; z-index: 20; }
-.skip-link:focus { top: 16px; }
-.text-link { display: inline-flex; align-items: center; gap: 8px; }
-.text-link:hover { color: var(--accent); }
-h1 { font-size: clamp(23px,3.3vw,42px); line-height: 1.3; }
-h2 { font-size: 28px; line-height: 1.4; }
-h3 { font-size: 23px; line-height: 1.45; }
-.hero { padding-top: 64px; text-align: center; }
-.hero-copy { margin-inline: auto; }
-.text-link { font-size: 16px; line-height: 1.6; }
-.text-link svg { transition: transform .2s; }
-.text-link:hover svg { transform: translateX(3px); }
-.install-link { width: min(100%, var(--reading-width)); margin: 32px auto 0; position: relative; text-align: left; }
-.install-address { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 8px 12px 8px 24px; min-height: 60px; border: 1px solid #d6d8d0; border-radius: 4px; }
-.install-address code { font: 17px/1.5 var(--mono); user-select: all; overflow-wrap: anywhere; }
-.install-address button { display: grid; place-items: center; border: 0; background: transparent; width: 42px; height: 42px; border-radius: 3px; flex-shrink: 0; }
-.install-address button:hover { background: #eeeee9; }
-.copy-feedback { display: block; font-size: 14px; line-height: 1.45; color: #47633d; }
-.install-link .copy-feedback { position: absolute; top: calc(100% + 5px); left: 0; }
-.copy-feedback:empty { display: none; }
-.copied-icon,[data-copied] .copy-icon { display: none; }
-[data-copied] .copied-icon { display: block; }
-.hero-visual { width: min(100%, var(--reading-width)); margin: 56px auto 0; text-align: left; }
-.audience-tabs { display: flex; justify-content: center; gap: 24px; margin-bottom: 32px; }
-.audience-tabs button { position: relative; background: transparent; border: 0; border-bottom: 2px solid transparent; padding: 8px 4px; font-size: 16px; color: var(--muted); }
-.audience-tabs button:hover { color: var(--ink); }
-.audience-tabs button[aria-selected="true"] { border-bottom-color: var(--accent); color: var(--ink); }
-.workflow-panel:focus-visible { outline-offset: 8px; }
-/* A single pair of rails carries every lower section. Spacing belongs to the new topic. */
-.use-cases,.skill-section,.agents-section,.faq-section,.start-section { margin-top: var(--section-gap); padding-top: var(--section-inset); border-top: 1px solid var(--line); }
-.story-grid { display: grid; gap: 48px; margin-top: 32px; }
-.story-card,.skill-section,.faq-section { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); column-gap: var(--column-gap); align-items: start; }
-.story-card + .story-card { border-top: 1px solid var(--line); padding-top: 48px; }
-.story-copy > p,.skill-copy > p { margin-top: 20px; font-size: 17px; line-height: 1.7; color: var(--muted); }
-.story-example { margin-top: 24px; }
-.story-example summary { display: flex; align-items: center; gap: 12px; width: fit-content; font-size: 16px; padding-block: 8px; list-style: none; }
-summary::-webkit-details-marker { display: none; }
-details[open] > summary > svg { transform: rotate(180deg); }
-.example-body { padding-top: 16px; }
-.example-body > p { color: var(--muted); font-size: 16px; }
-.example-body blockquote { margin-block: 16px; padding-left: 16px; border-left: 2px solid #b5b9ac; font-size: 16px; }
-.text-button { display: inline-flex; align-items: center; gap: 8px; background: transparent; border: 0; padding: 8px 0; font-size: 15px; }
-.text-button:hover { color: var(--accent); }
-.skill-copy .text-link { margin-top: 24px; }
-.agents-section > p { font-size: 17px; color: var(--muted); max-width: 52ch; margin-top: 20px; }
-.agent-list { list-style: none; padding: 0; margin: 32px 0; display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); column-gap: 32px; row-gap: 24px; }
-.agent-list li { display: flex; gap: 10px; align-items: center; font-size: 15px; }
-.agent-list img { width: 28px; height: 28px; flex-shrink: 0; }
-.faq-list details { border-bottom: 1px solid var(--line); }
-.faq-list summary { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding-block: 20px; list-style: none; font-size: 17px; line-height: 1.5; }
-.faq-list details:first-child summary { padding-top: 4px; }
-.faq-list p { color: var(--muted); font-size: 16px; padding: 0 16px 20px 0; line-height: 1.7; }
-.faq-list p a { text-decoration: underline; text-underline-offset: 4px; }
-.start-section { text-align: center; padding-bottom: 72px; }
-.start-section > h2 { max-width: 22ch; margin-inline: auto; }
-.start-title-lead { white-space: nowrap; }
-.start-title-brand { display: inline-block; width: 3.84em; height: auto; vertical-align: baseline; transform: translateY(.051em); }
-.start-section > p { font-size: 16px; color: var(--muted); margin-top: 24px; }
-.start-section > .github-invitation { color: var(--ink); }
-.start-section > p a { text-decoration: underline; text-underline-offset: 4px; }
-.start-section > .text-link { margin-top: 16px; }
-@media (max-width: 900px) {
-  :root { --column-gap: 40px; }
-  .agent-list { column-gap: 20px; }
-}
+
 @media (max-width: 720px) {
-  :root { --section-gap: 56px; --section-inset: 40px; }
-  .wrap { width: min(540px, calc(100% - 40px)); }
-  .hero { padding-top: 48px; }
-  .install-address { padding-left: 16px; gap: 10px; }
-  .install-address code { font-size: 15px; }
-  .hero-visual { margin-top: 48px; }
-  .audience-tabs { gap: 20px; margin-bottom: 28px; }
-  h2 { font-size: 25px; }
-  h3 { font-size: 22px; }
-  .story-card,.skill-section,.faq-section { grid-template-columns: 1fr; row-gap: 32px; }
-  .story-grid { gap: 40px; }
-  .story-card + .story-card { padding-top: 40px; }
-  .agent-list { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 24px; }
-  .faq-list details:first-child summary { padding-top: 0; }
-  .start-section { padding-bottom: 48px; }
-}
-@media (max-width: 380px) {
-  .wrap { width: calc(100% - 32px); }
-  h1 { font-size: 23px; }
-  .install-address { padding-inline: 10px 6px; gap: 6px; }
-  .install-address code { font-size: 13px; }
-  .audience-tabs { gap: 16px; }
-  .audience-tabs button { font-size: 15px; }
-}
-@media (prefers-reduced-motion: reduce) {
-  html { scroll-behavior: auto; }
-  *, *::before, *::after { animation: none !important; transition: none !important; }
+  .intro {
+    padding-block: 40px var(--space-8);
+  }
+
+  .intro h1 {
+    line-height: 1.08;
+  }
+
+  .intro-letter,
+  .intro .try-prompt {
+    margin-top: var(--space-5);
+  }
+
+  .copy-address p {
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .graph-canvas {
+    column-gap: var(--space-2);
+  }
+
+  .graph-node {
+    padding: var(--space-2);
+  }
+
+  .graph-name {
+    font-size: var(--size-small);
+  }
+
+  /* The names already sit in the node. On a phone the icon would crowd them. */
+  .graph-agent .graph-name .agent-icon,
+  .graph-agent .graph-name .agent-icon-mask {
+    display: none;
+  }
+
+  .leader,
+  .mixing li {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .leader-capability {
+    grid-column: 1 / -1;
+  }
+
+  .leader-detail {
+    grid-column: 1 / -1;
+  }
+
+  .mixing li {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: var(--space-1);
+  }
+
+  /* On a phone the frame turns vertical: one column, connectors pointing down. */
+  .path-columns {
+    display: none;
+  }
+
+  .path-row {
+    grid-template-columns: 1fr;
+    row-gap: var(--space-5);
+  }
+
+  .path-link::before {
+    top: calc(-1 * var(--space-5));
+    left: 50%;
+    width: 1px;
+    height: var(--space-5);
+  }
+
+  .path-link::after {
+    top: -6px;
+    left: 50%;
+    margin: 0 0 0 -3.5px;
+    border-top: 6px solid var(--ink);
+    border-right: 3.5px solid transparent;
+    border-bottom: 0;
+    border-left: 3.5px solid transparent;
+  }
+
+  .path-pass::before {
+    top: calc(-1 * var(--space-5));
+    right: auto;
+    bottom: 0;
+    left: 50%;
+    width: 1px;
+    height: auto;
+  }
+
+  .path-pass span {
+    padding-block: var(--space-1);
+  }
+
+  .question-list summary {
+    padding: var(--space-4) 0;
+  }
 }

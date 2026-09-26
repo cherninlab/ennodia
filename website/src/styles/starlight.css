@@ -1,34 +1,63 @@
 @import "../../../docs/assets/agent-font/ennodia-agents.css";
 
+/* Docs theme: the landing page palette and type. Warm paper, black ink,
+   Geist for text, Martian Mono for navigation labels, olive for the
+   current page. The docs stay light, like the rest of the site. */
+
+@font-face {
+  font-family: "Geist";
+  src: url("/fonts/geist-latin-variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Geist";
+  src: url("/fonts/geist-latin-italic-variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Martian Mono";
+  src: url("/fonts/martian-mono-regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root,
 :root[data-theme="light"],
 :root[data-theme="dark"] {
   color-scheme: light;
-  --sl-color-accent-low: #eef4ff;
-  --sl-color-accent: #2d6cdf;
-  --sl-color-accent-high: #0b0b0b;
-  --sl-color-white: #0b0b0b;
-  --sl-color-gray-1: #202124;
-  --sl-color-gray-2: #393b42;
-  --sl-color-gray-3: #5e6068;
-  --sl-color-gray-4: #8f929a;
-  --sl-color-gray-5: #d7d7d2;
-  --sl-color-gray-6: #e8e8e4;
-  --sl-color-gray-7: #f6f6f4;
-  --sl-color-black: #fbfbfa;
-  --sl-color-text: #5e6068;
-  --sl-color-text-accent: #0b0b0b;
-  --sl-color-text-invert: #ffffff;
-  --sl-color-bg: #fbfbfa;
-  --sl-color-bg-nav: #fbfbfa;
-  --sl-color-bg-sidebar: #fbfbfa;
-  --sl-color-bg-inline-code: #f6f6f4;
-  --sl-color-bg-accent: #0b0b0b;
-  --sl-color-hairline-light: #e8e8e4;
-  --sl-color-hairline: #e8e8e4;
-  --sl-color-hairline-shade: #e8e8e4;
+  --sl-color-accent-low: #e7ecbe;
+  --sl-color-accent: #4b5842;
+  --sl-color-accent-high: #000000;
+  --sl-color-white: #000000;
+  --sl-color-gray-1: #1f1f1f;
+  --sl-color-gray-2: #333333;
+  --sl-color-gray-3: #555555;
+  --sl-color-gray-4: #808080;
+  --sl-color-gray-5: #c9cdbf;
+  --sl-color-gray-6: #d8dad0;
+  --sl-color-gray-7: #eae9e0;
+  --sl-color-black: #f6f4ee;
+  --sl-color-text: #555555;
+  --sl-color-text-accent: #000000;
+  --sl-color-text-invert: #fffefa;
+  --sl-color-bg: #f6f4ee;
+  --sl-color-bg-nav: #f6f4ee;
+  --sl-color-bg-sidebar: #f6f4ee;
+  --sl-color-bg-inline-code: #eae9e0;
+  --sl-color-bg-accent: #000000;
+  --sl-color-hairline-light: #d8dad0;
+  --sl-color-hairline: #d8dad0;
+  --sl-color-hairline-shade: #d8dad0;
   --sl-color-backdrop-overlay: rgba(15, 15, 15, 0.42);
-  --sl-font: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --sl-font: "Geist", Arial, Helvetica, sans-serif;
+  --ennodia-mono: "Martian Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   --sl-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   --sl-line-height: 1.72;
   --sl-line-height-headings: 1.08;
@@ -38,21 +67,21 @@
 
 html,
 body {
-  background: #fbfbfa;
+  background: #f6f4ee;
 }
 
 body {
-  color: #0b0b0b;
+  color: #000000;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
 .header {
-  border-bottom-color: #e8e8e4 !important;
+  border-bottom-color: #d8dad0 !important;
 }
 
 .site-title {
-  color: #0b0b0b;
+  color: #000000;
   letter-spacing: 0;
 }
 
@@ -65,7 +94,7 @@ starlight-theme-select {
 }
 
 .sidebar-pane {
-  background: #fbfbfa !important;
+  background: #f6f4ee !important;
 }
 
 .sidebar-content {
@@ -76,51 +105,53 @@ starlight-theme-select {
 .sidebar-content a,
 .sidebar-content summary {
   border-radius: 6px;
-  color: #5e6068;
+  color: #555555;
 }
 
 .sidebar-content a[aria-current="page"] {
-  color: #0b0b0b;
-  background: #f6f6f4;
-  font-weight: 650;
+  color: #000000;
+  background: #e7ecbe;
+  font-weight: 500;
 }
 
 .sidebar-content a:hover,
 .sidebar-content summary:hover {
-  color: #0b0b0b;
-  background: #f6f6f4;
+  color: #000000;
+  background: #eae9e0;
 }
 
 .sidebar-content .large {
-  color: #0b0b0b;
-  font-size: 0.9375rem;
-  font-weight: 650;
-  letter-spacing: 0;
+  color: #555555;
+  font-family: var(--ennodia-mono);
+  font-size: 0.6875rem;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .right-sidebar-panel {
-  color: #8f929a;
+  color: #808080;
 }
 
 .right-sidebar-panel h2 {
-  color: #8f929a !important;
-  font-family: var(--sl-font-mono);
-  font-size: 0.75rem !important;
-  font-weight: 500;
-  letter-spacing: 0;
-  text-transform: none;
+  color: #555555 !important;
+  font-family: var(--ennodia-mono);
+  font-size: 0.6875rem !important;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .right-sidebar-panel a {
-  color: #5e6068 !important;
+  color: #555555 !important;
 }
 
 .right-sidebar-panel a:hover {
-  color: #0b0b0b !important;
+  color: #000000 !important;
 }
 
 .content-panel {
-  border-top-color: #e8e8e4 !important;
+  border-top-color: #d8dad0 !important;
 }
 
 .content-panel:first-child {
@@ -132,22 +163,22 @@ starlight-theme-select {
 }
 
 .sl-markdown-content {
-  color: #5e6068;
+  color: #555555;
 }
 
 .content-panel h1#_top {
   max-width: 32ch;
   margin-bottom: 1.25rem;
-  color: #0b0b0b;
-  font-size: clamp(2rem, 4vw, 2.75rem);
-  font-weight: 650;
-  letter-spacing: 0;
+  color: #000000;
+  font-size: clamp(2.25rem, 4.4vw, 3.25rem);
+  font-weight: 400;
+  letter-spacing: -0.04em;
   line-height: 1.06;
 }
 
 .content-panel h1#_top + p {
   max-width: 44rem;
-  color: #5e6068;
+  color: #555555;
   font-size: 1.25rem;
   line-height: 1.58;
 }
@@ -155,59 +186,59 @@ starlight-theme-select {
 .sl-markdown-content h1:not(:where(.not-content *)) {
   max-width: 32ch;
   margin-bottom: 1.25rem;
-  color: #0b0b0b;
+  color: #000000;
   font-size: clamp(2rem, 4vw, 2.75rem);
-  font-weight: 650;
-  letter-spacing: 0;
+  font-weight: 400;
+  letter-spacing: -0.035em;
   line-height: 1.06;
 }
 
 .sl-markdown-content h2:not(:where(.not-content *)) {
-  color: #0b0b0b;
-  font-size: clamp(1.875rem, 4vw, 2.75rem);
-  font-weight: 650;
-  letter-spacing: 0;
+  color: #000000;
+  font-size: clamp(1.625rem, 3vw, 2.125rem);
+  font-weight: 400;
+  letter-spacing: -0.03em;
 }
 
 .sl-markdown-content h3:not(:where(.not-content *)) {
-  color: #0b0b0b;
+  color: #000000;
   font-size: 1.25rem;
-  font-weight: 650;
-  letter-spacing: 0;
+  font-weight: 500;
+  letter-spacing: -0.015em;
 }
 
 .sl-markdown-content p:not(:where(.not-content *)),
 .sl-markdown-content li:not(:where(.not-content *)) {
-  color: #5e6068;
+  color: #555555;
   font-size: 1.0625rem;
 }
 
 .sl-markdown-content a:not(:where(.not-content *)) {
-  color: #0b0b0b;
-  text-decoration-color: #d7d7d2;
+  color: #000000;
+  text-decoration-color: #c9cdbf;
   text-decoration-thickness: 1px;
   text-underline-offset: 0.18em;
 }
 
 .sl-markdown-content a:hover:not(:where(.not-content *)) {
-  color: #2d6cdf;
+  color: #000000;
   text-decoration-color: currentColor;
 }
 
 .sl-markdown-content code:not(:where(.not-content *)) {
-  border: 1px solid #e8e8e4;
+  border: 1px solid #d8dad0;
   border-radius: 6px;
   padding: 0.1em 0.34em;
-  background: #f6f6f4;
-  color: #0b0b0b;
+  background: #eae9e0;
+  color: #000000;
 }
 
 .sl-markdown-content pre:not(:where(.not-content *)) {
-  border: 1px solid #e8e8e4;
+  border: 1px solid #d8dad0;
   border-radius: 8px;
-  background: #ffffff;
+  background: #fffefa;
   box-shadow: none;
-  color: #202124;
+  color: #1f1f1f;
 }
 
 .sl-markdown-content pre code:not(:where(.not-content *)) {
@@ -218,13 +249,13 @@ starlight-theme-select {
 }
 
 .expressive-code {
-  --ec-codeBg: #ffffff !important;
-  --ec-codeFg: #202124 !important;
-  --ec-brdCol: #e8e8e4 !important;
-  --ec-frm-edBg: #f6f6f4 !important;
-  --ec-frm-edActTabBg: #ffffff !important;
-  --ec-frm-edActTabIndTopCol: #d7d7d2 !important;
-  --ec-frm-edTabBarBrdCol: #e8e8e4 !important;
+  --ec-codeBg: #fffefa !important;
+  --ec-codeFg: #1f1f1f !important;
+  --ec-brdCol: #d8dad0 !important;
+  --ec-frm-edBg: #eae9e0 !important;
+  --ec-frm-edActTabBg: #fffefa !important;
+  --ec-frm-edActTabIndTopCol: #c9cdbf !important;
+  --ec-frm-edTabBarBrdCol: #d8dad0 !important;
   --ec-tm-lineBg: transparent !important;
   --ec-tm-lineBrdCol: transparent !important;
 }
@@ -233,48 +264,48 @@ starlight-theme-select {
 .expressive-code code,
 .expressive-code .ec-line,
 .expressive-code span {
-  color: #202124 !important;
+  color: #1f1f1f !important;
 }
 
 .expressive-code .copy button {
   opacity: 1 !important;
-  background: #ffffff !important;
-  border-color: #d7d7d2 !important;
-  color: #0b0b0b !important;
+  background: #fffefa !important;
+  border-color: #c9cdbf !important;
+  color: #000000 !important;
 }
 
 .expressive-code .copy button:focus-visible {
-  outline: 2px solid #2d6cdf !important;
+  outline: 2px solid #4b5842 !important;
   outline-offset: 3px !important;
 }
 
 .sl-markdown-content blockquote:not(:where(.not-content *)) {
-  border-inline-start-color: #d7d7d2;
-  color: #5e6068;
+  border-inline-start-color: #c9cdbf;
+  color: #555555;
 }
 
 .sl-markdown-content table:not(:where(.not-content *)) {
-  border-color: #e8e8e4;
+  border-color: #d8dad0;
 }
 
 .sl-markdown-content :is(th, td):not(:where(.not-content *)) {
-  border-bottom-color: #e8e8e4;
+  border-bottom-color: #d8dad0;
 }
 
 .sl-markdown-content th:not(:where(.not-content *)) {
-  color: #0b0b0b;
+  color: #000000;
 }
 
 .pagination-links a {
-  border-color: #e8e8e4 !important;
+  border-color: #d8dad0 !important;
   border-radius: 8px !important;
-  background: #fbfbfa;
+  background: #f6f4ee;
   box-shadow: none !important;
 }
 
 .pagination-links a:hover {
-  border-color: #d7d7d2 !important;
-  background: #f6f6f4;
+  border-color: #c9cdbf !important;
+  background: #eae9e0;
 }
 
 @media (max-width: 50rem) {

@@ -1,0 +1,46 @@
+---
+import Default from "@astrojs/starlight/components/SocialIcons.astro";
+
+// Keeps the docs header connected to the rest of the site.
+const links = [
+  { href: "/#abilities", label: "How it works" },
+  { href: "/articles/", label: "Articles" },
+];
+---
+<nav class="docs-site-links" aria-label="Site">
+  {links.map((link) => <a href={link.href}>{link.label}</a>)}
+</nav>
+<Default />
+
+<style>
+  .docs-site-links {
+    display: none;
+    align-items: center;
+    gap: 1.5rem;
+    margin-inline-end: 0.75rem;
+  }
+
+  .docs-site-links a {
+    color: var(--sl-color-gray-2);
+    font-family: var(--ennodia-mono);
+    font-size: 0.65625rem;
+    letter-spacing: 0.1em;
+    text-decoration: none;
+    text-transform: uppercase;
+  }
+
+  .docs-site-links a:hover {
+    color: var(--sl-color-white);
+  }
+
+  @media (min-width: 72rem) {
+    .docs-site-links {
+      display: flex;
+    }
+  }
+
+  /* The mobile menu has room for the links at every width. */
+  :global(.mobile-preferences) .docs-site-links {
+    display: flex;
+  }
+</style>

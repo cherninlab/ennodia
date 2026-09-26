@@ -1,0 +1,142 @@
+---
+import { ArrowUpRight } from "@lucide/astro";
+import AgentIcon from "./AgentIcon.astro";
+import { agent, graphAgents, graphTasks, middleRow, route, routeText, type GraphAgentId, type TaskId } from "../data/agents";
+
+// Figure 1. Agents are the nodes and Ennodia is the paths between them.
+// The server renders the default state, so the figure reads without script.
+// scripts/agent-graph.ts switches the agent you work in, the task, and
+// whether Ennodia is there at all.
+const from: GraphAgentId = "codex";
+const taskId: TaskId = "listen";
+const task = graphTasks.find((entry) => entry.id === taskId)!;
+const row = middleRow(from);
+const { workers, compare } = route(from, taskId);
+const text = routeText(from, taskId);
+const you = agent(from);
+
+// Paths run from the center column to each column and back. The view box is
+// stretched to the figure, and strokes keep their width while it stretches.
+const columns = [100, 300, 500];
+const out = columns.map((x) => (x === 300 ? "M300 0 L300 56" : `M300 0 C300 28 ${x} 28 ${x} 56`));
+const back = columns.map((x) => (x === 300 ? "M300 0 L300 56" : `M${x} 0 C${x} 28 300 28 300 56`));
+
+// Each task shows its capability as raw material, drawn with pyqtgraph from a
+// real run: decoration that shows and does not explain. Listen is clip 27 of
+// the audio study (bench/audio-routing/scope.py). The others come from
+// bench/strips: GPT Image textures from Codex, two reviews of an Ennodia
+// patch under Compare, and Kimi K3 reading RFC 9110.
+type Strip = { task: TaskId; name: string; credit?: { text: string; href: string } };
+const strips: Strip[] = [
+  {
+    task: "listen",
+    name: "perception-strip",
+    // MMAU is CC BY-NC 4.0, so its clip is credited where it shows.
+    credit: { text: "Spectrogram of a clip from MMAU test-mini, GAMMA Lab, University of Maryland, CC BY-NC 4.0", href: "https://huggingface.co/datasets/gamma-lab-umd/MMAU-test-mini" },
+  },
+  { task: "draw", name: "draw-strip" },
+  { task: "review", name: "review-strip" },
+  { task: "long", name: "read-strip" },
+];
+---
+<section class="split wrap abilities" id="abilities" aria-labelledby="abilities-title" data-graph>
+  <div class="split-head">
+    <h2 id="abilities-title">Each agent adds its abilities to the others</h2>
+    <p>Pick the agent you work in and a task. The path shows who does the work and what comes back.</p>
+    <div class="graph-controls">
+      <fieldset>
+        <legend class="label">You work in</legend>
+        <div class="choice-list">
+          {graphAgents.map((entry) => (
+            <button type="button" data-from={entry.id} aria-pressed={entry.id === from ? "true" : "false"}>
+              <AgentIcon name={entry.id} size={16} />{entry.app}
+            </button>
+          ))}
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend class="label">Task</legend>
+        <div class="graph-tasks">
+          {graphTasks.map((entry) => (
+            <button type="button" data-task={entry.id} aria-pressed={entry.id === taskId ? "true" : "false"}>{entry.tab}</button>
+          ))}
+        </div>
+      </fieldset>
+      <label class="graph-switch"><input type="checkbox" data-off /> Without Ennodia</label>
+    </div>
+  </div>
+
+  <figure class="graph" aria-labelledby="abilities-title">
+    {strips.map((strip) => (
+      <div class="graph-strip" data-strip={strip.task} hidden={strip.task !== taskId}>
+        <video aria-hidden="true" width="630" height="85" poster={`/studies/${strip.name}.jpg`} muted loop playsinline preload={strip.task === taskId ? "metadata" : "none"} autoplay={strip.task === taskId}>
+          <source src={`/studies/${strip.name}.mp4`} type="video/mp4" />
+          <source src={`/studies/${strip.name}.webm`} type="video/webm" />
+        </video>
+        {strip.credit && <p class="graph-strip-credit"><a href={strip.credit.href}>{strip.credit.text}</a></p>}
+      </div>
+    ))}
+    <div class="graph-canvas">
+      <div class={`graph-node graph-you${workers.length ? " is-sending" : ""}`}>
+        <span class="label">Your chat</span>
+        <span class="graph-name">
+          {graphAgents.map((entry) => <span data-icon={entry.id} hidden={entry.id !== from}><AgentIcon name={entry.id} size={16} /></span>)}
+          <span data-you-app>{you.app}</span>
+        </span>
+        <span data-you-model>{you.model}</span>
+      </div>
+
+      <svg class="graph-paths" viewBox="0 0 600 56" preserveAspectRatio="none" aria-hidden="true">
+        {out.map((d, index) => <path d={d} data-out={index} class={workers.includes(row[index]!) ? "is-active" : undefined} />)}
+      </svg>
+
+      <div class="graph-row">
+        {graphAgents.map((entry) => {
+          const column = row.indexOf(entry.id);
+          return (
+            <div
+              class={`graph-node graph-agent${workers.includes(entry.id) ? " is-active" : ""}`}
+              data-agent={entry.id}
+              hidden={column < 0}
+              style={column < 0 ? undefined : `grid-column: ${column + 1}`}
+            >
+              <span class="graph-name"><AgentIcon name={entry.id} size={16} />{entry.app}</span>
+              <span>{entry.model}</span>
+              <span class="graph-strength">{entry.strength}</span>
+            </div>
+          );
+        })}
+      </div>
+
+      <svg class="graph-paths" viewBox="0 0 600 56" preserveAspectRatio="none" aria-hidden="true">
+        {back.map((d, index) => <path d={d} data-back={index} class={workers.includes(row[index]!) ? "is-active" : undefined} />)}
+      </svg>
+
+      <div class={`graph-node graph-back${workers.length ? " is-receiving" : ""}`}>
+        <span class="label graph-compare" data-compare hidden={!compare}>Compare</span>
+        <span class="label">Back in your chat</span>
+        <span class="graph-name">
+          {graphAgents.map((entry) => <span data-icon={entry.id} hidden={entry.id !== from}><AgentIcon name={entry.id} size={16} /></span>)}
+          <span data-you-app>{you.app}</span>
+        </span>
+        <span data-back-short>{text.backShort}</span>
+      </div>
+    </div>
+
+    <figcaption class="graph-panel" aria-live="polite">
+      <p class="graph-summary" data-summary>{text.summary}</p>
+      <p class="graph-request">“<span data-request>{task.request}</span>”</p>
+      <dl class="graph-facts" data-facts hidden={!workers.length}>
+        <div><dt class="label">Sent</dt><dd data-sent>{text.sent}</dd></div>
+        <div><dt class="label">Runs</dt><dd data-runs>{text.runs}</dd></div>
+        <div><dt class="label">Back</dt><dd data-back>{text.back}</dd></div>
+      </dl>
+      <p class="graph-evidence" data-evidence>
+        {task.recorded && task.recorded.from === from
+          ? <><span><span class="recorded-dot" aria-hidden="true"></span>{task.recorded.text}</span><a class="text-link" href={task.recorded.href}>Read the write-up <ArrowUpRight size={14} aria-hidden="true" /></a></>
+          : <span>Example request. Model access depends on your installed agents and accounts.</span>}
+      </p>
+    </figcaption>
+  </figure>
+</section>
+<script>import "../scripts/agent-graph";</script>

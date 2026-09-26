@@ -1,0 +1,18 @@
+---
+import source from "../../../docs/assets/logo.svg?raw";
+
+interface Props {
+  class?: string;
+  label?: string;
+}
+
+// Inline the wordmark so it follows the current text color in both themes.
+// A label becomes real text beside the drawing, so copy, search, and text
+// extraction all read the name. An aria-label alone disappears from those.
+const { class: className = "wordmark", label } = Astro.props;
+const svg = source
+  .replace(/\swidth="47" height="10"/, "")
+  .replace(/fill="#000"/g, 'fill="currentColor"')
+  .replace("<svg ", `<svg class="${className}" aria-hidden="true" focusable="false" `);
+---
+{label && <span class="sr-only">{label}</span>}<Fragment set:html={svg} />

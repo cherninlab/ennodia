@@ -1,0 +1,36 @@
+<!doctype html>
+<!-- A DEV cover, 1000 by 420: the article title in the site's type and
+     palette, with the landing graph's paths as the one mark. make-cover.ts
+     fills the placeholders and screenshots this page. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+  @font-face { font-family: Geist; src: url("../public/fonts/geist-latin-variable.woff2") format("woff2"); font-weight: 100 900; }
+  @font-face { font-family: "Martian Mono"; src: url("../public/fonts/martian-mono-regular.ttf") format("truetype"); }
+  html, body { margin: 0; width: 1000px; height: 420px; overflow: hidden; background: #f6f4ee; }
+  body { position: relative; font-family: Geist, sans-serif; color: #000; }
+  .label { position: absolute; left: 64px; font: 400 13px/1.5 "Martian Mono", monospace; letter-spacing: 0.04em; text-transform: uppercase; color: #666; }
+  .top { top: 56px; }
+  .bottom { bottom: 56px; }
+  h1 { position: absolute; left: 64px; top: 104px; width: 560px; margin: 0; font-size: 52px; font-weight: 400; line-height: 1.08; letter-spacing: -0.04em; text-wrap: balance; }
+  svg { position: absolute; right: 64px; top: 72px; }
+  svg path { fill: none; stroke: #d8dad0; stroke-width: 1.5; }
+  svg path.on { stroke: #4b5842; stroke-width: 2; }
+  svg rect { fill: #fffefa; stroke: #d8dad0; stroke-width: 1.5; }
+  svg rect.on { stroke: #4b5842; }
+</style>
+</head>
+<body>
+  <p class="label top">Ennodia · {{kind}}</p>
+  <h1>{{title}}</h1>
+  <p class="label bottom">{{date}}</p>
+  <svg width="268" height="280" viewBox="-2 -2 268 280" aria-hidden="true">
+    <path d="M132 40 C132 70 32 70 32 100"/><path d="M132 40 L132 100"/><path class="on" d="M132 40 C132 70 232 70 232 100"/>
+    <path d="M32 156 C32 186 132 186 132 216"/><path d="M132 156 L132 216"/><path class="on" d="M232 156 C232 186 132 186 132 216"/>
+    <rect x="96" y="0" width="72" height="40" rx="4"/>
+    <rect x="0" y="100" width="64" height="56" rx="4"/><rect x="100" y="100" width="64" height="56" rx="4"/><rect class="on" x="200" y="100" width="64" height="56" rx="4"/>
+    <rect x="96" y="216" width="72" height="40" rx="4"/>
+  </svg>
+</body>
+</html>

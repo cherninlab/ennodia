@@ -1,0 +1,621 @@
+/* Long-form articles on the site grid: the left column labels, the right
+   column reads. An article is read, not scanned, so its prose uses the lead
+   size (19px), about 60 characters a line in the right column. Figures take
+   both columns when a wider view helps. */
+
+.article-header,
+.prose,
+.article-footer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.7fr);
+  column-gap: 72px;
+}
+
+.article-header {
+  padding-block: 72px 44px;
+  border-bottom: 1px solid var(--line);
+}
+
+.article-aside {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding-top: 12px;
+}
+
+.article-lead {
+  display: grid;
+  gap: 20px;
+}
+
+.label.article-kind {
+  color: var(--accent);
+}
+
+.article-title,
+.index-title {
+  max-width: 14em;
+  color: var(--ink);
+  font: 400 var(--size-page)/1.08 var(--sans);
+  letter-spacing: -0.04em;
+}
+
+.article-dek,
+.index-dek {
+  max-width: 34em;
+  font-size: var(--size-lead);
+  line-height: 1.55;
+}
+
+.article-meta {
+  display: grid;
+  gap: 2px;
+  font-size: var(--size-small);
+}
+
+.article-meta a {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+/* Prose */
+
+.prose {
+  padding-block: 44px 16px;
+  font-size: var(--size-lead);
+  line-height: 1.65;
+  overflow-wrap: break-word;
+}
+
+.prose > * {
+  grid-column: 2;
+}
+
+.prose > * + * {
+  margin-top: 1em;
+}
+
+.prose > .data-figure {
+  grid-column: 1 / -1;
+  margin-block: 1.6em;
+}
+
+.prose h2 {
+  margin-top: 1.9em;
+  color: var(--ink);
+  font: 400 var(--size-statement)/1.3 var(--sans);
+  letter-spacing: -0.02em;
+}
+
+.prose h3 {
+  margin-top: 1.6em;
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.prose h2 + *,
+.prose h3 + * {
+  margin-top: 0.6em;
+}
+
+.prose a {
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-color: var(--field-line);
+  text-underline-offset: 4px;
+}
+
+.prose a:hover {
+  text-decoration-color: var(--ink);
+}
+
+.prose ul,
+.prose ol {
+  padding-left: 1.2em;
+}
+
+.prose li + li {
+  margin-top: 0.35em;
+}
+
+.prose li::marker {
+  color: var(--muted);
+}
+
+.prose blockquote {
+  padding-left: 20px;
+  border-left: 2px solid var(--accent);
+  color: var(--ink);
+}
+
+/* Paths and identifiers are long single words. They may break anywhere,
+   because a reader copies them, not reads them aloud. */
+.prose code {
+  overflow-wrap: anywhere;
+  padding: 0.1em 0.35em;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--card);
+  color: var(--ink);
+  font-family: var(--code);
+  font-size: 0.8em;
+}
+
+/* Code is material to copy, not prose to read, so it steps down to 13px and
+   fits a whole command on one line. */
+.prose pre {
+  overflow-x: auto;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card) !important;
+  font-size: var(--size-small);
+  line-height: 1.6;
+}
+
+.prose pre code {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: inherit;
+}
+
+.prose pre span {
+  color: var(--ink) !important;
+}
+
+.prose table {
+  display: block;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  border-collapse: separate;
+  border-spacing: 0;
+  background: var(--card);
+  font-size: var(--size-body);
+  line-height: 1.5;
+}
+
+.prose th,
+.prose td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.prose tr:last-child > * {
+  border-bottom: 0;
+}
+
+.prose th {
+  color: var(--subtle);
+  font: 400 11px/1.5 var(--mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* Footnotes */
+
+/* Footnote markers are references, so they use the label face. */
+.prose sup {
+  font: 400 11px/0 var(--mono);
+}
+
+.prose sup a {
+  margin-left: 1px;
+  padding: 0 2px;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.prose .footnotes {
+  margin-top: 2.4em;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+  font-size: var(--size-small);
+  line-height: 1.6;
+}
+
+.prose .footnotes::before {
+  content: "Notes and sources";
+  display: block;
+  margin-bottom: 10px;
+  font: 400 11px/1.5 var(--mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.prose .footnotes ol {
+  padding-left: 1.3em;
+}
+
+.prose .footnotes li::marker {
+  color: var(--accent);
+  font: 400 11px var(--mono);
+}
+
+.prose .footnotes p {
+  display: inline;
+}
+
+.prose [data-footnote-backref] {
+  margin-left: 4px;
+  text-decoration: none;
+}
+
+/* Figures written as HTML inside Markdown. Their text is data, so it drops to
+   the body size, with Martian Mono for the labels that name each part. */
+
+.prose .data-figure {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+  font-size: var(--size-body);
+  line-height: 1.5;
+}
+
+.data-figure-head {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.data-figure-head .label {
+  color: var(--ink);
+}
+
+.prose .data-figure figcaption {
+  padding: 11px 16px;
+  border-top: 1px solid var(--line);
+  font-size: var(--size-small);
+  line-height: 1.5;
+}
+
+.prose .data-figure video {
+  width: 100%;
+  height: auto;
+}
+
+.receipt {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+}
+
+.receipt > div {
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.receipt > div:not(:nth-child(3n + 1)) {
+  border-left: 1px solid var(--line);
+}
+
+.receipt > div:nth-last-child(-n + 3) {
+  border-bottom: 0;
+}
+
+.receipt dt,
+.timeline time,
+.outcomes .format,
+.outcome {
+  font: 400 11px/1.5 var(--mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.receipt dd {
+  margin: 0;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+/* A measured value is the figure's statement, so it takes the statement size. */
+.receipt dd.receipt-big {
+  font-size: var(--size-statement);
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+.timeline {
+  display: grid;
+  margin: 0;
+  padding: 10px 16px 16px;
+  list-style: none;
+}
+
+.timeline li {
+  position: relative;
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  gap: 16px;
+  padding: 9px 0 9px 20px;
+}
+
+.timeline li + li {
+  margin-top: 0;
+}
+
+.timeline li::before {
+  content: "";
+  position: absolute;
+  top: 17px;
+  left: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--card);
+}
+
+.timeline li:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  top: 27px;
+  bottom: -9px;
+  left: 3.5px;
+  width: 1px;
+  background: var(--line);
+}
+
+.timeline time {
+  padding-top: 3px;
+  font-variant-numeric: tabular-nums;
+  text-transform: none;
+}
+
+.outcomes {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.outcomes li {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 16px;
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.outcomes li + li {
+  margin-top: 0;
+}
+
+.outcomes li:last-child {
+  border-bottom: 0;
+}
+
+.outcomes .format {
+  color: var(--ink);
+}
+
+.outcome {
+  white-space: nowrap;
+}
+
+.outcome-pass {
+  color: var(--accent);
+}
+
+.prose details {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+  font-size: var(--size-body);
+}
+
+.prose details summary {
+  padding: 13px 16px;
+  color: var(--ink);
+  font: 400 11px/1.5 var(--mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.prose details > :not(summary) {
+  margin: 0;
+  padding: 0 16px 14px;
+}
+
+@media (max-width: 640px) {
+  .receipt {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .receipt > div:not(:nth-child(3n + 1)) {
+    border-left: 0;
+  }
+
+  .receipt > div:nth-child(even) {
+    border-left: 1px solid var(--line);
+  }
+
+  .receipt > div:nth-last-child(-n + 3) {
+    border-bottom: 1px solid var(--line);
+  }
+
+  .receipt > div:nth-last-child(-n + 2) {
+    border-bottom: 0;
+  }
+
+  .timeline li {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .outcomes li {
+    grid-template-columns: 1fr auto;
+  }
+
+  .outcomes li > span:nth-child(2) {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
+
+/* Article footer */
+
+.article-footer {
+  row-gap: 44px;
+  padding-block: 20px 88px;
+}
+
+.article-footer > * {
+  grid-column: 2;
+}
+
+.article-try {
+  display: grid;
+  gap: 16px;
+  padding-top: 36px;
+  border-top: 1px solid var(--line);
+}
+
+.article-try h2 {
+  font: 400 var(--size-statement)/1.3 var(--sans);
+  letter-spacing: -0.02em;
+}
+
+.article-more ul {
+  display: grid;
+  margin-top: 12px;
+}
+
+.article-more a {
+  display: grid;
+  gap: 4px;
+  padding-block: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.article-more li:last-child a {
+  border-bottom: 1px solid var(--line);
+}
+
+.article-more a:hover {
+  text-decoration: none;
+}
+
+.article-more a span:first-child {
+  color: var(--ink);
+  font-size: var(--size-lead);
+  line-height: 1.4;
+}
+
+.article-more-meta {
+  font-size: var(--size-small);
+}
+
+.article-more a:hover span:first-child {
+  text-decoration: underline;
+  text-underline-offset: 5px;
+}
+
+/* Index */
+
+.index-header {
+  display: grid;
+  gap: 20px;
+  padding-block: 72px 48px;
+}
+
+.index-list {
+  display: grid;
+  padding-bottom: 88px;
+}
+
+.index-item a {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.7fr);
+  gap: 10px 72px;
+  padding-block: 28px;
+  border-top: 1px solid var(--line);
+}
+
+.index-item:last-child a {
+  border-bottom: 1px solid var(--line);
+}
+
+.index-item a:hover {
+  text-decoration: none;
+}
+
+.index-item-meta {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  padding-top: 6px;
+  font-size: var(--size-small);
+}
+
+.index-item-title {
+  display: block;
+  color: var(--ink);
+  font: 400 var(--size-statement)/1.3 var(--sans);
+  letter-spacing: -0.02em;
+}
+
+.index-item a:hover .index-item-title {
+  text-decoration: underline;
+  text-underline-offset: 6px;
+}
+
+.index-item-dek {
+  display: block;
+  max-width: 34em;
+  margin-top: 8px;
+}
+
+@media (max-width: 900px) {
+  /* minmax(0, 1fr), not 1fr: a plain 1fr track grows to fit its widest
+     unbreakable content, such as a long path, and pushes the page sideways. */
+  .article-header,
+  .prose,
+  .article-footer,
+  .index-item a {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .article-header {
+    row-gap: 20px;
+  }
+
+  .article-aside {
+    padding-top: 0;
+  }
+
+  .prose > *,
+  .article-footer > * {
+    grid-column: 1;
+  }
+}
+
+@media (max-width: 720px) {
+  .article-header,
+  .index-header {
+    padding-top: 40px;
+  }
+}
+
+/* Run records */
+
+.records {
+  padding-bottom: 88px;
+}
+
+.records section {
+  scroll-margin-top: 24px;
+}
+
+.records h3 .label {
+  margin-left: 8px;
+}

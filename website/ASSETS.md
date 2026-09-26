@@ -1,7 +1,8 @@
-# Landing page assets
+# Website assets
 
-The landing page uses the existing Ennodia wordmark and agent logos from
+The website uses the existing Ennodia wordmark and agent logos from
 `docs/assets`. Their use identifies supported tools, not endorsements.
+The wordmark is inlined so it follows the text color in both themes.
 
 Interface icons come from `@lucide/astro`. Each imported icon renders as static
 SVG, without a client-side icon runtime. The package's ISC and Feather MIT
@@ -10,23 +11,113 @@ notices are included in `public/third-party-notices.txt`.
 - [Lucide Astro documentation](https://lucide.dev/guide/astro/getting-started)
 - [Lucide license](https://lucide.dev/license)
 
+## Type, spacing, and color
+
+The site uses Geist for text and Martian Mono only for the page's own labels:
+figure titles, figure controls, and data. Their SIL Open Font License files
+are in `public/fonts`.
+
+`src/styles/site.css` defines the systems as tokens:
+
+- Type: 13 supports, 16 carries content, 19 leads, 25 states, 36 titles a
+  section, 52 titles a page, and 78 sets the opening line.
+- Spacing: a 4px base. Parts of one thing sit 4 to 16 apart, groups 24 to 32,
+  sections 64 to 96.
+- Grid: a title column and a content column in a 1 to 1.7 ratio with a 72px
+  gap. Every section, figure, and article uses these edges.
+- Color: ink for what you read first, gray for support, and olive for recorded
+  evidence. The docs theme in `src/styles/starlight.css` uses the same palette.
+
+## Charts
+
+Charts use Recharts through the Astro React integration. The token estimate
+chart loads when it becomes visible. Its stages use an ordinal olive ramp,
+`#2c3625`, `#4f6339`, and `#7f975a`. It passes the ordinal palette checks on
+the page background `#f6f4ee`, where the lightest step has 2.95:1 contrast.
+Totals are labeled on each column, and a hidden table repeats every value for
+screen readers. Diagrams stay in HTML and CSS on the same grid.
+
+## Capability strips
+
+Each strip shows one capability as raw material, drawn with pyqtgraph from a real run.
+They are decoration: they carry no claim and screen readers skip them.
+Figure 1 shows one strip per task, from `public/studies/`:
+
+| Task | Strip | Run |
+| --- | --- | --- |
+| Listen | `perception-strip` | Clip 27 of the audio study, a speech clip. Codex answered it right only once Ennodia handed it to Gemini. |
+| Draw | `draw-strip` | Codex drew four stone textures with its image tool. A probe traces each tiling seam. |
+| Review | `review-strip` | Claude Code and Kimi K3 reviewed one Ennodia patch, and Compare mapped where they differ. |
+| Read | `read-strip` | Kimi K3 read all of RFC 9110 in OpenCode, with each read call and the rules it listed. |
+
+Two more strips wait for a place: `compare-strip`, three solutions of a polyglot exercise under Compare, and `orchestrate-strip`, the audio study as it ran.
+
+A phone crops a strip from the right, at a point that moves with the screen width.
+So all text sits in the first 680 of the 1260 pixels, which a 320-pixel screen shows.
+`bench/strips/strip.py` holds the shared palette, size, and header.
+
+Render the perception strip:
+
+```sh
+uv run --with pyqtgraph --with PyQt6 --with numpy bench/audio-routing/scope.py --layout strip --palette site --clip clip-27 --size 1260x170 --text-scale 1.8 --run <run> --data <data> --out strip.mp4
+```
+
+Each script in `bench/strips/` renders one of the others, and its header names its inputs.
+
+## Content sources
+
+- `src/data/agents.ts` holds Figure 1, the agent graph. Agents are its nodes
+  and Ennodia is the paths between them. Each agent's one strength has a
+  public source in `leaders.ts`. Only the audio route has a recorded run. The
+  others are example requests, and the figure labels them so.
+- `src/data/leaders.ts` holds Figure 2. Every value was read at its source on
+  the date the file states. The two mixing findings come from the papers'
+  abstracts.
+- `src/content/articles` holds long-form write-ups. Each article cites its
+  receipts or development records. The controlled-English check covers them.
+
+Only add a recorded run with a receipt, a development record, or a run ID.
+Only add a date that the record states.
+
+Figure 1 opens in a given state from a link, for posts that discuss one
+route: `/?from=claude&task=review#abilities`. `ennodia=off` shows the same
+task without Ennodia.
+
+To cross-post an article to DEV Community, export it as Markdown:
+
+```sh
+bun run --cwd website export:devto can-gemini-hear-this-file > post.md
+```
+
+The export sets `canonical_url` to the website article and keeps
+`published: false`. Figures become Markdown tables and lists. An article's
+`devtoTags` and `series` fields set its DEV tags and series. Render its
+1000 by 420 cover first:
+
+```sh
+bun run --cwd website make:cover can-gemini-hear-this-file
+```
+
 The three images in `public/illustrations` were generated for this website on
 September 6, 2026. They share an editorial stipple-print style, originally with
 apricot, lavender, and blue backgrounds, refined to neutral paper on September 8.
 Each asset was composed separately for a 3:2
 slot, then exported as a 960-pixel-wide WebP. They are illustrations, not
-customer photographs or screenshots of actual results.
-
-The interactive workflow is an illustrative Unicode diagram with an automatic
-branch-and-return trace. All labels remain readable during the animation. The
-documentation review video in `public/demos` is an actual recorded MCP run.
-Its poster is extracted from the final result in that recording. The landing
-page labels the recording as a run on a test project.
+customer photographs or screenshots of actual results. The current pages don't
+use them.
 
 ## Design references
 
-The redesign uses these references for communication and visual hierarchy,
-without copying their branding, interfaces, product claims, or customer data:
+The September 25, 2026 figures follow how the
+[Arena Physica DJI teardown](https://www.arenaphysica.com/publications/dji-teardown)
+explains complex information: figures with their own controls, to-scale
+timelines, side-by-side comparisons, captions that say how to use the figure,
+and sources kept next to the data. The colors, type, and content are Ennodia’s.
+The page was inspected as screenshots and rendered styles on that date.
+
+Earlier iterations used these references for communication and visual
+hierarchy, without copying their branding, interfaces, product claims, or
+customer data:
 
 - [Codex](https://openai.com/codex/): a strong identity and visible product work.
 - [Claude](https://claude.com/product/overview): tasks paired with concrete output.
@@ -37,9 +128,6 @@ without copying their branding, interfaces, product claims, or customer data:
 - [Supermemory](https://supermemory.ai/): stable text columns and a monospace
   diagram whose animation traces a labeled route through the system. The live
   page was inspected as screenshots and rendered DOM on September 8, 2026.
-
-Changes to the examples belong in `src/data/workflows.ts`. The audience tabs,
-illustrated examples, and copyable prompts all use that same source.
 
 ## Illustration refinement — September 6, 2026
 

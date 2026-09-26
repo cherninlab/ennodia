@@ -1,0 +1,55 @@
+---
+import "../styles/site.css";
+import SiteFooter from "../components/SiteFooter.astro";
+import SiteNav from "../components/SiteNav.astro";
+
+interface Props {
+  title: string;
+  description: string;
+  type?: "website" | "article";
+  structuredData?: unknown;
+  publishedTime?: Date;
+}
+
+const { title, description, type = "website", structuredData, publishedTime } = Astro.props;
+const site = Astro.site ?? new URL("https://ennodia.cherninlab.com");
+const canonical = new URL(Astro.url.pathname, site).toString();
+const image = new URL("/og.png", site).toString();
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="preload" href="/fonts/geist-latin-variable.woff2" as="font" type="font/woff2" crossorigin />
+    <meta name="theme-color" content="#f6f4ee" />
+    <meta property="og:type" content={type} />
+    <meta property="og:site_name" content="Ennodia" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={image} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="628" />
+    <meta property="og:image:alt" content="Ennodia wordmark." />
+    {publishedTime && <meta property="article:published_time" content={publishedTime.toISOString()} />}
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={image} />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <SiteNav />
+    <main id="main">
+      <slot />
+    </main>
+    <SiteFooter />
+    {structuredData && <script type="application/ld+json" set:html={JSON.stringify(structuredData).replace(/</g, "\\u003c")} />}
+    <script>import "../scripts/site";</script>
+  </body>
+</html>

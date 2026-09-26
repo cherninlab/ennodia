@@ -1,0 +1,43 @@
+---
+import { ArrowUpRight } from "@lucide/astro";
+import AgentIcon from "./AgentIcon.astro";
+import { leaders, leadersReadOn, mixing } from "../data/leaders";
+
+// Figure 2. Identity, not magnitude, is the finding: a different agent leads
+// each row. Scores sit on different scales, so they stay as numbers in their
+// own units, not bars on one axis.
+---
+<figure class="leaders" aria-labelledby="leaders-title">
+  <p class="figure-title" id="leaders-title">Who leads, read {leadersReadOn}</p>
+  <ol class="leader-list" role="list">
+    {leaders.map((row) => (
+      <li class="leader">
+        <span class="label leader-capability">{row.capability}</span>
+        <span class="leader-name">
+          <AgentIcon name={row.through} size={18} />
+          <strong>{row.leader}</strong>
+          <span class="leader-through">in {row.throughLabel}</span>
+        </span>
+        <span class="leader-value">{row.value}{row.unit && <span class="leader-unit"> {row.unit}</span>}</span>
+        <span class="leader-detail">
+          {row.detail}
+          {row.sources.map((source) => <a class="text-link" href={source.href}>{source.label}<ArrowUpRight size={12} aria-hidden="true" /></a>)}
+        </span>
+      </li>
+    ))}
+  </ol>
+  <figcaption class="leaders-caption">Values as each source reports them. Scores use different scales, so compare within a row, not across rows.</figcaption>
+
+  <div class="mixing">
+    <p class="figure-title">Does combining answers help?</p>
+    <ul role="list">
+      {mixing.map((item) => (
+        <li>
+          <span class="label">{item.stance}</span>
+          <span>{item.finding} <a class="text-link" href={item.source.href}>{item.source.label}<ArrowUpRight size={12} aria-hidden="true" /></a></span>
+        </li>
+      ))}
+    </ul>
+    <p class="mixing-lesson">A team helps when each member brings something the others lack, and when the answer is picked well. So Ennodia routes each part to the agent with the ability, and Compare stays optional.</p>
+  </div>
+</figure>

@@ -1,0 +1,33 @@
+---
+import SiteLayout from "../../layouts/SiteLayout.astro";
+import { formatDate, publishedArticles, readingMinutes } from "../../data/articles";
+import "../../styles/article.css";
+
+const articles = await publishedArticles();
+const title = "Articles — Ennodia";
+const description = "Write-ups of recorded Ennodia runs: which agents and models worked together, what they found, and where they failed.";
+---
+<SiteLayout title={title} description={description}>
+  <header class="index-header wrap">
+    <p class="label article-kind">Articles</p>
+    <h1 class="index-title">Real runs, written up with their limits</h1>
+    <p class="index-dek">Each article follows recorded Ennodia runs across different agents and models. Failed attempts stay in the story. No speed or cost claim appears without a measurement.</p>
+  </header>
+  <ul class="index-list wrap" role="list">
+    {articles.map((article) => (
+      <li class="index-item">
+        <a href={`/articles/${article.id}/`}>
+          <span class="index-item-meta">
+            <span class="label article-kind">{article.data.kind}</span>
+            <time datetime={article.data.published.toISOString().slice(0, 10)}>{formatDate(article.data.published)}</time>
+            <span>{readingMinutes(article)} min read</span>
+          </span>
+          <span>
+            <span class="index-item-title">{article.data.title}</span>
+            <span class="index-item-dek">{article.data.description}</span>
+          </span>
+        </a>
+      </li>
+    ))}
+  </ul>
+</SiteLayout>

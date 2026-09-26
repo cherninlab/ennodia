@@ -1,0 +1,22 @@
+---
+import { ArrowUpRight } from "@lucide/astro";
+import Wordmark from "./Wordmark.astro";
+
+const links = [
+  { href: "/articles/", label: "Articles" },
+  { href: "/docs/", label: "Docs" },
+  { href: "https://github.com/cherninlab/ennodia", label: "GitHub", external: true },
+];
+const path = Astro.url.pathname;
+---
+<header class="site-header wrap">
+  <a class="home" href="/" aria-label="Ennodia home"><Wordmark /></a>
+  <nav aria-label="Main navigation">
+    {links.map((link) => (
+      <a href={link.href} aria-current={!link.external && path.startsWith(link.href) ? "page" : undefined}>
+        {link.label}
+        {link.external && <ArrowUpRight size={14} aria-hidden="true" />}
+      </a>
+    ))}
+  </nav>
+</header>

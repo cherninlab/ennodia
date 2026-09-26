@@ -1,10 +1,12 @@
 import { defineConfig } from "astro/config";
+import react from "@astrojs/react";
 import starlight from "@astrojs/starlight";
 
 export default defineConfig({
   site: "https://ennodia.cherninlab.com",
   output: "static",
   integrations: [
+    react(),
     starlight({
       title: "Ennodia",
       description: "Try other agents and skills from your familiar workflow.",
@@ -42,6 +44,9 @@ export default defineConfig({
         alt: "Ennodia",
         replacesTitle: true
       },
+      components: {
+        SocialIcons: "./src/components/starlight/SocialIcons.astro"
+      },
       social: [
         {
           icon: "github",
@@ -51,33 +56,30 @@ export default defineConfig({
       ],
       sidebar: [
         {
-          label: "Start Here",
+          label: "Start here",
           items: [
             { label: "What is Ennodia?", slug: "docs" },
             { label: "Quickstart", slug: "docs/getting-started" },
-            { label: "Installation for Agents", slug: "docs/install" }
+            { label: "Installation for agents", slug: "docs/install" }
           ]
         },
         {
           label: "Use Ennodia",
           items: [
             { label: "Recipes", slug: "docs/guides/recipes" },
-            { label: "Understand Results", slug: "docs/guides/understand-results" },
+            { label: "Understand results", slug: "docs/guides/understand-results" },
             { label: "Using Agent Skills", slug: "docs/guides/agent-skills" },
             { label: "Pragmatic mode", slug: "docs/guides/pragmatic-mode" },
             { label: "Troubleshooting", slug: "docs/guides/troubleshooting" },
-            { label: "Budgets and Limits", slug: "docs/guides/budgets-and-limits" },
-            { label: "Running Better Audits", slug: "docs/guides/running-better-audits" }
+            { label: "Budgets and limits", slug: "docs/guides/budgets-and-limits" },
+            { label: "Running better audits", slug: "docs/guides/running-better-audits" }
           ]
         },
         {
-          label: "Examples and Evidence",
+          label: "Evidence",
           items: [
             { label: "Overview", slug: "docs/evidence" },
-            { label: "Building Ennodia with Ennodia", slug: "docs/evidence/building-ennodia" },
-            { label: "Find Stale Documentation", slug: "docs/evidence/docs-drift" },
-            { label: "Try a Skill Separately", slug: "docs/evidence/skill-trial" },
-            { label: "Measurement Plan", slug: "docs/evidence/measurement" },
+            { label: "Measurement plan", slug: "docs/evidence/measurement" },
             { label: "Roadmap", slug: "docs/roadmap" }
           ]
         },
@@ -85,21 +87,20 @@ export default defineConfig({
           label: "Concepts",
           collapsed: true,
           items: [
-            { label: "How Ennodia Works", slug: "docs/concepts/how-ennodia-works" },
+            { label: "How Ennodia works", slug: "docs/concepts/how-ennodia-works" },
             { label: "Interfaces and Core", slug: "docs/concepts/interfaces-and-core" },
-            { label: "Compositional Audits", slug: "docs/concepts/compositional-audits" },
-            { label: "Second Opinions", slug: "docs/concepts/second-opinions" },
-            { label: "Data Governance", slug: "docs/concepts/data-governance" }
+            { label: "Compositional audits", slug: "docs/concepts/compositional-audits" },
+            { label: "Second opinions", slug: "docs/concepts/second-opinions" },
+            { label: "Data governance", slug: "docs/concepts/data-governance" }
           ]
         },
         {
           label: "Reference",
           collapsed: true,
           items: [
-            { label: "MCP Tools", slug: "docs/reference/mcp-tools" },
-            { label: "Supported Harnesses", slug: "docs/reference/supported-harnesses" },
+            { label: "MCP tools", slug: "docs/reference/mcp-tools" },
+            { label: "Supported harnesses", slug: "docs/reference/supported-harnesses" },
             { label: "Ennodia IO", slug: "docs/reference/ennodia-io" },
-            { label: "Benchmarks", slug: "docs/reference/benchmarks" },
             { label: "Controlled English", slug: "docs/reference/controlled-english" }
           ]
         },
@@ -112,9 +113,9 @@ export default defineConfig({
             { label: "Ennodia vs ChatHub", slug: "docs/comparisons/chathub" },
             { label: "Ennodia vs LangGraph", slug: "docs/comparisons/langgraph" },
             { label: "Ennodia vs AutoGen", slug: "docs/comparisons/autogen" },
-            { label: "Ennodia vs Agent Frameworks", slug: "docs/comparisons/agent-frameworks" },
-            { label: "Ennodia vs MoA and Ensembles", slug: "docs/comparisons/mixture-of-agents" },
-            { label: "Ennodia vs Model Merging", slug: "docs/comparisons/model-merging" }
+            { label: "Ennodia vs agent frameworks", slug: "docs/comparisons/agent-frameworks" },
+            { label: "Ennodia vs MoA and ensembles", slug: "docs/comparisons/mixture-of-agents" },
+            { label: "Ennodia vs model merging", slug: "docs/comparisons/model-merging" }
           ]
         }
       ],

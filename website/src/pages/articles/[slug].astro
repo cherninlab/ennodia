@@ -1,0 +1,85 @@
+---
+import { render } from "astro:content";
+import { ArrowRight } from "@lucide/astro";
+import SetupPrompt from "../../components/SetupPrompt.astro";
+import SiteLayout from "../../layouts/SiteLayout.astro";
+import { formatDate, publishedArticles, readingMinutes, type Article } from "../../data/articles";
+import "../../styles/article.css";
+
+export async function getStaticPaths() {
+  const articles = await publishedArticles();
+  return articles.map((article) => ({
+    params: { slug: article.id },
+    props: { article, others: articles.filter((other) => other.id !== article.id).slice(0, 3) },
+  }));
+}
+
+interface Props {
+  article: Article;
+  others: Article[];
+}
+
+const { article, others } = Astro.props;
+const { Content } = await render(article);
+const { title, description, kind, published, recorded, related } = article.data;
+const site = Astro.site ?? new URL("https://ennodia.cherninlab.com");
+const url = new URL(`/articles/${article.id}/`, site).toString();
+
+const structuredData = {
+  "@context": "https://schema.org",
+  "@type": "Article",
+  headline: title,
+  description,
+  datePublished: published.toISOString(),
+  url,
+  mainEntityOfPage: url,
+  image: new URL("/og.png", site).toString(),
+  author: { "@type": "Organization", name: "Chernin Lab", url: "https://github.com/cherninlab" },
+  publisher: { "@type": "Organization", name: "Chernin Lab" },
+  about: { "@id": new URL("/#software", site).toString() },
+};
+---
+<SiteLayout title={`${title} — Ennodia`} description={description} type="article" publishedTime={published} structuredData={structuredData}>
+  <article class="article wrap">
+    <header class="article-header">
+      <div class="article-aside">
+        <a class="label article-kind" href="/articles/">{kind}</a>
+        <p class="article-meta">
+          <span>By <a href="https://github.com/cherninlab">Chernin Lab</a></span>
+          <time datetime={published.toISOString().slice(0, 10)}>{formatDate(published)}</time>
+          <span>{readingMinutes(article)} min read</span>
+          {recorded && <span>Run recorded {formatDate(recorded)}</span>}
+        </p>
+      </div>
+      <div class="article-lead">
+        <h1 class="article-title">{title}</h1>
+        <p class="article-dek">{description}</p>
+      </div>
+    </header>
+    <div class="prose">
+      <Content />
+    </div>
+    <footer class="article-footer">
+      <section class="article-try" aria-labelledby="article-try-title">
+        <h2 id="article-try-title">Try it on your own task</h2>
+        <SetupPrompt id="article-setup-prompt" heading="Paste this into your agent:" />
+        {related && <a class="text-link" href={related}>Technical record<ArrowRight size={14} aria-hidden="true" /></a>}
+      </section>
+      {others.length > 0 && (
+        <section class="article-more" aria-labelledby="article-more-title">
+          <h2 class="label" id="article-more-title">More articles</h2>
+          <ul role="list">
+            {others.map((other) => (
+              <li>
+                <a href={`/articles/${other.id}/`}>
+                  <span>{other.data.title}</span>
+                  <span class="article-more-meta">{other.data.kind} · {formatDate(other.data.published)}</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+    </footer>
+  </article>
+</SiteLayout>

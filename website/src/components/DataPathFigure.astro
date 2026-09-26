@@ -1,0 +1,42 @@
+---
+import AgentIcon from "./AgentIcon.astro";
+
+// Both setups share one three-column frame, so the only difference the eye
+// finds is the middle column. Nothing sits there for Ennodia, so the line
+// passes through. The endpoints differ only in whose account a provider sees.
+// Hosted services are described by what hosting implies, not by product.
+---
+<figure class="data-path" aria-labelledby="data-path-title">
+  <p class="figure-title" id="data-path-title">Where your prompts go</p>
+  <div class="path-columns" aria-hidden="true">
+    <span class="label">Your computer</span>
+    <span class="label">In between</span>
+    <span class="label">Model providers</span>
+  </div>
+
+  <section class="path-case" aria-label="A hosted multi-model service">
+    <h3 class="path-name">A hosted multi-model service</h3>
+    <div class="path-row" role="img" aria-label="Your chat app sends prompts to the service’s servers. The servers call the model providers with the service’s accounts.">
+      <div class="path-cell"><span class="node">Chat app</span></div>
+      <div class="path-cell path-link"><span class="node node-between">Their servers</span></div>
+      <div class="path-cell path-link"><span class="node">Their accounts</span></div>
+    </div>
+    <p class="path-facts">A separate plan or per-token fees. Your prompts pass through the service, under its telemetry policy.</p>
+  </section>
+
+  <section class="path-case" aria-label="Ennodia">
+    <h3 class="path-name">Ennodia</h3>
+    <div class="path-row" role="img" aria-label="Your chat calls Ennodia on your computer, and Ennodia starts your other agents there. No Ennodia server sits in between. Each agent calls its model provider with your own account.">
+      <div class="path-cell path-stack">
+        <span class="node">Your chat</span>
+        <span class="node node-ennodia">Ennodia</span>
+        <span class="node"><span class="node-icons"><AgentIcon name="codex" size={14} /><AgentIcon name="claude" size={14} /><AgentIcon name="antigravity" size={14} /></span>Other agents</span>
+      </div>
+      <div class="path-cell path-pass"><span>No Ennodia server</span></div>
+      <div class="path-cell path-link"><span class="node">Your accounts</span></div>
+    </div>
+    <p class="path-facts path-facts-ennodia">Each agent signs in with your existing account. Ennodia is free and MIT licensed, with no server and no telemetry.</p>
+  </section>
+
+  <figcaption class="path-caption">Your agents’ quotas and charges still apply. <a class="text-link" href="/docs/concepts/data-governance/">How data is handled</a></figcaption>
+</figure>
