@@ -63,6 +63,7 @@
 
 .prose {
   padding-block: 44px 16px;
+  color: var(--reading);
   font-size: var(--size-lead);
   line-height: 1.65;
   overflow-wrap: break-word;

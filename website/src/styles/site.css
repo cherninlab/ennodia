@@ -58,6 +58,8 @@
   --card: #fffefa;
   --ink: #000000;
   --subtle: #666666;
+  /* Long reading: near ink, so eyes do not tire over many paragraphs. */
+  --reading: #262626;
   --muted: #808080;
   --line: #d8dad0;
   --field-line: #adb6a5;
@@ -448,9 +450,10 @@ a svg {
   font-size: var(--size-small);
 }
 
+/* Olive marks Ennodia's path, so the star stays in ink. */
 .star-link svg:first-child {
-  fill: var(--accent-wash);
-  stroke: var(--accent);
+  fill: none;
+  stroke: var(--ink);
 }
 
 .footer-base {
