@@ -1,17 +1,35 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { StdioClientTransport, getDefaultEnvironment } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { CORE_TOOL_NAMES } from "../server";
 import { ENNODIA_VERSION } from "../version";
+
+// The default set is what a new user's agent loads, so check it exactly.
+const coreClient = new Client({ name: "ennodia-smoke-core", version: ENNODIA_VERSION });
+await coreClient.connect(new StdioClientTransport({
+  command: "bun",
+  args: ["run", "src/cli.ts"],
+  cwd: process.cwd(),
+  stderr: "pipe",
+  env: getDefaultEnvironment(),
+}));
+const coreToolNames = (await coreClient.listTools()).tools.map((tool) => tool.name).sort();
+await coreClient.close();
+if (JSON.stringify(coreToolNames) !== JSON.stringify([...CORE_TOOL_NAMES].sort())) {
+  throw new Error(`Default tool set was ${coreToolNames.join(", ")}.`);
+}
 
 const client = new Client({
   name: "ennodia-smoke",
   version: ENNODIA_VERSION,
 });
 
+// The rest of the smoke test exercises the full set.
 const transport = new StdioClientTransport({
   command: "bun",
   args: ["run", "src/cli.ts"],
   cwd: process.cwd(),
   stderr: "pipe",
+  env: { ...getDefaultEnvironment(), ENNODIA_TOOLS: "all" },
 });
 
 await client.connect(transport);
@@ -108,6 +126,7 @@ if (!isBudgetPlan(budgetPlan)) {
 console.log(
   JSON.stringify(
     {
+      coreTools: coreToolNames,
       tools: toolNames,
       harnesses: harnessList.filter(isHarnessSummary).map((harness) => ({
         id: harness.id,

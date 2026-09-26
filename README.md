@@ -47,6 +47,8 @@ For manual setup, add this Model Context Protocol (MCP) server to your client:
 }
 ```
 
+Ennodia loads six core tools by default. Add `"--tools", "all"` to `args` for the [full tool set](https://ennodia.cherninlab.com/docs/reference/mcp-tools/#tool-sets).
+
 Requirements: Bun `1.3.14` or newer, a compatible MCP client, and a supported agent with working provider access.
 `npx` downloads Ennodia. Bun runs it. You can also use `bunx ennodia`.
 
@@ -70,12 +72,8 @@ Native agents can also select unrequested skills from their own environment.
 
 ## See it in practice
 
-- [Building Ennodia with Ennodia](https://ennodia.cherninlab.com/docs/evidence/building-ennodia/): a worker patch, a failed login, and primary-agent corrections.
-- [Find stale documentation](https://ennodia.cherninlab.com/docs/evidence/docs-drift/): a small review with known answers.
-- [Try a skill separately](https://ennodia.cherninlab.com/docs/evidence/skill-trial/): two attempts against the same contract.
-
-The existing saved-answer benchmark is a regression check, not a live speed or cost comparison.
-[Measurement plan](https://ennodia.cherninlab.com/docs/evidence/measurement/)
+- [Can Gemini hear this file?](https://ennodia.cherninlab.com/articles/can-gemini-hear-this-file/): a Codex conversation hands an audio file to Gemini through Antigravity.
+- [Measurement plan](https://ennodia.cherninlab.com/docs/evidence/measurement/): how Ennodia will compare single agents with teams on public benchmarks.
 
 ## Data and limits
 

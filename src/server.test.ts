@@ -1,12 +1,59 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { StdioClientTransport, getDefaultEnvironment } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { describe, expect, it } from "bun:test";
 import { ENNODIA_VERSION } from "./version";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { createEnnodiaServer } from "./server";
+import { CORE_TOOL_NAMES, createEnnodiaServer, type EnnodiaServerOptions, type ToolSet } from "./server";
 import type { EnnodiaCore } from "./core";
 
 describe("MCP server tool surface", () => {
+  it("loads only the core tools by default", async () => {
+    expect(await toolNames()).toEqual([...CORE_TOOL_NAMES].sort());
+    await withClient(async (client) => {
+      const listed = await client.listTools();
+      expect(listed.tools.map((tool) => tool.name).sort()).toEqual([...CORE_TOOL_NAMES].sort());
+    }, { tools: null });
+  });
+
+  it("loads every tool when the full set is requested", async () => {
+    const all = await toolNames({ tools: "all" });
+    expect(all).toHaveLength(26);
+    expect(all).toEqual(expect.arrayContaining([...CORE_TOOL_NAMES, "ennodia_start_compositional", "ennodia_start_plan_advice"]));
+    await withClient(async (client) => {
+      const listed = await client.listTools();
+      expect(listed.tools.map((tool) => tool.name).sort()).toEqual(all);
+    }, { tools: null, args: ["--tools", "all"] });
+  });
+
+  it("marks reading tools read-only so clients can skip approval prompts", async () => {
+    const server = createEnnodiaServer({} as EnnodiaCore, { tools: "all" });
+    const client = new Client({ name: "annotation-test", version: "1" });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+    try {
+      const tools = new Map((await client.listTools()).tools.map((tool) => [tool.name, tool.annotations]));
+      for (const name of ["ennodia_get_run", "ennodia_list_harnesses", "ennodia_history", "ennodia_get_task", "ennodia_estimate_budget", "ennodia_plan"]) {
+        expect(tools.get(name)).toMatchObject({ readOnlyHint: true, openWorldHint: false });
+      }
+      for (const name of ["ennodia_run", "ennodia_start", "ennodia_start_compare"]) {
+        expect(tools.get(name)).toMatchObject({ readOnlyHint: false, openWorldHint: true });
+        expect(tools.get(name)?.destructiveHint).toBeUndefined();
+      }
+      expect(tools.get("ennodia_cancel_run")).toMatchObject({ readOnlyHint: false, destructiveHint: false, idempotentHint: true });
+    } finally {
+      await client.close();
+      await server.close();
+    }
+  });
+
+  it("rejects an unknown tool set flag before serving", async () => {
+    const child = Bun.spawn(["bun", "run", "src/cli.ts", "--tools", "most"], { stdin: "ignore", stdout: "pipe", stderr: "pipe" });
+    expect(await child.exited).toBe(1);
+    expect(await new Response(child.stderr).text()).toContain("Unknown tool set: most. Use core or all.");
+  });
+
+
   it("routes bounded waits through Core and preserves immediate reads", async () => {
     const calls: unknown[] = [];
     const core = {
@@ -268,6 +315,7 @@ describe("MCP server tool surface", () => {
 
     await withClient(async (client) => {
       const live = await client.listTools();
+      // The bundle serves the default set.
       const project = (tool: {
         name: string;
         description?: string;
@@ -279,20 +327,27 @@ describe("MCP server tool surface", () => {
       });
 
       expect(manifest.tools.map(project)).toEqual(live.tools.map(project));
-    });
+    }, { tools: null });
   });
 });
 
-async function withClient<T>(fn: (client: Client) => Promise<T>): Promise<T> {
+/** Starts the real CLI. Most tests inspect advanced tools, so the full set
+ * is the default here. Pass tools: null for the CLI's own default. */
+async function withClient<T>(
+  fn: (client: Client) => Promise<T>,
+  options: { tools?: ToolSet | null; args?: string[] } = {},
+): Promise<T> {
   const client = new Client({
     name: "ennodia-server-test",
     version: ENNODIA_VERSION,
   });
+  const tools = options.tools === undefined ? "all" : options.tools;
   const transport = new StdioClientTransport({
     command: "bun",
-    args: ["run", "src/cli.ts"],
+    args: ["run", "src/cli.ts", ...(options.args ?? [])],
     cwd: process.cwd(),
     stderr: "pipe",
+    env: { ...getDefaultEnvironment(), ...(tools ? { ENNODIA_TOOLS: tools } : {}) },
   });
 
   await client.connect(transport);
@@ -300,6 +355,20 @@ async function withClient<T>(fn: (client: Client) => Promise<T>): Promise<T> {
     return await fn(client);
   } finally {
     await client.close();
+  }
+}
+
+async function toolNames(options?: EnnodiaServerOptions): Promise<string[]> {
+  const server = createEnnodiaServer({} as EnnodiaCore, options);
+  const client = new Client({ name: "tool-set-test", version: "1" });
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  await server.connect(serverTransport);
+  await client.connect(clientTransport);
+  try {
+    return (await client.listTools()).tools.map((tool) => tool.name).sort();
+  } finally {
+    await client.close();
+    await server.close();
   }
 }
 

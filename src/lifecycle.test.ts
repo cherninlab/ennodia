@@ -155,7 +155,8 @@ describe("owned task lifecycle", () => {
     writeFileSync(join(dir, "codex"), '#!/bin/sh\nif [ "$1" = "--version" ]; then echo fixture; exit 0; fi\necho $$ > worker.pid\nexec /bin/sleep 30\n');
     chmodSync(join(dir, "codex"), 0o755);
     const child = Bun.spawn([process.execPath, join(import.meta.dir, "cli.ts")], {
-      cwd: dir, env: { ...process.env, PATH: dir, ENNODIA_HISTORY: "0" }, stdin: "pipe", stdout: "pipe", stderr: "pipe",
+      // ennodia_start is in the full tool set.
+      cwd: dir, env: { ...process.env, PATH: dir, ENNODIA_HISTORY: "0", ENNODIA_TOOLS: "all" }, stdin: "pipe", stdout: "pipe", stderr: "pipe",
     });
     const output = new Response(child.stdout).text();
     const errors = new Response(child.stderr).text();

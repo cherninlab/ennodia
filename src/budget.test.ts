@@ -58,7 +58,7 @@ describe("budget estimates", () => {
         }, { prompt: input.prompt, timeoutMs: 5_000 });
         const result = await manager.waitForTerminal(task.id, 5_000);
         expect(result?.status).toBe("succeeded");
-        expect(result?.stdout).toContain("Ennodia media input guidance");
+        expect(result?.stdout).toContain("<ennodia-media-guidance>");
         receivedPrompts.push(result!.stdout);
       }
 

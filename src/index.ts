@@ -1,8 +1,12 @@
 export { pragmaticSchema, type PragmaticOptions } from "./pragmatic";
 export {
+  CORE_TOOL_NAMES,
+  TOOL_SETS,
   createEnnodiaServer,
   shutdownEnnodia,
+  type EnnodiaServerOptions,
   type EnnodiaShutdownOptions,
+  type ToolSet,
 } from "./server";
 export {
   EnnodiaCore,

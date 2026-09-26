@@ -17,10 +17,13 @@ const markdownFiles = [
   "CHANGELOG.md",
   "CONTRIBUTING.md",
   "SECURITY.md",
-  "bench/README.md",
   "packages/ennodia-io/README.md",
+  "bench/audio-routing/README.md",
   ...await Array.fromAsync(
     new Bun.Glob("docs/**/*.md").scan({ cwd: ".", absolute: false }),
+  ),
+  ...await Array.fromAsync(
+    new Bun.Glob("website/src/content/articles/**/*.md").scan({ cwd: ".", absolute: false }),
   ),
 ];
 
@@ -82,8 +85,10 @@ function checkMarkdown(file: string): void {
     const prose = cleanMarkdown(line);
     checkRestrictedForms(`${file}:${index + 1}`, prose);
 
+    // Headings, list items, table rows, HTML figure lines, and footnote
+    // definitions are checked alone.
     const isolatedLine =
-      !line.trim() || /^\s*(?:#{1,6}\s|[-*+] |\d+[.)] |\|)/.test(line);
+      !line.trim() || /^\s*(?:#{1,6}\s|[-*+] |\d+[.)] |\||<|\[\^)/.test(line);
     if (isolatedLine) {
       checkParagraph();
       if (line.trim()) {
@@ -118,7 +123,12 @@ function checkRestrictedForms(source: string, text: string): void {
   if (text.includes(";")) {
     findings.push({ source, message: "prose semicolon", text });
   }
-  if (FORBIDDEN_GENERAL_WORDS.test(text)) {
+  // The landing page uses the author's conversational invitation, "Just ask your agent".
+  // Keep the technical documentation vocabulary rule unchanged.
+  const restrictedText = source === "website/dist/index.html"
+    ? text.replace(/\bJust ask your agent\b/g, "Give your agent")
+    : text;
+  if (FORBIDDEN_GENERAL_WORDS.test(restrictedText)) {
     findings.push({ source, message: "restricted general word", text });
   }
 }

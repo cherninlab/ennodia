@@ -104,15 +104,14 @@ exists solely on that channel.
 - `bin/ennodia`
 - source files that the Bun runtime needs
 - README, LICENSE, CONTRIBUTING, and documentation files
-- benchmark fixtures
 
 The core npm package must not include these items:
 
 - `.github/`, `AGENTS.md`, or `CLAUDE.md`
 - `bun.lock`, `src/dev/`, or `src/io.ts`
-- `*.test.ts`, `packages/`, or `website/`
+- `*.test.ts`, `bench/`, `packages/`, or `website/`
 
-JSR publishes the TypeScript source and docs, but not benchmark fixtures.
+JSR publishes the TypeScript source and docs.
 The IO npm package must include `bin/ennodia-io`, its `src/` files, and its
 README. It has an exact runtime dependency on the matching `ennodia` version.
 The release workflow publishes the core package first. The IO package stays
@@ -151,22 +150,6 @@ listing is per-version, so re-run `mcp-publisher publish` after each release.
 Community aggregators (Glama, PulseMCP, mcp.so, Smithery) index
 GitHub and the official registry automatically or accept one-time
 submissions. They do not need per-release updates.
-
-## Benchmarks
-
-The deterministic benchmark suite is:
-
-```sh
-bun run bench:bug-recall
-```
-
-Live harness benchmarks use:
-
-```sh
-bun run bench:bug-recall:live
-```
-
-Live runs are intentionally not part of `bun run verify`.
 
 ## Security
 

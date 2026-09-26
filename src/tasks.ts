@@ -10,7 +10,7 @@ import type {
   HarnessRunInput,
   HarnessUsage,
 } from "./harnesses";
-import { assertNativeSandboxSupported, assertNativeSubagentsSupported, assertReasoningEffortSupported, DEFAULT_TASK_TIMEOUT_MS, withInputGuidance } from "./harnesses";
+import { assertHarnessSettingsSupported, DEFAULT_TASK_TIMEOUT_MS, inputGuidanceNotes, withInputGuidance } from "./harnesses";
 import { preview, tailItems } from "./internal";
 import { signalOwnedProcess } from "./process";
 import {
@@ -19,11 +19,14 @@ import {
   type AppliedSkillInfo,
 } from "./skills";
 
+/** Ennodia's own instructions are tagged, so workers do not read them as task content. */
+export const EXECUTION_NOTICE_TAG = "ennodia-execution-notice";
+
 export type TaskStatus = "running" | "succeeded" | "failed" | "cancelled";
 
 export type TaskEvent = {
   at: string;
-  type: "started" | "input-guidance" | "stdout" | "stderr" | "exit" | "cancel" | "error";
+  type: "started" | "input-guidance" | "restart" | "stdout" | "stderr" | "exit" | "cancel" | "error";
   message?: string;
 };
 
@@ -83,6 +86,9 @@ export type TaskView = {
   /** Set when this task ran against an isolated copy of the requested cwd
    * (see HarnessRunInput.isolateCwd), naming the original directory. */
   isolatedFrom?: string;
+  /** Starts repeated because another instance of the same CLI held shared
+   * local state. Present only when a restart happened. */
+  startupRestarts?: number;
 };
 
 export type TaskViewOptions = {
@@ -138,6 +144,11 @@ type InternalTask = Omit<
   isolatedCwd?: string;
   extractUsage?: HarnessAdapter["extractUsage"];
   failureReason?: HarnessAdapter["failureReason"];
+  /** The exact spawn, kept so a start that met a startup conflict can run again. */
+  spawnInput: TaskSpawnInput;
+  stdinText?: string;
+  startupConflict?: RegExp;
+  attemptStartedAtMs: number;
 };
 
 export type StartTaskResult = {
@@ -146,6 +157,8 @@ export type StartTaskResult = {
 
 export type TaskManagerOptions = {
   drainTimeoutMs?: number;
+  /** Base delay before restarting a start that met a startup conflict. */
+  startupRestartDelayMs?: number;
   maxTasks?: number;
   spawn?: TaskSpawn;
   removeIsolatedCwd?: (path: string) => void;
@@ -161,10 +174,16 @@ const DEFAULT_MAX_TASKS = 200;
 const MAX_CAPTURE_CHARS = 200_000;
 const MAX_EVENT_MESSAGE_CHARS = 4_000;
 const MAX_EVENTS = 300;
+// A startup conflict shows up within moments of launch. Later failures are
+// not restarted, because the worker may have started real work.
+const STARTUP_CONFLICT_WINDOW_MS = 10_000;
+const MAX_STARTUP_RESTARTS = 3;
+const STARTUP_RESTART_DELAY_MS = 500;
 
 export class TaskManager {
   private readonly tasks = new Map<string, InternalTask>();
   private readonly drainTimeoutMs: number;
+  private readonly startupRestartDelayMs: number;
   private readonly maxTasks: number;
   private readonly spawn: TaskSpawn;
   private readonly removeIsolatedCwd: (path: string) => void;
@@ -175,6 +194,7 @@ export class TaskManager {
 
   constructor(options: TaskManagerOptions = {}) {
     this.drainTimeoutMs = options.drainTimeoutMs ?? DEFAULT_DRAIN_TIMEOUT_MS;
+    this.startupRestartDelayMs = options.startupRestartDelayMs ?? STARTUP_RESTART_DELAY_MS;
     this.maxTasks = Math.max(1, options.maxTasks ?? DEFAULT_MAX_TASKS);
     this.spawn = options.spawn ?? ((input) => Bun.spawn(input));
     this.ownsProcessGroups = !options.spawn && process.platform !== "win32";
@@ -214,9 +234,7 @@ export class TaskManager {
     if (input.persistSession && (!adapter.supportsSessionContinuation || input.isolateCwd)) {
       throw new Error("Persistent sessions require a supported harness and a persistent working directory.");
     }
-    assertReasoningEffortSupported(adapter, input.reasoningEffort);
-    assertNativeSubagentsSupported(adapter, input.nativeSubagents);
-    assertNativeSandboxSupported(adapter, input.nativeSandbox);
+    assertHarnessSettingsSupported(adapter, input);
     if (adapter.supportsNativeSandbox) input = { ...input, nativeSandbox: input.nativeSandbox ?? "read-only" };
 
     const sourceCwd = input.cwd ?? process.cwd();
@@ -244,26 +262,46 @@ export class TaskManager {
     const now = Date.now();
     const deadlineMs = now + timeoutMs;
     const deadlineAt = new Date(deadlineMs).toISOString();
-    const guidedPrompt = withInputGuidance(input.prompt, adapter);
-    const executionPrompt = `${guidedPrompt}
+    const guidance = inputGuidanceNotes(input.prompt, adapter);
+    const noticeLines = [
+      `Execution allowance: ${timeoutMs} ms from task launch (${input.timeoutMs === undefined ? "Ennodia default" : "caller supplied"}). Deadline (UTC): ${deadlineAt}. This is a hard cutoff, not a completion estimate or a target duration.`,
+      "Check actual UTC time before attributing incomplete work to the deadline. Do not report a cutoff merely because the task is difficult or the answer is getting long. Continue within the remaining allowance unless complete or blocked by a demonstrated access or tool failure.",
+      `Configured native sandbox: ${input.nativeSandbox ?? "harness-managed; check available permissions"}. Report any mismatch between the assignment and available access before attempting the work.`,
+      "Before the cutoff, return useful partial findings, verification performed, remaining work, and a justified continuation budget if needed. Only the caller can authorize a follow-up.",
+      "Use only tools and permissions actually available in this session; the caller's tools are not automatically inherited. If access is missing, report the exact tool, file, or permission and its impact. Try a permitted alternative when useful; do not repeat an unchanged failed attempt or claim success without evidence.",
+    ];
+    // An adapter that takes operator instructions gets Ennodia's notices
+    // there. Other workers get them as tagged blocks after the task.
+    let systemNotice: string | undefined;
+    let executionPrompt: string;
+    if (adapter.systemNotices) {
+      executionPrompt = input.prompt;
+      systemNotice = [
+        "Ennodia, the local tool that started this session for its caller, sets these limits for the task.",
+        ...noticeLines,
+        ...(guidance ? ["When the task needs native media inspection:", ...guidance.map((note) => `- ${note}`)] : []),
+      ].join("\n");
+    } else {
+      executionPrompt = `${withInputGuidance(input.prompt, adapter)}
 
-Ennodia execution notice:
-Execution allowance: ${timeoutMs} ms from task launch (${input.timeoutMs === undefined ? "Ennodia default" : "caller supplied"}). Deadline (UTC): ${deadlineAt}. This is a hard cutoff, not a completion estimate or a target duration.
-Check actual UTC time before attributing incomplete work to the deadline. Do not report a cutoff merely because the task is difficult or the answer is getting long. Continue within the remaining allowance unless complete or blocked by a demonstrated access or tool failure.
-Configured native sandbox: ${input.nativeSandbox ?? "harness-managed; check available permissions"}. Report any mismatch between the assignment and available access before attempting the work.
-Before the cutoff, return useful partial findings, verification performed, remaining work, and a justified continuation budget if needed. Only the caller can authorize a follow-up.
-Use only tools and permissions actually available in this session; the caller's tools are not automatically inherited. If access is missing, report the exact tool, file, or permission and its impact. Try a permitted alternative when useful; do not repeat an unchanged failed attempt or claim success without evidence.`;
+<${EXECUTION_NOTICE_TAG}>
+From Ennodia, not part of the task above.
+${noticeLines.join("\n")}
+</${EXECUTION_NOTICE_TAG}>`;
+    }
     const augmentedPrompt = input.skills && input.skills.length > 0
       ? augmentPrompt(executionPrompt, input.skills, adapter.id)
       : executionPrompt;
     let commandSpec: CommandSpec;
     let cwd: string;
+    let spawnInput: TaskSpawnInput;
     let child: TaskProcess;
     try {
       commandSpec = adapter.buildCommand(discovery.commandPath, {
         ...input,
         cwd: resolvedInputCwd,
         prompt: augmentedPrompt,
+        systemNotice,
         finalMessagePath,
         nativeSessionId: previous?.nativeSessionId,
       });
@@ -273,7 +311,7 @@ Use only tools and permissions actually available in this session; the caller's 
         throw new Error(`Working directory does not exist: ${cwd}`);
       }
 
-      child = this.spawn({
+      spawnInput = {
         cmd: [commandSpec.command, ...commandSpec.args],
         cwd,
         env: { ...process.env, ...commandSpec.env },
@@ -281,7 +319,8 @@ Use only tools and permissions actually available in this session; the caller's 
         stdout: "pipe",
         stderr: "pipe",
         detached: process.platform !== "win32",
-      });
+      };
+      child = this.spawn(spawnInput);
     } catch (error) {
       cleanupFailedStartArtifacts(
         finalMessagePath,
@@ -307,7 +346,7 @@ Use only tools and permissions actually available in this session; the caller's 
       isolatedFrom,
       command: [
         basename(commandSpec.command),
-        ...commandSpec.args.map((arg) => arg === augmentedPrompt ? "<prompt>" : arg),
+        ...commandSpec.args.map((arg) => arg === augmentedPrompt ? "<prompt>" : arg === systemNotice ? "<ennodia-notice>" : arg),
         ...(commandSpec.stdin === undefined ? [] : ["<stdin-prompt>"]),
       ],
       promptPreview: preview(input.prompt),
@@ -328,6 +367,10 @@ Use only tools and permissions actually available in this session; the caller's 
       isolatedCwd,
       extractUsage: adapter.extractUsage,
       failureReason: adapter.failureReason,
+      spawnInput,
+      stdinText: commandSpec.stdin,
+      startupConflict: adapter.startupConflict,
+      attemptStartedAtMs: Date.now(),
     };
 
     task.process = child;
@@ -339,7 +382,7 @@ Use only tools and permissions actually available in this session; the caller's 
     if (previous) previous.continuationTaskId = task.id;
     this.pruneTasks(task.id);
     this.pushEvent(task, { type: "started", message: `Task started. Execution limit: ${timeoutMs}ms (${task.timeoutSource}); deadline: ${task.deadlineAt}. This is not a completion estimate.` });
-    if (guidedPrompt !== input.prompt) {
+    if (guidance) {
       this.pushEvent(task, {
         type: "input-guidance",
         message: "Media input guidance was included in the worker prompt. Native inspection remains unverified until the worker reports evidence.",
@@ -366,24 +409,7 @@ Use only tools and permissions actually available in this session; the caller's 
 
     task.settled = this.watchExit(task, child);
     void task.settled;
-
-    if (commandSpec.stdin !== undefined) {
-      try {
-        const childStdin = child.stdin;
-        if (!childStdin) {
-          throw new Error("Child stdin pipe was not available.");
-        }
-
-        childStdin.write(commandSpec.stdin);
-        childStdin.end();
-      } catch (error) {
-        this.pushEvent(task, {
-          type: "error",
-          message: error instanceof Error ? error.message : String(error),
-        });
-        this.terminate(task);
-      }
-    }
+    this.writeStdin(task, child);
 
     return { task: this.toView(task) };
   }
@@ -495,9 +521,16 @@ Use only tools and permissions actually available in this session; the caller's 
   ): Promise<void> {
     let terminalStatus: TaskStatus = "failed";
     try {
-      const exitCode = await child.exited;
+      let exitCode = await child.exited;
       if (task.killTimeout) this.signal(task, "SIGKILL");
       await this.waitForOutputDrain(task);
+      while (exitCode !== 0 && this.metStartupConflict(task)) {
+        const restarted = await this.restartAfterConflict(task);
+        if (!restarted) break;
+        exitCode = await restarted.exited;
+        if (task.killTimeout) this.signal(task, "SIGKILL");
+        await this.waitForOutputDrain(task);
+      }
       task.exitCode = exitCode;
 
       if (task.cancelRequested) {
@@ -551,6 +584,80 @@ Use only tools and permissions actually available in this session; the caller's 
       this.touch(task);
       this.pruneTasks(task.id);
     }
+  }
+
+  private writeStdin(task: InternalTask, child: TaskProcess): void {
+    if (task.stdinText === undefined) {
+      return;
+    }
+
+    try {
+      const childStdin = child.stdin;
+      if (!childStdin) {
+        throw new Error("Child stdin pipe was not available.");
+      }
+
+      childStdin.write(task.stdinText);
+      childStdin.end();
+    } catch (error) {
+      this.pushEvent(task, {
+        type: "error",
+        message: error instanceof Error ? error.message : String(error),
+      });
+      this.terminate(task);
+    }
+  }
+
+  /** A start that lost a race for the CLI's shared local state did no work,
+   * so running the same command again is safe. */
+  private metStartupConflict(task: InternalTask): boolean {
+    return Boolean(task.startupConflict?.test(task.stderr)) &&
+      !task.stdout.trim() &&
+      !task.cancelRequested && !task.timedOut && !task.drainTimedOut && !this.shuttingDown &&
+      (task.startupRestarts ?? 0) < MAX_STARTUP_RESTARTS &&
+      Date.now() - task.attemptStartedAtMs < STARTUP_CONFLICT_WINDOW_MS;
+  }
+
+  private async restartAfterConflict(task: InternalTask): Promise<TaskProcess | undefined> {
+    const restart = (task.startupRestarts ?? 0) + 1;
+    // Jitter spreads out tasks that met the same conflict together.
+    const delayMs = Math.round(this.startupRestartDelayMs * restart * (1 + Math.random()));
+    this.pushEvent(task, {
+      type: "restart",
+      message: `The CLI stopped during startup because another instance held shared local state. Restart ${restart} of ${MAX_STARTUP_RESTARTS} in ${delayMs}ms. stderr: ${tail(task.stderr, 500).trim()}`,
+    });
+    await Bun.sleep(delayMs);
+    if (task.cancelRequested || task.timedOut || this.shuttingDown) {
+      return undefined;
+    }
+
+    // Clear anything the failed start left in its process group.
+    this.signal(task, "SIGKILL");
+    let child: TaskProcess;
+    try {
+      child = this.spawn(task.spawnInput);
+    } catch (error) {
+      this.pushEvent(task, {
+        type: "error",
+        message: `Restart failed: ${error instanceof Error ? error.message : String(error)}`,
+      });
+      return undefined;
+    }
+
+    task.forceSignalled = false;
+    task.startupRestarts = restart;
+    task.stdout = "";
+    task.stderr = "";
+    task.streamCaptureTruncated = false;
+    task.process = child;
+    task.pid = child.pid;
+    task.attemptStartedAtMs = Date.now();
+    task.streamsDone = Promise.all([
+      this.pipeStreamSafely(task, "stdout", child.stdout),
+      this.pipeStreamSafely(task, "stderr", child.stderr),
+    ]).then(() => undefined);
+    this.writeStdin(task, child);
+    return child;
   }
 
   private async collectFinalMessage(task: InternalTask): Promise<void> {
@@ -865,6 +972,7 @@ Use only tools and permissions actually available in this session; the caller's 
           task.stderr.length > (includeOutput ? maxOutputChars : 0)),
       usage: task.usage,
       isolatedFrom: task.isolatedFrom,
+      startupRestarts: task.startupRestarts || undefined,
     };
   }
 

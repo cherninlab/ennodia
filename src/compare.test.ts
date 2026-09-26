@@ -5,6 +5,7 @@ import {
   buildJudgePrompt,
   buildSynthesizerPrompt,
   CompareManager,
+  MAX_PROMPT_CANDIDATE_CHARS,
   parseJudgeAnalysis,
 } from "./compare";
 import { TaskManager } from "./tasks";
@@ -72,6 +73,47 @@ describe("CompareManager", () => {
         maxCandidateChars: 2,
       })?.candidates[0]?.content,
     ).toHaveLength(2);
+  });
+
+  it("keeps the Result Advisor's choice only when it names a listed candidate", async () => {
+    // [chosen, kept, ignored]: a blank or null choice means no choice, and
+    // none of them may cost the Advisor's structured answer.
+    const cases: [string | null | undefined, string | undefined, boolean][] = [
+      ["agent-b", "agent-b", false],
+      ["agent-z", undefined, true],
+      [null, undefined, false],
+      ["", undefined, false],
+      [undefined, undefined, false],
+    ];
+    for (const [chosen, kept, ignored] of cases) {
+      const result = await compareWithChoice(chosen, [
+        { id: "agent-a", text: "def score(): return 0" },
+        { id: "agent-b", text: "def score(): return 300" },
+      ]);
+
+      expect(result.status).toBe("succeeded");
+      expect(result.advisor?.answer).toBe("Use the second file.");
+      expect(result.advisor?.chosenSourceId).toBe(kept);
+      expect(result.events.some((event) => event.type === "advisor-choice-ignored")).toBe(ignored);
+      expect(result.events.some((event) => event.type === "advisor-degraded")).toBe(false);
+    }
+  });
+
+  it("ignores a choice of a candidate the Result Advisor saw only in part", async () => {
+    const result = await compareWithChoice("agent-b", [
+      { id: "agent-a", text: "def score(): return 0" },
+      { id: "agent-b", text: `def score(): return 300\n${"# padding\n".repeat(MAX_PROMPT_CANDIDATE_CHARS / 8)}` },
+    ]);
+
+    expect(result.status).toBe("succeeded");
+    expect(result.advisor?.chosenSourceId).toBeUndefined();
+    expect(result.events.find((event) => event.type === "advisor-choice-ignored")?.message).toContain("saw only part");
+  });
+
+  it("asks the Result Advisor to choose a candidate that can be used unchanged", () => {
+    const prompt = buildAdvisorPrompt("Return the complete file.", [{ id: "agent-a", content: "code" }]);
+    expect(prompt).toContain("set chosenSourceId to its source_id");
+    expect(prompt).toContain("Choose only a listed source_id.");
   });
 
   it("degrades when judge output is invalid but still synthesizes", async () => {
@@ -346,6 +388,44 @@ const compareAdapter: HarnessAdapter = {
     ],
   }),
 };
+
+// Judges like compareAdapter, then advises with a chosen source ID.
+async function compareWithChoice(chosen: string | null | undefined, responses: { id: string; text: string }[]) {
+  const manager = new CompareManager(new TaskManager(), async () => ({
+    adapter: choosingAdapter(chosen),
+    discovery: compareDiscovery,
+  }));
+  const started = await manager.start({ prompt: "Return the complete file.", responses, timeoutMs: 5_000 });
+  return waitForCompare(manager, started.id);
+}
+
+function choosingAdapter(chosen: string | null | undefined): HarnessAdapter {
+  const advice = JSON.stringify({
+    answer: "Use the second file.",
+    basis: "judge-analysis",
+    confidence: "high",
+    openQuestions: [],
+    ...(chosen === undefined ? {} : { chosenSourceId: chosen }),
+  });
+  return {
+    ...compareAdapter,
+    buildCommand: (commandPath, input) => ({
+      command: commandPath,
+      args: [
+        "-c",
+        [
+          "if printf '%s' \"$1\" | grep -q ENNODIA_COMPARE_JUDGE; then",
+          "  printf '%s\\n' '{\"consensus\":[],\"contradictions\":[],\"partial_coverage\":[],\"unique_insights\":[],\"blind_spots\":[],\"risks\":[],\"confidence\":\"high\"}'",
+          "else",
+          `  printf '%s\\n' '${advice}'`,
+          "fi",
+        ].join("\n"),
+        "compare-agent",
+        input.prompt,
+      ],
+    }),
+  };
+}
 
 const invalidJudgeAdapter: HarnessAdapter = {
   ...compareAdapter,

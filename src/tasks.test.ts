@@ -43,7 +43,7 @@ describe("TaskManager", () => {
     expect(result.exitCode).toBe(0);
     expect(result.timeoutSource).toBe("caller");
     expect(Date.parse(result.deadlineAt!) - Date.parse(result.createdAt)).toBe(5_000);
-    expect(result.stdout).toStartWith("stdout:hello\n\nEnnodia execution notice:");
+    expect(result.stdout).toStartWith("stdout:hello\n\n<ennodia-execution-notice>");
     expect(result.stdout).toContain("5000 ms from task launch (caller supplied)");
     expect(result.stdout).toContain(`Deadline (UTC): ${result.deadlineAt}.`);
     expect(result.stdout).toContain("Check actual UTC time");
@@ -108,14 +108,14 @@ describe("TaskManager", () => {
         ]);
         const events = result.events.filter((event) => event.type === "input-guidance");
         if (prompt === mediaPrompt) {
-          expect(result.stdout.startsWith(`${prompt}\n\nEnnodia media input guidance`)).toBe(true);
+          expect(result.stdout.startsWith(`${prompt}\n\n<ennodia-media-guidance>`)).toBe(true);
           expect(result.stdout).toContain("eight-second MP3 loaded through view_file");
           expect(result.stdout).toContain("keep normal permission settings");
           expect(result.command.join(" ")).not.toContain("view_file");
           expect(events).toHaveLength(1);
           expect(events[0].message).toContain("Native inspection remains unverified");
         } else {
-          expect(result.stdout).toStartWith(`${prompt}\n\nEnnodia execution notice:`);
+          expect(result.stdout).toStartWith(`${prompt}\n\n<ennodia-execution-notice>`);
           expect(events).toHaveLength(0);
         }
       }
@@ -279,6 +279,128 @@ describe("TaskManager", () => {
     } finally {
       rmSync(parentCwd, { recursive: true, force: true });
     }
+  });
+
+  it("sends Ennodia's notices as operator instructions when the adapter takes them", async () => {
+    const manager = new TaskManager();
+    const { task } = manager.start(systemNoticeAdapter, shellDiscovery, {
+      prompt: "review the clip notes/call.mp3",
+      timeoutMs: 5_000,
+    });
+    const result = await waitForTask(manager, task.id);
+
+    expect(result.status).toBe("succeeded");
+    const [prompt, notice] = result.stdout.split("\n---\n");
+    expect(prompt).toBe("prompt:review the clip notes/call.mp3");
+    expect(prompt).not.toContain("ennodia-execution-notice");
+    expect(notice).toStartWith("notice:Ennodia, the local tool that started this session");
+    expect(notice).toContain("5000 ms from task launch (caller supplied)");
+    expect(notice).toContain("When the task needs native media inspection:");
+    expect(result.command).toContain("<ennodia-notice>");
+    expect(result.command.join(" ")).not.toContain("Execution allowance");
+    expect(result.events.map((event) => event.type)).toContain("input-guidance");
+  });
+
+  it("restarts a start that stopped on a startup conflict", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "ennodia-startup-conflict-"));
+    let spawns = 0;
+    const manager = new TaskManager({
+      startupRestartDelayMs: 10,
+      spawn: (input) => {
+        spawns += 1;
+        return Bun.spawn(input);
+      },
+    });
+
+    try {
+      const { task } = manager.start(conflictOnceAdapter, shellDiscovery, {
+        prompt: "review",
+        cwd: dir,
+        timeoutMs: 5_000,
+      });
+      const result = await waitForTask(manager, task.id);
+
+      expect(spawns).toBe(2);
+      expect(result.status).toBe("succeeded");
+      expect(result.stdout).toBe("answer\n");
+      expect(result.stderr).toBe("");
+      expect(result.startupRestarts).toBe(1);
+      const restarts = result.events.filter((event) => event.type === "restart");
+      expect(restarts).toHaveLength(1);
+      expect(restarts[0]?.message).toContain("database is locked");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("does not restart a failure without the adapter's startup conflict", async () => {
+    let spawns = 0;
+    const manager = new TaskManager({
+      startupRestartDelayMs: 10,
+      spawn: (input) => {
+        spawns += 1;
+        return Bun.spawn(input);
+      },
+    });
+    const { task } = manager.start({ ...conflictOnceAdapter, startupConflict: undefined }, shellDiscovery, {
+      prompt: "review",
+      cwd: mkdtempSync(join(tmpdir(), "ennodia-no-conflict-")),
+      timeoutMs: 5_000,
+    });
+    const result = await waitForTask(manager, task.id);
+    rmSync(result.cwd, { recursive: true, force: true });
+
+    expect(spawns).toBe(1);
+    expect(result.status).toBe("failed");
+    expect(result.startupRestarts).toBeUndefined();
+    expect(result.stderr).toContain("database is locked");
+  });
+
+  it("stops restarting after three startup conflicts", async () => {
+    let spawns = 0;
+    const manager = new TaskManager({
+      startupRestartDelayMs: 5,
+      spawn: (input) => {
+        spawns += 1;
+        return Bun.spawn(input);
+      },
+    });
+    const { task } = manager.start(alwaysConflictAdapter, shellDiscovery, {
+      prompt: "review",
+      timeoutMs: 5_000,
+    });
+    const result = await waitForTask(manager, task.id);
+
+    expect(spawns).toBe(4);
+    expect(result.status).toBe("failed");
+    expect(result.exitCode).toBe(1);
+    expect(result.startupRestarts).toBe(3);
+    expect(result.events.filter((event) => event.type === "restart")).toHaveLength(3);
+  });
+
+  it("does not restart a task cancelled while it waits to restart", async () => {
+    let spawns = 0;
+    const manager = new TaskManager({
+      startupRestartDelayMs: 300,
+      spawn: (input) => {
+        spawns += 1;
+        return Bun.spawn(input);
+      },
+    });
+    const { task } = manager.start(alwaysConflictAdapter, shellDiscovery, {
+      prompt: "review",
+      timeoutMs: 5_000,
+    });
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      if (manager.get(task.id)?.events.some((event) => event.type === "restart")) break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    manager.cancel(task.id);
+    const result = await waitForTask(manager, task.id);
+
+    expect(spawns).toBe(1);
+    expect(result.status).toBe("cancelled");
+    expect(result.startupRestarts).toBeUndefined();
   });
 
   it("does not store periodic ticks as task events", async () => {
@@ -530,8 +652,8 @@ describe("TaskManager", () => {
       expect(secondResult.status).toBe("succeeded");
       expect(firstResult.isolatedFrom).toBe(sharedCwd);
       expect(secondResult.isolatedFrom).toBe(sharedCwd);
-      expect(firstResult.stdout).toStartWith("first\n\nEnnodia execution notice:");
-      expect(secondResult.stdout).toStartWith("second\n\nEnnodia execution notice:");
+      expect(firstResult.stdout).toStartWith("first\n\n<ennodia-execution-notice>");
+      expect(secondResult.stdout).toStartWith("second\n\n<ennodia-execution-notice>");
       expect(existsSync(firstResult.cwd)).toBe(false);
       expect(existsSync(secondResult.cwd)).toBe(false);
       expect(readFileSync(join(sharedCwd, "marker.txt"), "utf8")).toBe("original");
@@ -807,7 +929,7 @@ describe("TaskManager", () => {
       const result = await waitForTask(manager, task.id);
 
       expect(result.status).toBe("succeeded");
-      expect(result.stdout).toStartWith("default cwd\n\nEnnodia execution notice:");
+      expect(result.stdout).toStartWith("default cwd\n\n<ennodia-execution-notice>");
       expect(result.isolatedFrom).toBe(process.cwd());
       expect(existsSync(result.cwd)).toBe(false);
     } finally {
@@ -1059,6 +1181,50 @@ const ignoreTerminationAdapter: HarnessAdapter = {
   buildCommand: (commandPath) => ({
     command: commandPath,
     args: ["-c", "trap '' TERM; while :; do :; done"],
+  }),
+};
+
+// Prints the prompt and the separate notice, like a CLI with a
+// system-prompt flag.
+const systemNoticeAdapter: HarnessAdapter = {
+  id: "system-notice",
+  name: "System Notice",
+  kind: "cli",
+  commandCandidates: ["sh"],
+  capabilities: ["smoke-test"],
+  systemNotices: true,
+  buildCommand: (commandPath, input) => ({
+    command: commandPath,
+    args: ["-c", "printf 'prompt:%s\\n---\\nnotice:%s' \"$1\" \"$2\"", "system-notice", input.prompt, input.systemNotice ?? ""],
+  }),
+};
+
+// Fails like a CLI that lost a race for its local database, once per
+// working directory, then answers.
+const conflictOnceAdapter: HarnessAdapter = {
+  id: "conflict-once",
+  name: "Conflict Once",
+  kind: "cli",
+  commandCandidates: ["sh"],
+  capabilities: ["smoke-test"],
+  startupConflict: /database is locked/i,
+  buildCommand: (commandPath, input) => ({
+    command: commandPath,
+    args: [
+      "-c",
+      "if [ -f started ]; then echo answer; else touch started; echo 'Error: Unexpected error' >&2; echo 'database is locked' >&2; exit 1; fi",
+    ],
+    cwd: input.cwd,
+  }),
+};
+
+const alwaysConflictAdapter: HarnessAdapter = {
+  ...conflictOnceAdapter,
+  id: "always-conflict",
+  name: "Always Conflict",
+  buildCommand: (commandPath) => ({
+    command: commandPath,
+    args: ["-c", "echo 'database is locked' >&2; exit 1"],
   }),
 };
 

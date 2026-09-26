@@ -37,6 +37,9 @@ export type HarnessRunInput = {
    * file writes. TaskManager refuses symbolic links in the copied tree and
    * deletes the copy when the task becomes terminal. */
   isolateCwd?: boolean;
+  /** Ennodia's limits and notes for the worker, set only for adapters that
+   * declare systemNotices. Other adapters get them after the prompt. */
+  systemNotice?: string;
   /** Scratch file path an adapter can write its clean final message to,
    * separate from the harness's raw stdout (which may include a full
    * transcript). Populated by TaskManager; adapters opt in by referencing it. */
@@ -87,30 +90,36 @@ export type HarnessAdapter = {
   extractSessionId?: (stdout: string) => string | undefined;
   /** Some public CLIs report a semantic failure with exit code zero. */
   failureReason?: (stdout: string, stderr: string) => string | undefined;
+  /** The CLI accepts operator instructions separately from the prompt. A
+   * worker then reads Ennodia's limits as its session's own, not as text
+   * inside the task, which a careful model can distrust. */
+  systemNotices?: boolean;
+  /** Stderr from a start that stopped because another instance of the same
+   * CLI held a shared local resource. The task manager restarts these. */
+  startupConflict?: RegExp;
 };
 
-export function assertNativeSandboxSupported(adapter: HarnessAdapter, setting?: "read-only" | "workspace-write"): void {
-  if (setting === undefined) return;
-  if (setting !== "read-only" && setting !== "workspace-write") throw new Error("Unsupported nativeSandbox setting.");
-  if (!adapter.supportsNativeSandbox) throw new Error(`${adapter.name} (${adapter.id}) does not support nativeSandbox control.`);
-}
-
-export function assertNativeSubagentsSupported(adapter: HarnessAdapter, setting?: "disabled"): void {
-  if (setting !== undefined && !adapter.supportsNativeSubagentControl) {
-    throw new Error(`${adapter.name} (${adapter.id}) does not support nativeSubagents control.`);
-  }
-}
-
-export function assertReasoningEffortSupported(
-  adapter: Pick<HarnessAdapter, "id" | "name" | "supportsReasoningEffort">,
-  reasoningEffort?: ReasoningEffort,
+/** Checks every harness-specific setting at once and names all unsupported
+ * ones in one error, so a caller fixes them in one retry instead of one per
+ * setting. Unsupported settings are refused, never dropped: a caller who
+ * asked for a sandbox must not get a run without one. */
+export function assertHarnessSettingsSupported(
+  adapter: Pick<HarnessAdapter, "id" | "name" | "supportsReasoningEffort" | "supportsNativeSubagentControl" | "supportsNativeSandbox">,
+  input: { reasoningEffort?: ReasoningEffort; nativeSubagents?: "disabled"; nativeSandbox?: "read-only" | "workspace-write" },
 ): void {
-  if (reasoningEffort !== undefined && !adapter.supportsReasoningEffort) {
-    throw new Error(
-      `${adapter.name} (${adapter.id}) does not support explicit reasoningEffort.`,
-    );
+  if (input.nativeSandbox !== undefined && input.nativeSandbox !== "read-only" && input.nativeSandbox !== "workspace-write") {
+    throw new Error("Unsupported nativeSandbox setting.");
+  }
+  const unsupported = [
+    input.reasoningEffort !== undefined && !adapter.supportsReasoningEffort ? "explicit reasoningEffort" : undefined,
+    input.nativeSubagents !== undefined && !adapter.supportsNativeSubagentControl ? "nativeSubagents control" : undefined,
+    input.nativeSandbox !== undefined && !adapter.supportsNativeSandbox ? "nativeSandbox control" : undefined,
+  ].filter((setting): setting is string => setting !== undefined);
+  if (unsupported.length > 0) {
+    throw new Error(`${adapter.name} (${adapter.id}) does not support ${unsupported.join(" or ")}. Omit ${unsupported.length > 1 ? "these settings" : "this setting"} for this harness.`);
   }
 }
+
 
 export type HarnessDiscovery = {
   id: string;
@@ -147,6 +156,9 @@ let cachedDiscovery:
   | undefined;
 let inFlightDiscovery: Promise<HarnessDiscovery[]> | undefined;
 
+/** Ennodia's own guidance is tagged, so workers do not read it as task content. */
+export const MEDIA_GUIDANCE_TAG = "ennodia-media-guidance";
+
 export const MULTIMODAL_INPUT_GUIDANCE = [
   "Ennodia passes text prompts and local file paths, not media attachments. Native input depends on the selected harness, model, file tools, permissions, and format. Missing guidance means unverified access.",
   "When native listening or viewing is required, first load one small sample with native file tools. Report the file, inspected range, tool, and content-specific evidence, or the exact blocking error. A transcript, DSP score, or extracted frame is not equivalent evidence.",
@@ -158,16 +170,26 @@ export function hasMultimodalInput(prompt: string): boolean {
 }
 
 /** Keep preparation instructions out of unrelated work and internal text judges. */
+/** Media advice for a prompt that names media files, or undefined. */
+export function inputGuidanceNotes(
+  prompt: string,
+  adapter?: Pick<HarnessAdapter, "inputGuidance">,
+): string[] | undefined {
+  if (!hasMultimodalInput(prompt) || /^ENNODIA_(?:COMPARE|PLAN_ADVISOR)/.test(prompt)) {
+    return undefined;
+  }
+  return adapter?.inputGuidance ?? MULTIMODAL_INPUT_GUIDANCE;
+}
+
 export function withInputGuidance(
   prompt: string,
   adapter?: Pick<HarnessAdapter, "inputGuidance">,
 ): string {
-  if (!hasMultimodalInput(prompt) || /^ENNODIA_(?:COMPARE|PLAN_ADVISOR)/.test(prompt)) {
-    return prompt;
-  }
-  return `${prompt}\n\nEnnodia media input guidance (applies when native media inspection is required):\n${
-    (adapter?.inputGuidance ?? MULTIMODAL_INPUT_GUIDANCE).map((note) => `- ${note}`).join("\n")
-  }`;
+  const notes = inputGuidanceNotes(prompt, adapter);
+  if (!notes) return prompt;
+  return `${prompt}\n\n<${MEDIA_GUIDANCE_TAG}>\nFrom Ennodia, not part of the task above. Applies when native media inspection is required.\n${
+    notes.map((note) => `- ${note}`).join("\n")
+  }\n</${MEDIA_GUIDANCE_TAG}>`;
 }
 
 export const harnessAdapters: HarnessAdapter[] = [
@@ -179,6 +201,7 @@ export const harnessAdapters: HarnessAdapter[] = [
     versionArgs: ["--version"],
     capabilities: ["reasoning", "code", "agents", "mcp", "non-interactive-cli"],
     notes: ["Runs through the supported Claude Code CLI surface."],
+    systemNotices: true,
     buildCommand: (commandPath, input) => {
       const args = [
         "-p",
@@ -189,6 +212,10 @@ export const harnessAdapters: HarnessAdapter[] = [
 
       if (input.model) {
         args.push("--model", input.model);
+      }
+
+      if (input.systemNotice) {
+        args.push("--append-system-prompt", input.systemNotice);
       }
 
       args.push("--", input.prompt);
@@ -277,6 +304,8 @@ export const harnessAdapters: HarnessAdapter[] = [
     versionArgs: ["--version"],
     capabilities: ["reasoning", "code", "agents", "non-interactive-cli"],
     notes: ["Runs through `opencode run` without permission-bypass flags."],
+    // Concurrent starts can fail while another instance holds its database.
+    startupConflict: /database is locked/i,
     buildCommand: (commandPath, input) => {
       const args = ["run"];
 

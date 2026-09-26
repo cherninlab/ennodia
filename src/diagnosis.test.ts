@@ -97,6 +97,38 @@ describe("diagnoseTasks", () => {
     expect(diagnosis?.likelyCause).toContain("authentication failed");
     expect(diagnosis?.suggestions.join(" ")).toContain("Sign in");
   });
+
+  it("distinguishes an outdated agent CLI from a model or configuration failure", () => {
+    const diagnosis = diagnoseTasks([taskView({
+      harnessId: "claude-code",
+      stdout: "API Error: 400 Claude Code 2.1.267 does not support this model; version 2.1.280 or newer is required. Run 'claude update', or update the Claude desktop app, then try again.\n",
+    })]);
+    expect(diagnosis?.likelyCause).toContain("older than the requested model requires");
+    expect(diagnosis?.suggestions.join(" ")).toContain("Update the affected agent CLI");
+    expect(diagnosis?.suggestions.join(" ")).not.toContain("Check the requested model and command configuration");
+  });
+
+  it("names a permission that a headless agent could not ask for", () => {
+    const diagnosis = diagnoseTasks([taskView({
+      harnessId: "antigravity",
+      exitCode: 0,
+      stderr: "jetski: no output produced — a tool required the \"command\" permission that headless mode cannot prompt for, so it was auto-denied. Add an allow-rule under permissions.allow in settings.json.\n",
+    })]);
+    expect(diagnosis?.likelyCause).toContain("needs the \"command\" permission, which its headless mode cannot ask for");
+    expect(diagnosis?.likelyCause).toContain("did not measure the model");
+    expect(diagnosis?.suggestions.join(" ")).toContain("use its own file tools, without running commands");
+  });
+
+  it("reports a startup conflict that outlasted Ennodia's restarts", () => {
+    const diagnosis = diagnoseTasks([taskView({
+      harnessId: "opencode",
+      stderr: "Error: Unexpected error\n\ndatabase is locked\n",
+      startupRestarts: 3,
+    })]);
+    expect(diagnosis?.likelyCause).toContain("another instance held its local database");
+    expect(diagnosis?.suggestions.join(" ")).toContain("Starting fewer tasks on the same agent at once");
+    expect(diagnosis?.suggestions.join(" ")).not.toContain("Check the requested model and command configuration");
+  });
 });
 
 function taskView(overrides: Partial<TaskView> = {}): TaskView {

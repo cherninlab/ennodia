@@ -37,7 +37,7 @@ import {
 import {
   discoverHarnesses as defaultDiscoverHarnesses,
   findHarnessAdapter as defaultFindHarnessAdapter,
-  assertNativeSandboxSupported, assertNativeSubagentsSupported, assertReasoningEffortSupported,
+  assertHarnessSettingsSupported,
   type HarnessAdapter,
   type HarnessDiscovery,
   type ReasoningEffort,
@@ -611,9 +611,7 @@ export class EnnodiaCore {
     for (const harnessId of selectedHarnessIds) {
       const adapter = this.findHarnessAdapter(harnessId);
       if (adapter) {
-        assertReasoningEffortSupported(adapter, input.reasoningEffort);
-        assertNativeSubagentsSupported(adapter, input.nativeSubagents);
-        assertNativeSandboxSupported(adapter, input.nativeSandbox);
+        assertHarnessSettingsSupported(adapter, input);
       }
     }
     const budget = checkBudgetLimits(

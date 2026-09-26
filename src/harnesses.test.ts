@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { harnessAdapters, hasMultimodalInput, withInputGuidance } from "./harnesses";
+import { assertHarnessSettingsSupported, harnessAdapters, hasMultimodalInput, withInputGuidance } from "./harnesses";
 import { allPriorityHarnessIds } from "./priority";
 
 describe("harness adapters", () => {
@@ -340,5 +340,15 @@ describe("harness adapters", () => {
       expect(guided).not.toContain("gemini-3.8-flash-medium");
     }
     expect(hasMultimodalInput("Review the release plan and listenPort setting.")).toBe(false);
+  });
+
+  it("names every unsupported setting in one error", () => {
+    const antigravity = harnessAdapters.find((adapter) => adapter.id === "antigravity")!;
+    expect(() => assertHarnessSettingsSupported(antigravity, { nativeSubagents: "disabled", nativeSandbox: "read-only" }))
+      .toThrow("Antigravity (antigravity) does not support nativeSubagents control or nativeSandbox control. Omit these settings for this harness.");
+    expect(() => assertHarnessSettingsSupported(antigravity, { reasoningEffort: "low" }))
+      .toThrow("does not support explicit reasoningEffort. Omit this setting for this harness.");
+    const codex = harnessAdapters.find((adapter) => adapter.id === "codex")!;
+    expect(() => assertHarnessSettingsSupported(codex, { nativeSubagents: "disabled", nativeSandbox: "read-only", reasoningEffort: "high" })).not.toThrow();
   });
 });

@@ -193,8 +193,6 @@ function assertPackedFiles(paths: string[]): void {
     "skills/release-readiness/SKILL.md",
     "skills/rigorous-review/SKILL.md",
     "skills/source-grounded-audit/SKILL.md",
-    "examples/docs-drift/check.ts",
-    "examples/skill-trial/check.ts",
   ];
 
   for (const path of expected) {
@@ -209,6 +207,7 @@ function assertPackedFiles(paths: string[]): void {
     /^src\/dev\//,
     /^src\/io\.ts$/,
     /\.test\.ts$/,
+    /^bench\//,
     /^packages\//,
     /^website\//,
     /^\.github\//,

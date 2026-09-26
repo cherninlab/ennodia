@@ -1,5 +1,5 @@
 import { pragmaticSchema } from "./pragmatic";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer, type RegisteredTool } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { compositionalSliceSchema } from "./compositional";
 import {
@@ -50,11 +50,57 @@ const budgetSchema = z
 
 export type EnnodiaShutdownOptions = EnnodiaCoreShutdownOptions;
 
-export function createEnnodiaServer(core: EnnodiaCore = defaultCore): McpServer {
+/** Every tool definition is loaded into each session of every agent that
+ * has Ennodia configured, even when Ennodia is never called. The core set
+ * covers handing work to one agent or a team, Compare, waiting, and
+ * cancelling. The full set adds raw tasks, compositional slices, Plan
+ * Advisor, budget estimates, and skill installation. */
+export const CORE_TOOL_NAMES: readonly string[] = [
+  "ennodia_run",
+  "ennodia_get_run",
+  "ennodia_cancel_run",
+  "ennodia_list_harnesses",
+  "ennodia_list_skills",
+  "ennodia_history",
+];
+
+/** Clients such as Codex run read-only tools without an approval prompt,
+ * so polling a run never stops for approval. Tools that start agents reach
+ * model providers, and their workers can change files when the caller allows
+ * it, so they claim neither read-only nor harmless. */
+export function toolAnnotations(name: string): { readOnlyHint: boolean; openWorldHint: boolean; destructiveHint?: boolean; idempotentHint?: boolean } {
+  if (/^ennodia_(?:list_|get_|history$|plan$|estimate_)/.test(name)) return { readOnlyHint: true, openWorldHint: false };
+  if (name.startsWith("ennodia_cancel_")) return { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false };
+  if (name === "ennodia_install_skills") return { readOnlyHint: false, destructiveHint: false, openWorldHint: false };
+  return { readOnlyHint: false, openWorldHint: true };
+}
+
+export const TOOL_SETS = ["core", "all"] as const;
+export type ToolSet = (typeof TOOL_SETS)[number];
+
+export type EnnodiaServerOptions = {
+  /** Defaults to "core". */
+  tools?: ToolSet;
+};
+
+export function createEnnodiaServer(
+  core: EnnodiaCore = defaultCore,
+  options: EnnodiaServerOptions = {},
+): McpServer {
   const server = new McpServer({
     name: "ennodia",
     version: ENNODIA_VERSION,
   });
+
+  // Keep each registration, so the core set can drop the others below, and
+  // add the annotations that tell clients which calls only read.
+  const registered = new Map<string, RegisteredTool>();
+  const registerTool = server.registerTool.bind(server) as (name: string, config: { annotations?: object }, ...rest: unknown[]) => RegisteredTool;
+  server.registerTool = ((name: string, config: { annotations?: object }, ...rest: unknown[]) => {
+    const tool = registerTool(name, { ...config, annotations: { ...toolAnnotations(name), ...config.annotations } }, ...rest);
+    registered.set(name, tool);
+    return tool;
+  }) as McpServer["registerTool"];
 
   server.registerTool(
     "ennodia_list_harnesses",
@@ -1217,6 +1263,13 @@ export function createEnnodiaServer(core: EnnodiaCore = defaultCore): McpServer 
     },
     async ({ taskId }) => jsonResult(core.cancelTask(taskId)),
   );
+
+  // Removing before connect sends no list-changed notification.
+  if ((options.tools ?? "core") === "core") {
+    for (const [name, tool] of registered) {
+      if (!CORE_TOOL_NAMES.includes(name)) tool.remove();
+    }
+  }
 
   return server;
 }

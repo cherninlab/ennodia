@@ -48,6 +48,16 @@ function likelyCause(tasks: TaskView[]): string {
   if (tasks.every(hasAuthenticationError)) {
     return "Agent authentication failed. This attempt did not establish how the selected model would handle the task.";
   }
+  if (tasks.every(hasOutdatedCliError)) {
+    return "The installed agent CLI is older than the requested model requires. This attempt did not establish how the model would handle the task.";
+  }
+  if (tasks.every(hasHeadlessPermissionDenial)) {
+    const permission = headlessDeniedPermission(tasks[0]!);
+    return `The agent tried a tool that needs the ${permission ? `"${permission}" ` : ""}permission, which its headless mode cannot ask for, so it stopped without an answer. This attempt did not measure the model.`;
+  }
+  if (tasks.every(hasStartupConflictError)) {
+    return "The agent CLI stopped during startup because another instance held its local database. This attempt did not reach the model.";
+  }
   if (tasks.every((task) => task.timedOut)) {
     if (tasks.some(outputChars) && tasks.some(hasRecentOutput)) {
       return "The task produced output near its deadline but did not return a completed result.";
@@ -89,6 +99,18 @@ function suggestions(
     result.add("Sign in through the affected agent's supported CLI, then retry the same task.");
   }
 
+  if (tasks.some(hasOutdatedCliError)) {
+    result.add("Update the affected agent CLI through its supported updater, then retry the same task. Choosing a model that the installed version supports also works.");
+  }
+
+  if (tasks.some(hasHeadlessPermissionDenial)) {
+    result.add("Retry and tell the agent to use its own file tools, without running commands. To allow one specific command, add it to the agent's own permission settings, such as permissions.allow in Antigravity's settings.json.");
+  }
+
+  if (tasks.some(hasStartupConflictError)) {
+    result.add("Retry the same task. Starting fewer tasks on the same agent at once, or a few seconds apart, avoids the conflict.");
+  }
+
   if (tasks.some((task) => task.timedOut)) {
     result.add("Review captured findings and partial changes before retrying. Check the assigned scope, deadline, tool access, and permissions; continue useful work with an adequate budget instead of repeating the investigation.");
   }
@@ -99,7 +121,7 @@ function suggestions(
 
   if (tasks.some((task) => !task.timedOut && !task.cancelRequested && task.exitCode !== undefined && task.exitCode !== null && task.exitCode !== 0)) {
     result.add("Inspect stderr and task events with ennodia_get_task.");
-    if (!tasks.every(task => hasAuthenticationError(task) || hasQuotaError(task))) {
+    if (!tasks.every(task => hasAuthenticationError(task) || hasQuotaError(task) || hasOutdatedCliError(task) || hasStartupConflictError(task) || hasHeadlessPermissionDenial(task))) {
       result.add("Check the requested model and command configuration before retrying.");
     }
   }
@@ -134,6 +156,31 @@ function hasQuotaError(task: TaskView): boolean {
 function hasAuthenticationError(task: TaskView): boolean {
   return !task.timedOut && /^(?:Error: )?(?:Failed to authenticate:|OAuth session expired|Authentication failed:|Not logged in\b)/im
     .test(`${task.stdout}\n${task.stderr}`);
+}
+
+/** Claude Code reports, for example: "does not support this model; version 2.1.280 or newer is required". */
+function hasOutdatedCliError(task: TaskView): boolean {
+  return !task.timedOut && /does not support this model[;,.]?\s*version\s+\d[\w.-]*\s+or newer is required/i
+    .test(`${task.stdout}\n${task.stderr}`);
+}
+
+/** Antigravity reports, for example: "a tool required the "command"
+ * permission that headless mode cannot prompt for, so it was auto-denied". */
+const HEADLESS_DENIAL = /required the "?([\w-]+)"? permission that headless mode cannot prompt for/i;
+
+function hasHeadlessPermissionDenial(task: TaskView): boolean {
+  return !task.timedOut && HEADLESS_DENIAL.test(`${task.stdout}\n${task.stderr}`);
+}
+
+function headlessDeniedPermission(task: TaskView): string | undefined {
+  return HEADLESS_DENIAL.exec(`${task.stdout}\n${task.stderr}`)?.[1];
+}
+
+/** OpenCode reports "database is locked" when another instance holds its
+ * local database at startup. Ennodia restarts these, so a failure here means
+ * the conflict outlasted the restarts. */
+function hasStartupConflictError(task: TaskView): boolean {
+  return !task.timedOut && !task.stdout.trim() && /database is locked/i.test(task.stderr);
 }
 
 function summaryLine(task: TaskView): string {

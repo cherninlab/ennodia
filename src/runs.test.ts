@@ -27,7 +27,7 @@ describe("RunManager", () => {
     const run = await fixture.manager.start({prompt: "evidence", harnessId: "agent-a", compare: false});
     const result = await fixture.manager.waitForTerminal(run.id, 1000, {includeEvents: false});
     expect(result?.status).toBe("succeeded");
-    expect(result?.finalAnswer?.split("\n\nEnnodia execution notice:")[0]).toBe("agent-a:evidence");
+    expect(result?.finalAnswer?.split("\n\n<ennodia-execution-notice>")[0]).toBe("agent-a:evidence");
     expect(result?.events).toEqual([]);
   });
 
@@ -45,7 +45,7 @@ describe("RunManager", () => {
     expect(result.status).toBe("succeeded");
     expect(result.taskIds).toHaveLength(1);
     expect(result.compareId).toBeUndefined();
-    expect(result.finalAnswer?.split("\n\nEnnodia execution notice:")[0]).toBe("agent-a:hello");
+    expect(result.finalAnswer?.split("\n\n<ennodia-execution-notice>")[0]).toBe("agent-a:hello");
     expect(result.events.map((event) => event.type)).toContain("task-succeeded");
   });
 
@@ -200,6 +200,75 @@ describe("RunManager", () => {
 
     expect(result.status).toBe("succeeded");
     expect(result.finalAnswer).toBe("Preferred Advisor answer.");
+  });
+
+  it("returns a candidate the Result Advisor chose, unchanged, after its reason", async () => {
+    const taskManager = new TaskManager();
+    let view: CompareView | undefined;
+    const compareManager = {
+      // The stub chooses the second task and lists both as candidates.
+      start: async (input: { taskIds: string[] }) => {
+        const candidates = input.taskIds.map((taskId, index) => ({
+          id: `task:${taskId}`,
+          label: index === 0 ? "Agent A" : "Agent B",
+          content: taskManager.get(taskId, { includeOutput: true })?.stdout.trim() ?? "",
+        }));
+        view = {
+          id: "compare-chosen",
+          status: "succeeded",
+          promptPreview: "Return the complete file.",
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          endedAt: new Date().toISOString(),
+          elapsedMs: 1,
+          candidateCount: candidates.length,
+          candidates,
+          remainingMs: 0,
+          etaConfidence: "complete",
+          analysisAvailable: true,
+          advisor: {
+            answer: "Agent B's file is complete.",
+            basis: "judge-analysis",
+            confidence: "high",
+            openQuestions: [],
+            chosenSourceId: candidates[1]!.id,
+            taskId: "advisor-task",
+          },
+          events: [],
+        };
+        return view;
+      },
+      waitForTerminal: async () => view,
+      get: () => view,
+      cancel: () => view,
+    } as unknown as CompareManager;
+    const adapters = new Map([
+      ["agent-a", echoAdapter("agent-a", "Agent A")],
+      ["agent-b", echoAdapter("agent-b", "Agent B")],
+    ]);
+    const manager = new RunManager({
+      taskManager,
+      compareManager,
+      discoverHarnesses: async () => [
+        echoDiscovery("agent-a", "Agent A"),
+        echoDiscovery("agent-b", "Agent B"),
+      ],
+      findHarnessAdapter: (id) => adapters.get(id),
+      planRoute,
+    });
+
+    const started = await manager.start({
+      prompt: "Return the complete file.",
+      mode: "parallel",
+      compare: true,
+      timeoutMs: 5_000,
+    });
+    const result = await waitForRun(manager, started.id);
+
+    expect(result.status).toBe("succeeded");
+    const chosen = view!.candidates[1]!.content;
+    expect(chosen.length).toBeGreaterThan(0);
+    expect(result.finalAnswer).toBe(`Agent B's file is complete.\n\nChosen answer from Agent B, unchanged:\n\n${chosen}`);
   });
 
   it("rejects conflicting Result Advisor aliases before starting child tasks", async () => {

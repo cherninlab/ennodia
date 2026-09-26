@@ -6,7 +6,7 @@ import {
   type BudgetCheck,
   type BudgetLimits,
 } from "./budget";
-import type { CompareManager, CompareView } from "./compare";
+import { MAX_PROMPT_CANDIDATE_CHARS, type CompareManager, type CompareView } from "./compare";
 import { diagnoseTasks, type TaskDiagnosis } from "./diagnosis";
 import type {
   DiscoverHarnessesOptions,
@@ -14,7 +14,7 @@ import type {
   HarnessDiscovery,
   ReasoningEffort,
 } from "./harnesses";
-import { assertNativeSandboxSupported, assertNativeSubagentsSupported, assertReasoningEffortSupported } from "./harnesses";
+import { assertHarnessSettingsSupported } from "./harnesses";
 import {
   noopHistorySink,
   type HistorySink,
@@ -264,9 +264,7 @@ export class RunManager {
     for (const harnessId of selectedHarnessIds) {
       const adapter = this.dependencies.findHarnessAdapter(harnessId);
       if (adapter) {
-        assertReasoningEffortSupported(adapter, input.reasoningEffort);
-        assertNativeSubagentsSupported(adapter, input.nativeSubagents);
-        assertNativeSandboxSupported(adapter, input.nativeSandbox);
+        assertHarnessSettingsSupported(adapter, input);
       }
     }
 
@@ -561,13 +559,21 @@ export class RunManager {
       return;
     }
 
-    const finalAnswer = result.advisor?.answer.trim() ||
+    const advice = result.advisor?.answer.trim() ||
       result.synthesis?.text.trim();
+    // When the Advisor chose a candidate to use unchanged, the answer carries
+    // that candidate's own text after the Advisor's reason.
+    const chosen = result.candidates.find((candidate) => candidate.id === result.advisor?.chosenSourceId);
+    const finalAnswer = advice && chosen
+      ? `${advice}\n\nChosen answer from ${chosen.label ?? chosen.id}, unchanged:\n\n${chosen.content}`
+      : advice;
     if (result.status === "succeeded" && finalAnswer) {
       this.pushEvent(run, {
         type: "compare-succeeded",
         compareId: compare.id,
-        message: "Compare returned the Advisor recommendation.",
+        message: chosen
+          ? `Compare returned the Advisor recommendation and the chosen answer from ${chosen.label ?? chosen.id}.`
+          : "Compare returned the Advisor recommendation.",
       });
       this.succeedRun(run, finalAnswer);
       return;
@@ -589,7 +595,10 @@ export class RunManager {
       compareId,
       undefined,
       {
-        includeCandidates: false,
+        // A chosen candidate fits in the Advisor's evidence, so this cap
+        // keeps it whole.
+        includeCandidates: true,
+        maxCandidateChars: MAX_PROMPT_CANDIDATE_CHARS,
         includeEvents: true,
         maxEvents: 25,
       },

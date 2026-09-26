@@ -137,7 +137,7 @@ describe("EnnodiaCore", () => {
     const finished = await waitForRun(first, started.id);
 
     expect(finished.status).toBe("succeeded");
-    expect(finished.finalAnswer?.split("\n\nEnnodia execution notice:")[0]).toBe("core:hello core");
+    expect(finished.finalAnswer?.split("\n\n<ennodia-execution-notice>")[0]).toBe("core:hello core");
     expect(first.listTasks()).toHaveLength(1);
     expect(second.listTasks()).toHaveLength(0);
 
@@ -167,7 +167,7 @@ describe("EnnodiaCore", () => {
     const finished = await core.waitForRun(started.id, 10_000);
 
     expect(finished?.status).toBe("succeeded");
-    expect(finished?.finalAnswer?.split("\n\nEnnodia execution notice:")[0]).toBe("core:wait for me");
+    expect(finished?.finalAnswer?.split("\n\n<ennodia-execution-notice>")[0]).toBe("core:wait for me");
 
     await core.shutdown();
   });

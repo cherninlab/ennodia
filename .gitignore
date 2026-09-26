@@ -30,3 +30,6 @@ repomix-output.*
 *.mcpb
 *.tgz
 *.log
+
+# Python bytecode from the bench scripts
+__pycache__/
