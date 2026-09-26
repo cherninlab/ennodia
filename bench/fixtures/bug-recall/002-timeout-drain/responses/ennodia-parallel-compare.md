@@ -1,1 +1,0 @@
-{"findings":[{"line":35,"summary":"collectChild must await both stdout and stderr drain loops before returning, otherwise output can be truncated."},{"line":31,"summary":"A timeout only calls kill; the result does not say the process timed out."}]}

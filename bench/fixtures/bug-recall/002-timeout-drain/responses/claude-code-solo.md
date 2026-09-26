@@ -1,1 +1,0 @@
-{"findings":[{"line":35,"summary":"The function awaits child.exited but never awaits the stdout and stderr reader loops, so output can be returned before it drains."},{"line":31,"summary":"When the timeout fires and kill is called, the returned Result does not mark the process as timed out."}]}
