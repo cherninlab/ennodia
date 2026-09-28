@@ -1,1 +1,1 @@
-export const ENNODIA_VERSION = "0.4.0";
+export const ENNODIA_VERSION = "0.4.1";

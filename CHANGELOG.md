@@ -2,6 +2,17 @@
 
 This file records all notable Ennodia changes.
 
+## [0.4.1] - 2026-09-28
+
+### Added
+
+- Added a Questions page to the docs. It answers setup, data, cost, and time questions in one place.
+
+### Changed
+
+- Rewrote the README around what Ennodia does for you. You keep your agent, and it hands one part of a task to an agent with the ability.
+- Changed the package description to match. The npm, JSR, and MCP Registry listings show both.
+
 ## [0.4.0] - 2026-09-26
 
 ### Added
