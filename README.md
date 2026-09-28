@@ -13,6 +13,17 @@ Ennodia runs on your computer, and each agent uses your own account.
 Have Gemini listen to meeting.mp3 through Ennodia and tell me what was decided.
 ```
 
+## Why use it
+
+- **Keep the app you like.** Ennodia has no window of its own. You work in your agent as before, and it can now reach the others.
+- **Your agents work together.** Any agent can hand part of a task to any other and get the answer back in your chat.
+- **Nothing to pay, nothing to join.** Ennodia is free and open source, with no account. It uses the agents and plans you have.
+- **It grows with your agents.** It is a set of tools, not a framework or a method. Each new model one agent gains becomes an ability for all of them.
+- **It stays on your computer.** Every handoff leaves a receipt there: who did the work, how long it took, and what came back.
+- **Less to keep up with.** You don't need to follow every new model. Name the task, and your agent hands it to one that can do it.
+
+Next on the [roadmap](https://ennodia.cherninlab.com/docs/roadmap/): Ennodia reads its receipts, so your agent stops repeating what failed.
+
 ## What each agent adds
 
 No model leads every task, so each agent you connect brings an ability the others lack.
@@ -84,7 +95,7 @@ Native agents can also select unrequested skills from their own environment.
 
 - [Can Gemini hear this file?](https://ennodia.cherninlab.com/articles/can-gemini-hear-this-file/): a Codex conversation hands an audio file to Gemini through Antigravity.
 - [Measurement plan](https://ennodia.cherninlab.com/docs/evidence/measurement/): how Ennodia compares single agents with teams on public benchmarks.
-- [Audio routing study](bench/audio-routing/README.md): can an agent that cannot hear answer questions about audio once Ennodia lets it hand each clip to one that can?
+- [Audio routing pilot](bench/audio-routing/pilot-2026-09-26.md): Codex got 10 of 10 speech questions right through Gemini, and 4 of 10 alone. Across all 30 clips the gain was not significant, and each answer took about twice as long.
 
 ## Data and limits
 

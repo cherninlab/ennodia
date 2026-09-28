@@ -19,6 +19,7 @@ const markdownFiles = [
   "SECURITY.md",
   "packages/ennodia-io/README.md",
   "bench/audio-routing/README.md",
+  "bench/audio-routing/pilot-2026-09-26.md",
   ...await Array.fromAsync(
     new Bun.Glob("docs/**/*.md").scan({ cwd: ".", absolute: false }),
   ),
