@@ -4,10 +4,14 @@ startCommand:
     (config) => ({
       command: 'npx',
       args: ['-y', 'ennodia'],
-      env: {}
+      env: config.tools === 'all' ? { ENNODIA_TOOLS: 'all' } : {}
     })
 
 configSchema:
   type: object
-  description: "No configuration needed."
-  properties: {}
+  properties:
+    tools:
+      type: string
+      enum: ["core", "all"]
+      default: "core"
+      description: "core loads the six tools for handing work to agents. all loads every Ennodia tool, which adds about 9,000 tokens of tool definitions to each session."
