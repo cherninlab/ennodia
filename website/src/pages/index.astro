@@ -47,10 +47,10 @@ const structuredData = {
 };
 ---
 <SiteLayout title={title} description={description} structuredData={structuredData}>
-  <!-- Sections below the opening fade in once, the first time they come
-       into view. The class goes on before the first paint, so nothing
-       flashes. Without script, or for readers who ask for less motion,
-       every section simply shows. -->
+  <!-- Each block below the opening rises in once, as its top crosses 85%
+       of the screen height, so the reader sees it arrive. The class goes on
+       before the first paint, so nothing flashes. Without script, or for
+       readers who ask for less motion, every block simply shows. -->
   <script is:inline slot="head">
     if ("IntersectionObserver" in window && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
       document.documentElement.classList.add("js-reveal");
@@ -61,8 +61,8 @@ const structuredData = {
             entry.target.classList.add("is-revealed");
             observer.unobserve(entry.target);
           }
-        }, { rootMargin: "0px 0px -8% 0px" });
-        for (const section of document.querySelectorAll("[data-reveal]")) observer.observe(section);
+        }, { rootMargin: "0px 0px -15% 0px" });
+        for (const block of document.querySelectorAll("[data-reveal]")) observer.observe(block);
       });
     }
   </script>
@@ -73,20 +73,20 @@ const structuredData = {
     <SetupPrompt id="setup-prompt" />
   </section>
 
-  <section class="wrap why" id="why" aria-labelledby="why-title" data-reveal>
-    <h2 id="why-title">Why use Ennodia</h2>
+  <section class="wrap why" id="why" aria-labelledby="why-title">
+    <h2 id="why-title" data-reveal>Why use Ennodia</h2>
     <ul class="why-list" role="list">
-      {benefits.map((item) => <li><h3>{item.title}</h3><p>{item.text}</p></li>)}
+      {benefits.map((item, index) => <li data-reveal style={`--reveal-delay: ${(index % 3) * 90}ms`}><h3>{item.title}</h3><p>{item.text}</p></li>)}
     </ul>
-    <p class="why-next">
+    <p class="why-next" data-reveal>
       <span>Next: Ennodia will read its receipts, so your agent stops repeating what failed.</span>
       <a class="text-link" href="/docs/roadmap/">Roadmap <Icon name="arrow-right" size={14} /></a>
       <a class="text-link" href="/docs/questions/">Questions about setup, data, and cost <Icon name="arrow-right" size={14} /></a>
     </p>
   </section>
 
-  <section class="split wrap" id="result" aria-labelledby="result-title" data-reveal>
-    <div class="split-head">
+  <section class="split wrap" id="result" aria-labelledby="result-title">
+    <div class="split-head" data-reveal>
       <h2 id="result-title">What changes when Codex can listen</h2>
       <p>Codex can’t hear audio. In Fig. 1, each row runs from Codex alone to Codex with Ennodia, which hands the clip to Gemini. Speech rises from 4 to 10, and sound falls from 7 to 5.</p>
     </div>
@@ -95,16 +95,16 @@ const structuredData = {
 
   <AgentGraph />
 
-  <section class="split wrap" id="evidence" aria-labelledby="evidence-title" data-reveal>
-    <div class="split-head">
+  <section class="split wrap" id="evidence" aria-labelledby="evidence-title">
+    <div class="split-head" data-reveal>
       <h2 id="evidence-title">No model leads every task</h2>
       <p>Fig. 3 names the leader in four kinds of work, as each public leaderboard reports it. A different agent leads each row, so each agent you connect adds a strength. Fig. 4 shows when combining answers helps.</p>
     </div>
     <LeadersFigure />
   </section>
 
-  <section class="split wrap" id="alternatives" aria-labelledby="alternatives-title" data-reveal>
-    <div class="split-head">
+  <section class="split wrap" id="alternatives" aria-labelledby="alternatives-title">
+    <div class="split-head" data-reveal>
       <h2 id="alternatives-title">Why not just switch apps?</h2>
       <p>Both of the usual ways move you out of the agent that knows your project. Read Fig. 5 across a row: where you work, who carries the work, and whose account it uses.</p>
     </div>

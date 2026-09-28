@@ -46,13 +46,13 @@ const credit = shown.credit;
 const join = comparePoint(rows.length ? rows : [0]);
 const steps = manualSteps(rows.length ? rows : [0]);
 ---
-<section class="wrap abilities" id="abilities" aria-labelledby="abilities-title" data-graph data-reveal>
-  <div class="abilities-head">
+<section class="wrap abilities" id="abilities" aria-labelledby="abilities-title" data-graph>
+  <div class="abilities-head" data-reveal>
     <h2 id="abilities-title">Your agent stays in charge</h2>
     <p>Follow the olive line in Fig. 2. It leaves your agent’s tool call, runs through the agent that does the work, and returns to the same chat. Pick a task to change the route.</p>
   </div>
 
-  <div class="fig-toolbar">
+  <div class="fig-toolbar" data-reveal>
     <div class="fig-tasks" role="group" aria-label="Task">
       {graphTasks.map((entry) => {
         return (
@@ -68,7 +68,7 @@ const steps = manualSteps(rows.length ? rows : [0]);
     </div>
   </div>
 
-  <figure class={`fig${workers.length ? "" : " is-self"}`}>
+  <figure class={`fig${workers.length ? "" : " is-self"}`} data-reveal>
     <div class="fig-stage" style={`--call: ${y(CALL_Y)}; --answer: ${y(ANSWER_Y)}`}>
       <svg class="fig-paths" viewBox={`0 0 ${STAGE.width} ${STAGE.height}`} aria-hidden="true">
         <path class="fig-idle" d={idlePath()} />

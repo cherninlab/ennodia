@@ -56,13 +56,17 @@
   margin-top: var(--space-6);
 }
 
-/* A section rises into place once, the first time it comes into view: half
-   a second, eight pixels. The opening never moves, and print shows all. */
+/* Each block rises into place once, as its top crosses 85% of the screen
+   height, so the reader sees it arrive: 0.7 seconds, 24 pixels, easing out.
+   Blocks side by side follow each other by a beat. The opening never moves,
+   and print shows all. */
 @media (prefers-reduced-motion: no-preference) {
   .js-reveal [data-reveal] {
     opacity: 0;
-    transform: translateY(8px);
-    transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+    transform: translateY(24px);
+    transition:
+      opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1) var(--reveal-delay, 0ms),
+      transform 0.7s cubic-bezier(0.22, 1, 0.36, 1) var(--reveal-delay, 0ms);
   }
 
   .js-reveal [data-reveal].is-revealed {

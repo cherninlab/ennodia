@@ -8,7 +8,7 @@ import { leaders, leadersReadOn, mixing } from "../data/leaders";
 // their own units, not bars on one axis.
 ---
 <div class="leaders">
-<figure>
+<figure data-reveal style="--reveal-delay: 120ms">
   <ol class="leader-list" role="list">
     {leaders.map((row) => (
       <li class="leader">
@@ -32,7 +32,7 @@ import { leaders, leadersReadOn, mixing } from "../data/leaders";
   </figcaption>
 </figure>
 
-<figure class="mixing">
+<figure data-reveal style="--reveal-delay: 120ms" class="mixing">
     <ul role="list">
       {mixing.map((item) => (
         <li>
