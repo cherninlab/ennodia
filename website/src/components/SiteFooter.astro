@@ -1,5 +1,5 @@
 ---
-import { ArrowUpRight, Star } from "@lucide/astro";
+import Icon from "./Icon.astro";
 import Wordmark from "./Wordmark.astro";
 
 const repo = "https://github.com/cherninlab/ennodia";
@@ -7,7 +7,7 @@ const repo = "https://github.com/cherninlab/ennodia";
 <footer class="site-footer wrap">
   <div class="footer-note">
     <p>If <Wordmark class="inline-wordmark" label="Ennodia" /> is useful to you,<br />a star on GitHub would mean a lot.</p>
-    <a class="star-link" href={repo}><Star size={18} aria-hidden="true" /> Star on GitHub <ArrowUpRight size={16} aria-hidden="true" /></a>
+    <a class="star-link" href={repo}><Icon name="star" size={18} /> Star on GitHub <Icon name="arrow-up-right" size={16} /></a>
   </div>
   <div class="footer-base">
     <span>Made by <a href="https://github.com/cherninlab">Chernin Lab</a></span>

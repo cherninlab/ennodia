@@ -1,0 +1,29 @@
+---
+// The two usual ways to get another model's help, next to Ennodia, in the
+// reader's terms: where you work, who carries the work, and whose account
+// it runs on. On a phone each row becomes a short block with its labels.
+const columns = ["Where you work", "Who carries the work", "Whose account"];
+const rows = [
+  { name: "Switch apps", cells: ["In two apps, back and forth", "You: repeat the request, then paste the answer back", "Yours"] },
+  { name: "A hosted multi-model chat", cells: ["In its app", "Its servers", "Its plan"] },
+  { name: "Ennodia", cells: ["In your agent", "Your agent, through Ennodia", "Yours"], ennodia: true },
+];
+---
+<figure class="options">
+  <table class="options-table">
+    <thead>
+      <tr><td></td>{columns.map((column) => <th scope="col" class="label">{column}</th>)}</tr>
+    </thead>
+    <tbody>
+      {rows.map((row) => (
+        <tr class={row.ennodia ? "is-ennodia" : undefined}>
+          <th scope="row">{row.name}</th>
+          {row.cells.map((cell, index) => <td data-label={columns[index]}>{cell}</td>)}
+        </tr>
+      ))}
+    </tbody>
+  </table>
+  <figcaption class="caption">
+    <span class="caption-title"><span class="caption-number">Fig. 5</span>Three ways to use another model</span>
+  </figcaption>
+</figure>

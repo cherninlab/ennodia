@@ -1,6 +1,6 @@
 ---
 import { render } from "astro:content";
-import { ArrowRight } from "@lucide/astro";
+import Icon from "../../components/Icon.astro";
 import SetupPrompt from "../../components/SetupPrompt.astro";
 import SiteLayout from "../../layouts/SiteLayout.astro";
 import { formatDate, publishedArticles, readingMinutes, type Article } from "../../data/articles";
@@ -63,7 +63,7 @@ const structuredData = {
       <section class="article-try" aria-labelledby="article-try-title">
         <h2 id="article-try-title">Try it on your own task</h2>
         <SetupPrompt id="article-setup-prompt" heading="Paste this into your agent:" />
-        {related && <a class="text-link" href={related}>Technical record<ArrowRight size={14} aria-hidden="true" /></a>}
+        {related && <a class="text-link" href={related}>Technical record<Icon name="arrow-right" size={14} /></a>}
       </section>
       {others.length > 0 && (
         <section class="article-more" aria-labelledby="article-more-title">

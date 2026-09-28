@@ -1,0 +1,68 @@
+---
+import Icon from "./Icon.astro";
+
+// Our own measured result: Codex alone against the same Codex with Ennodia,
+// on 30 MMAU test-mini clips. Every number comes from
+// bench/audio-routing/pilot-2026-09-26.md, including the task that got
+// worse. Each row is a dumbbell: gray for Codex alone, olive with Ennodia.
+const rows = [
+  { task: "Sound", alone: 7, with: 5, of: 10 },
+  { task: "Music", alone: 6, with: 6, of: 10 },
+  { task: "Speech", alone: 4, with: 10, of: 10 },
+  { task: "All 30 clips", alone: 17, with: 21, of: 30 },
+];
+const costs = [
+  { label: "Said it listened", alone: "0", with: "30", unit: "of 30" },
+  { label: "Median time", alone: "27 s", with: "57 s", unit: "per clip" },
+  { label: "Median tokens", alone: "85,443", with: "157,085", unit: "per clip" },
+];
+const share = (value: number, of: number) => `${(value / of) * 100}%`;
+const source = "https://github.com/cherninlab/ennodia/blob/main/bench/audio-routing/pilot-2026-09-26.md";
+---
+<figure class="result">
+  <p class="result-key" aria-hidden="true">
+    <span><span class="result-dot is-alone"></span>Codex alone</span>
+    <span><span class="result-dot is-with"></span>Codex with Ennodia</span>
+  </p>
+
+  <ol class="result-rows" aria-hidden="true">
+    {rows.map((row) => {
+      const low = Math.min(row.alone, row.with);
+      const high = Math.max(row.alone, row.with);
+      return (
+        <li class={row.of === 30 ? "is-total" : undefined}>
+          <span class="result-task">{row.task}</span>
+          <span class="result-track">
+            <span class="result-span" style={`left: ${share(low, row.of)}; width: ${share(high - low, row.of)}`}></span>
+            <span class="result-dot is-alone" style={`left: ${share(row.alone, row.of)}`} title={`${row.task}, Codex alone: ${row.alone} of ${row.of}`}></span>
+            <span class="result-dot is-with" style={`left: ${share(row.with, row.of)}`} title={`${row.task}, Codex with Ennodia: ${row.with} of ${row.of}`}></span>
+          </span>
+          <span class="result-values"><span>{row.alone}</span> → <b>{row.with}</b> <span class="result-of">of {row.of}</span></span>
+        </li>
+      );
+    })}
+  </ol>
+
+  <dl class="result-costs">
+    {costs.map((cost) => (
+      <div>
+        <dt class="label">{cost.label}</dt>
+        <dd><span>{cost.alone}</span> → <b>{cost.with}</b> <span class="result-of">{cost.unit}</span></dd>
+      </div>
+    ))}
+  </dl>
+
+  <figcaption class="caption">
+    <span class="caption-title"><span class="caption-number">Fig. 1</span>Right answers on 30 MMAU clips, Codex alone and with Ennodia</span>
+    <span class="caption-note">Audio pilot, September 26, 2026. By chance, 8.4 of 30 would be right. Speech: exact McNemar p = 0.031. All 30 clips: p = 0.42. A pilot this small shows speech, not audio in general.</span>
+    <a class="text-link" href={source}>Every clip and the protocol <Icon name="arrow-up-right" size={14} /></a>
+  </figcaption>
+
+  <table class="sr-only">
+    <caption>Right answers for Codex alone and Codex with Ennodia, by task</caption>
+    <thead><tr><th scope="col">Task</th><th scope="col">Codex alone</th><th scope="col">Codex with Ennodia</th></tr></thead>
+    <tbody>
+      {rows.map((row) => <tr><th scope="row">{row.task}</th><td>{row.alone} of {row.of}</td><td>{row.with} of {row.of}</td></tr>)}
+    </tbody>
+  </table>
+</figure>

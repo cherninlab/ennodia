@@ -9,7 +9,9 @@ export default defineConfig({
     react(),
     starlight({
       title: "Ennodia",
-      description: "Try other agents and skills from your familiar workflow.",
+      description: "Connects the AI agents you use: your agent hands a task to another and gets the answer back.",
+      // Square code blocks, as on the rest of the site.
+      expressiveCode: { styleOverrides: { borderRadius: "0" } },
       favicon: "/favicon.svg",
       head: [
         {
@@ -60,7 +62,8 @@ export default defineConfig({
           items: [
             { label: "What is Ennodia?", slug: "docs" },
             { label: "Quickstart", slug: "docs/getting-started" },
-            { label: "Installation for agents", slug: "docs/install" }
+            { label: "Installation for agents", slug: "docs/install" },
+            { label: "Questions", slug: "docs/questions" }
           ]
         },
         {

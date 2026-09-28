@@ -1,39 +1,35 @@
 ---
-import { ArrowUpRight, ChevronDown } from "@lucide/astro";
+import Icon from "../components/Icon.astro";
 import AgentGraph from "../components/AgentGraph.astro";
-import AgentIcon from "../components/AgentIcon.astro";
-import BudgetChart from "../components/BudgetChart";
-import DataPathFigure from "../components/DataPathFigure.astro";
+import AudioResultFigure from "../components/AudioResultFigure.astro";
+import AlternativesFigure from "../components/AlternativesFigure.astro";
 import LeadersFigure from "../components/LeadersFigure.astro";
 import SetupPrompt from "../components/SetupPrompt.astro";
 import Wordmark from "../components/Wordmark.astro";
 import SiteLayout from "../layouts/SiteLayout.astro";
-import type { AgentId } from "../data/agents";
 import "../styles/landing.css";
 
-// One claim, one figure that shows it, the evidence behind it, and where the
-// data goes. A third tool to unite the others would be a third standard, so
-// the page never asks anyone to move: it shows the agents they have, joined.
+// Talk about the reader's result, not about Ennodia: one claim with one
+// measured number, what you get, the result itself, how a handoff runs, the
+// premise, and the alternative you would otherwise use. Answers to setup,
+// data, and cost questions live at /docs/questions/, so the pitch does not
+// raise them. A third tool to unite the others would be a third standard, so
+// the page never asks anyone to move.
 const title = "Ennodia isn’t another agent. It connects the agents you use";
 const description = "A free, open-source MCP server on your computer. The agent you use hands parts of a task to your other agents and gets their answers back.";
 const site = Astro.site ?? new URL("https://ennodia.cherninlab.com");
 
-const agents: { id: AgentId; name: string }[] = [
-  { id: "claude", name: "Claude Code" },
-  { id: "codex", name: "Codex CLI" },
-  { id: "opencode", name: "OpenCode" },
-  { id: "antigravity", name: "Antigravity" },
-  { id: "kilo", name: "Kilo Code" },
-  { id: "kiro", name: "Kiro" },
-  { id: "cline", name: "Cline" },
-  { id: "hermes", name: "Hermes Agent" },
-];
 
-const questions = [
-  { question: "Can I use my existing subscriptions?", answer: "Yes. Each agent runs through its own command-line tool, with the plan or API key you set up for it. Ennodia adds no subscription of its own.", href: "/docs/reference/supported-harnesses/", link: "See supported tools" },
-  { question: "Does my agent hand off work on its own?", answer: "Only when you let it. Say it in your own words, like “get Codex’s opinion”. Or install the pragmatic skill, so your agent can hand off bounded work within the limits you set.", href: "/docs/guides/agent-skills/#main-agent-delegation-skill", link: "The delegation skill" },
-  { question: "Does everything stay on my computer?", answer: "Ennodia runs on your computer, with no Ennodia-hosted service. Your chosen agents still send prompts and files to their own model providers.", href: "/docs/concepts/data-governance/", link: "How data is handled" },
-  { question: "Does it remember what worked?", answer: "It keeps a local run history, including outputs and failures, so you can look back. Learning which model or skill to choose next is planned.", href: "/docs/guides/understand-results/", link: "What the history records" },
+
+// Why use Ennodia, in the reader's terms. Each line is true today. Learning
+// from receipts is marked as next, as the roadmap has it.
+const benefits = [
+  { title: "Keep the app you like", text: "Ennodia has no window of its own. You work in your agent as before, and it can now reach the others." },
+  { title: "Your agents work together", text: "Any agent can hand part of a task to any other and get the answer back in your chat." },
+  { title: "Nothing to pay, nothing to join", text: "Ennodia is free and open source, with no account. It uses the agents and plans you have." },
+  { title: "It grows with your agents", text: "It is a set of tools, not a framework or a method. Each new model one agent gains becomes an ability for all of them." },
+  { title: "It stays on your computer", text: "Every handoff leaves a receipt there: who did the work, how long it took, and what came back. Nothing goes to Ennodia." },
+  { title: "Less to keep up with", text: "You don’t need to follow every new model. Name the task, and your agent hands it to one that can do it." },
 ];
 
 const structuredData = {
@@ -53,8 +49,29 @@ const structuredData = {
 <SiteLayout title={title} description={description} structuredData={structuredData}>
   <section class="intro wrap" aria-labelledby="intro-title">
     <h1 id="intro-title" aria-label="Ennodia isn’t another agent. It connects the agents you use."><Wordmark class="inline-wordmark" label="Ennodia" /> <span class="quiet">isn’t another agent</span> <span class="claim"><span class="quiet">It</span> connects the agents you use</span></h1>
-    <p class="intro-letter">Stay in Codex, Claude Code, or any agent you like. When a task needs another model, your agent hands that part over and brings the answer back.</p>
+    <p class="intro-letter">A free MCP server for Codex, Claude Code, and six other agents. When your agent lacks an ability, it calls one that has it and keeps the answer in your chat.</p>
+    <p class="intro-proof">Codex can’t hear audio. In a 30-clip test, it got 10 of 10 speech questions right through Gemini, and 4 of 10 alone. <a class="text-link" href="#result">See Fig. 1 <Icon name="arrow-down" size={14} /></a></p>
     <SetupPrompt id="setup-prompt" />
+  </section>
+
+  <section class="wrap why" id="why" aria-labelledby="why-title">
+    <h2 id="why-title">Why use Ennodia</h2>
+    <ul class="why-list" role="list">
+      {benefits.map((item) => <li><h3>{item.title}</h3><p>{item.text}</p></li>)}
+    </ul>
+    <p class="why-next">
+      <span>Next: Ennodia will read its receipts, so your agent stops repeating what failed.</span>
+      <a class="text-link" href="/docs/roadmap/">Roadmap <Icon name="arrow-right" size={14} /></a>
+      <a class="text-link" href="/docs/questions/">Questions about setup, data, and cost <Icon name="arrow-right" size={14} /></a>
+    </p>
+  </section>
+
+  <section class="split wrap" id="result" aria-labelledby="result-title">
+    <div class="split-head">
+      <h2 id="result-title">What changes when Codex can listen</h2>
+      <p>Codex can’t hear audio. In Fig. 1, each row runs from Codex alone to Codex with Ennodia, which hands the clip to Gemini. Speech rises from 4 to 10, and sound falls from 7 to 5.</p>
+    </div>
+    <AudioResultFigure />
   </section>
 
   <AgentGraph />
@@ -62,51 +79,16 @@ const structuredData = {
   <section class="split wrap" id="evidence" aria-labelledby="evidence-title">
     <div class="split-head">
       <h2 id="evidence-title">No model leads every task</h2>
-      <p>Public leaderboards name a different leader for each kind of work. Each agent you connect brings a strength the others lack.</p>
+      <p>Fig. 3 names the leader in four kinds of work, as each public leaderboard reports it. A different agent leads each row, so each agent you connect adds a strength. Fig. 4 shows when combining answers helps.</p>
     </div>
     <LeadersFigure />
   </section>
 
-  <section class="split wrap" id="local" aria-labelledby="local-title">
+  <section class="split wrap" id="alternatives" aria-labelledby="alternatives-title">
     <div class="split-head">
-      <h2 id="local-title">No Ennodia server in between</h2>
-      <p>Hosted multi-model tools route your prompts through their servers, on their plans. Ennodia runs on your computer, and each agent uses your account.</p>
+      <h2 id="alternatives-title">Why not just switch apps?</h2>
+      <p>Both of the usual ways move you out of the agent that knows your project. Read Fig. 5 across a row: where you work, who carries the work, and whose account it uses.</p>
     </div>
-    <DataPathFigure />
+    <AlternativesFigure />
   </section>
-
-  <section class="split wrap questions" aria-labelledby="questions-title">
-    <div class="split-head">
-      <h2 id="questions-title">Good to know</h2>
-    </div>
-    <div class="question-list">
-      <details>
-        <summary>Which tools can I use?<ChevronDown size={20} aria-hidden="true" /></summary>
-        <div class="answer">
-          <p>Ennodia uses the agents on your computer, with the models and access you’ve set up.</p>
-          <ul class="agent-list" role="list">{agents.map((agent) => <li><AgentIcon name={agent.id} size={24} /><span>{agent.name}</span></li>)}</ul>
-          <a class="text-link" href="/docs/reference/supported-harnesses/">Check compatibility <ArrowUpRight size={14} aria-hidden="true" /></a>
-        </div>
-      </details>
-      {questions.map((item) => (
-        <details>
-          <summary>{item.question}<ChevronDown size={20} aria-hidden="true" /></summary>
-          <div class="answer"><p>{item.answer}</p><a class="text-link" href={item.href}>{item.link}<ArrowUpRight size={14} aria-hidden="true" /></a></div>
-        </details>
-      ))}
-      <details id="tokens">
-        <summary>Will this use more tokens?<ChevronDown size={20} aria-hidden="true" /></summary>
-        <div class="answer">
-          <p>It can. Each agent you call reads its own prompt, and Compare reads every answer. Ennodia’s own tool definitions add about 2,600 tokens to each session. You can cap agent runs and estimated input tokens for every run.</p>
-          <BudgetChart client:visible />
-          <a class="text-link" href="/docs/guides/budgets-and-limits/">Set limits for a run <ArrowUpRight size={14} aria-hidden="true" /></a>
-        </div>
-      </details>
-      <details id="manual-setup">
-        <summary>Can I set it up myself?<ChevronDown size={20} aria-hidden="true" /></summary>
-        <div class="answer"><p>Yes. Add one server entry to your agent’s MCP settings. It needs Bun 1.3.14 or newer.</p><a class="text-link" href="/docs/getting-started/#manual-setup">See the manual setup guide <ArrowUpRight size={14} aria-hidden="true" /></a></div>
-      </details>
-    </div>
-  </section>
-  <script>import "../scripts/landing";</script>
 </SiteLayout>

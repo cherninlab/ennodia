@@ -19,14 +19,20 @@ are in `public/fonts`.
 
 `src/styles/site.css` defines the systems as tokens:
 
-- Type: 13 supports, 16 carries content, 19 leads, 25 states, 36 titles a
-  section, 52 titles a page, and 78 sets the opening line.
-- Spacing: a 4px base. Parts of one thing sit 4 to 16 apart, groups 24 to 32,
-  sections 64 to 96.
+- Type: 13 for figures, captions, and notes, 16 carries content, 19 for
+  article reading, 25 titles a section, 52 titles a page, and 78 sets the
+  opening line. The landing uses four of these: 78, 25, 16, and 13.
+- Spacing: steps of 8px. Text sits on a 4px baseline: 16px text on 24px
+  lines, 13px text on 20px lines.
 - Grid: a title column and a content column in a 1 to 1.7 ratio with a 72px
   gap. Every section, figure, and article uses these edges.
-- Color: ink for what you read first, gray for support, and olive for recorded
-  evidence. The docs theme in `src/styles/starlight.css` uses the same palette.
+- Color: running text is ink. Gray is for captions, notes, and parts of a
+  figure that are not in play. Olive means one thing: Ennodia's path, and
+  what comes back along it. Agent logos render in ink from the agent font.
+  The docs theme in `src/styles/starlight.css` uses the same palette.
+- Figures: each has a number and a caption below it, with a plain title, then
+  its date and source. The text reads each figure by its number, and one key
+  under Fig. 2 names the kinds of line. Corners are square.
 
 ## Charts
 
@@ -41,7 +47,7 @@ screen readers. Diagrams stay in HTML and CSS on the same grid.
 
 Each strip shows one capability as raw material, drawn with pyqtgraph from a real run.
 They are decoration: they carry no claim and screen readers skip them.
-Figure 1 shows one strip per task, from `public/studies/`:
+Fig. 2 shows one strip per task, from `public/studies/`, and its caption says what each strip shows and when:
 
 | Task | Strip | Run |
 | --- | --- | --- |
@@ -66,11 +72,11 @@ Each script in `bench/strips/` renders one of the others, and its header names i
 
 ## Content sources
 
-- `src/data/agents.ts` holds Figure 1, the agent graph. Agents are its nodes
-  and Ennodia is the paths between them. Each agent's one strength has a
+- `src/data/agents.ts` holds Fig. 2, the agent graph. Agents are its boxes
+  and Ennodia is the path between them. `graph-layout.ts` places both. Each agent's one strength has a
   public source in `leaders.ts`. Only the audio route has a recorded run. The
   others are example requests, and the figure labels them so.
-- `src/data/leaders.ts` holds Figure 2. Every value was read at its source on
+- `src/data/leaders.ts` holds Figs. 3 and 4. Every value was read at its source on
   the date the file states. The two mixing findings come from the papers'
   abstracts.
 - `src/content/articles` holds long-form write-ups. Each article cites its
@@ -79,7 +85,7 @@ Each script in `bench/strips/` renders one of the others, and its header names i
 Only add a recorded run with a receipt, a development record, or a run ID.
 Only add a date that the record states.
 
-Figure 1 opens in a given state from a link, for posts that discuss one
+Fig. 2 opens in a given state from a link, for posts that discuss one
 route: `/?from=claude&task=review#abilities`. `ennodia=off` shows the same
 task without Ennodia.
 

@@ -1,7 +1,7 @@
 import { agent, graphAgents, graphTasks, middleRow, route, routeText, type GraphAgentId, type TaskId } from "../data/agents";
 import { AGENTS, STAGE, backPath, comparePoint, manualSteps, outPath, percent } from "../data/graph-layout";
 
-// Figure 1's states: the task, the agent you work in, and whether Ennodia is
+// Fig. 2's states: the task, the agent you work in, and whether Ennodia is
 // there. The server rendered the first state. This keeps the rest in step.
 const root = document.querySelector<HTMLElement>("[data-graph]");
 
@@ -71,7 +71,7 @@ if (root) {
     for (const item of all<HTMLElement>("[data-agent]")) {
       const index = row.indexOf(item.dataset.agent as GraphAgentId);
       item.hidden = index < 0;
-      if (index >= 0) item.style.top = `calc(${y(AGENTS.rows[index]!)} - 12px)`;
+      if (index >= 0) item.style.top = `calc(${y(AGENTS.rows[index]!)} - 16px)`;
       item.classList.toggle("is-active", workers.includes(item.dataset.agent as GraphAgentId));
     }
 
@@ -95,7 +95,6 @@ if (root) {
     const backLabel = one<HTMLElement>("[data-back-label]");
     backLabel.hidden = !handoff;
     backLabel.textContent = text.backLabel;
-    setText("[data-legend]", manual ? "By hand" : "Ennodia’s path");
 
     const steps = one<HTMLElement>("[data-steps]");
     steps.hidden = !manual;
@@ -114,6 +113,7 @@ if (root) {
     }
     const strip = shownStrip();
     if (strip && replay && seen) play(strip);
+    setText("[data-strip-note]", strip?.dataset.note ?? "");
 
     setText("[data-summary]", manual ? text.alone : text.summary);
     const evidence = one<HTMLElement>("[data-evidence]");

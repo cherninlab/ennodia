@@ -1,12 +1,4 @@
 ---
-import antigravity from "../../../docs/assets/agents/antigravity-color.svg?url";
-import claude from "../../../docs/assets/agents/claudecode-color.svg?url";
-import cline from "../../../docs/assets/agents/cline.svg?url";
-import codex from "../../../docs/assets/agents/codex-color.svg?url";
-import hermes from "../../../docs/assets/agents/hermesagent.svg?url";
-import kilo from "../../../docs/assets/agents/kilocode.svg?url";
-import kiro from "../../../docs/assets/agents/kiro-color.svg?url";
-import opencode from "../../../docs/assets/agents/opencode-light.svg?url";
 import type { AgentId } from "../data/agents";
 
 interface Props {
@@ -14,13 +6,18 @@ interface Props {
   size?: number;
 }
 
-// Colored logos render as images. Single-color logos use a mask, so they
-// follow the surrounding text color.
-const colored: Partial<Record<AgentId, string>> = { antigravity, claude, codex, kiro, opencode };
-const masked: Partial<Record<AgentId, string>> = { cline, hermes, kilo };
+// Agents are drawn in ink from the agent logo font, so that in a figure
+// color only ever means Ennodia's path. The glyph follows the text color.
+const glyphs: Record<AgentId, string> = {
+  antigravity: "antigravity",
+  claude: "claude-code",
+  cline: "cline",
+  codex: "codex",
+  hermes: "hermes-agent",
+  kilo: "kilo-code",
+  kiro: "kiro",
+  opencode: "opencode",
+};
 const { name, size = 22 } = Astro.props;
-const src = colored[name];
-const mask = masked[name];
 ---
-{src && <img class="agent-icon" src={src} width={size} height={size} alt="" loading="lazy" decoding="async" />}
-{mask && <span class="agent-icon agent-icon-mask" style={`--icon: url("${mask}"); width: ${size}px; height: ${size}px;`} aria-hidden="true" />}
+<span class={`agent-icon agent-logo agent-logo--${glyphs[name]}`} style={`font-size: ${size}px`} aria-hidden="true"></span>

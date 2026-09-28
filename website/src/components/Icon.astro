@@ -1,0 +1,26 @@
+---
+// The site's own icons: straight strokes that meet at right angles or sharp
+// points, with square ends. No rounded corners, so they match the square
+// blocks and paths around them.
+interface Props {
+  name: "arrow-right" | "arrow-up-right" | "arrow-down" | "check" | "copy" | "star" | "listen" | "draw" | "review" | "read";
+  size?: number;
+  class?: string;
+}
+
+const { name, size = 16, class: className } = Astro.props;
+const paths: Record<Props["name"], string> = {
+  "arrow-right": "M4 12H19M13 6L19 12L13 18",
+  "arrow-up-right": "M7 17L17 7M8 7H17V16",
+  "arrow-down": "M12 4V19M6 13L12 19L18 13",
+  check: "M4 12L9 17L20 6",
+  copy: "M8 8H21V21H8ZM16 8V3H3V16H8",
+  star: "M12 2.5L14.35 8.76L21.03 9.06L15.8 13.24L17.58 19.69L12 16L6.42 19.69L8.2 13.24L2.97 9.06L9.65 8.76Z",
+  // A waveform, a pencil, two pages, and an open book.
+  listen: "M4 10V14M8 7V17M12 4V20M16 8V16M20 11V13",
+  draw: "M3 21L4.5 15.5L15.5 4.5L19.5 8.5L8.5 19.5ZM13 7L17 11",
+  review: "M4 7H15V21H4ZM8 7V3H20V17H15M7 12H12M7 16H12",
+  read: "M2 5H8L12 7L16 5H22V19H16L12 21L8 19H2ZM12 7V21",
+};
+---
+<svg class:list={["icon", className]} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true"><path d={paths[name]} /></svg>

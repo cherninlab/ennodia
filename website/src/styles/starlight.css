@@ -104,7 +104,7 @@ starlight-theme-select {
 
 .sidebar-content a,
 .sidebar-content summary {
-  border-radius: 6px;
+  border-radius: 0;
   color: #555555;
 }
 
@@ -227,7 +227,7 @@ starlight-theme-select {
 
 .sl-markdown-content code:not(:where(.not-content *)) {
   border: 1px solid #d8dad0;
-  border-radius: 6px;
+  border-radius: 0;
   padding: 0.1em 0.34em;
   background: #eae9e0;
   color: #000000;
@@ -235,7 +235,7 @@ starlight-theme-select {
 
 .sl-markdown-content pre:not(:where(.not-content *)) {
   border: 1px solid #d8dad0;
-  border-radius: 8px;
+  border-radius: 0;
   background: #fffefa;
   box-shadow: none;
   color: #1f1f1f;
@@ -298,7 +298,7 @@ starlight-theme-select {
 
 .pagination-links a {
   border-color: #d8dad0 !important;
-  border-radius: 8px !important;
+  border-radius: 0 !important;
   background: #f6f4ee;
   box-shadow: none !important;
 }
@@ -320,4 +320,21 @@ starlight-theme-select {
 
 .sl-markdown-content td:has(.agent-logo) {
   white-space: nowrap;
+}
+
+/* Square corners, as on the rest of the site. These Starlight parts set a
+   radius of their own. */
+site-search button,
+site-search dialog,
+site-search kbd,
+.sl-link-card,
+.sl-badge,
+.card,
+.starlight-aside,
+starlight-tabs [role="tab"],
+.sl-markdown-content :not(pre) > code,
+.sl-markdown-content img,
+.expressive-code .frame,
+.expressive-code pre {
+  border-radius: 0 !important;
 }

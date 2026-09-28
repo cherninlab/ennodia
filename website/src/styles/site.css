@@ -1,20 +1,28 @@
 /* Shared Ennodia website system.
 
    Type: Geist carries every sentence. Martian Mono appears only where the
-   page labels its own structure: figure titles, figure controls, and data.
+   page labels its own structure: figure labels, figure numbers, and data.
 
    Scale: each step is 1.2 to 1.5 times the previous one, so every size
-   reads as a different role:
-     13  supports content: notes, metadata, navigation
+   reads as a different role. The landing uses four of them: 78, 25, 16,
+   and 13, with 11 for the labels inside figures.
+     13  figure text and captions, notes, navigation
      16  carries content
-     19  leads: the first paragraph, quoted requests, long-form reading
-     25  a statement or a stat
-     36  titles a section
+     19  long-form reading in articles
+     25  titles a section
+     36  a statement or a stat in articles
      52  titles a page
      78  the opening line, once
 
-   Color: ink is what you read first. Gray supports it. The lighter gray only
-   sets the quiet words of the opening line. Olive marks recorded evidence. */
+   Color: running text is ink. Gray is for captions, notes, and parts of a
+   figure that are not in play. Olive means one thing: Ennodia's path, and
+   what comes back along it.
+
+   Rhythm: spacing steps by 8px. Text sits on a 4px baseline: 16px text on
+   24px lines, 13px text on 20px lines, 25px titles on 32px lines. */
+
+/* Agent logos as one-color glyphs. */
+@import "../../../docs/assets/agent-font/ennodia-agents.css";
 
 @font-face {
   font-family: "Geist";
@@ -85,8 +93,9 @@
   --space-9: 96px;
   --column-gap: 72px;
 
-  --radius: 9px;
-  --radius-sm: 5px;
+  /* Square corners everywhere: blocks meet at right angles. */
+  --radius: 0;
+  --radius-sm: 0;
   --gutter: 48px;
 }
 
@@ -112,7 +121,7 @@ body {
   margin: 0;
   background: var(--paper);
   color: var(--subtle);
-  font: 400 var(--size-body)/1.6 var(--sans);
+  font: 400 var(--size-body)/24px var(--sans);
   font-synthesis: none;
   -webkit-font-smoothing: antialiased;
 }
@@ -251,7 +260,7 @@ a svg {
 
 .figure-number {
   margin-right: 10px;
-  color: var(--accent);
+  color: var(--ink);
 }
 
 .text-link {
@@ -279,14 +288,14 @@ a svg {
   gap: 2px;
   padding: 3px;
   border: 1px solid var(--line);
-  border-radius: 7px;
+  border-radius: 0;
 }
 
 .segmented button {
   min-height: 30px;
   padding: 0 11px;
   border: 0;
-  border-radius: 5px;
+  border-radius: 0;
   background: transparent;
   color: var(--subtle);
   transition: background-color 0.2s ease, color 0.2s ease;
@@ -340,7 +349,7 @@ a svg {
   padding: 0 var(--space-4);
   border: 0;
   border-left: 1px solid var(--field-line);
-  border-radius: 0 4px 4px 0;
+  border-radius: 0;
   background: var(--ink);
   color: var(--paper);
   font: 500 var(--size-small)/1 var(--sans);

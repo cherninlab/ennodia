@@ -14,7 +14,7 @@ function end(d: string): { x: number; y: number } {
   return { x, y };
 }
 
-describe("Figure 1 layout", () => {
+describe("Fig. 2 layout", () => {
   it("runs each outbound path from the tool call into its agent row", () => {
     AGENTS.rows.forEach((row, index) => {
       const d = outPath([index]);
