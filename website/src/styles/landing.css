@@ -56,6 +56,28 @@
   margin-top: var(--space-6);
 }
 
+/* A section rises into place once, the first time it comes into view: half
+   a second, eight pixels. The opening never moves, and print shows all. */
+@media (prefers-reduced-motion: no-preference) {
+  .js-reveal [data-reveal] {
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+  }
+
+  .js-reveal [data-reveal].is-revealed {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media print {
+  .js-reveal [data-reveal] {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 /* Running text is ink everywhere on the page. Gray is for captions, notes,
    and the parts of a figure that are not in play. */
 .why,
