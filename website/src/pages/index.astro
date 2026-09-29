@@ -1,5 +1,6 @@
 ---
 import Icon from "../components/Icon.astro";
+import { Image } from "astro:assets";
 import AgentGraph from "../components/AgentGraph.astro";
 import AudioResultFigure from "../components/AudioResultFigure.astro";
 import AlternativesFigure from "../components/AlternativesFigure.astro";
@@ -8,6 +9,12 @@ import SetupPrompt from "../components/SetupPrompt.astro";
 import Wordmark from "../components/Wordmark.astro";
 import SiteLayout from "../layouts/SiteLayout.astro";
 import "../styles/landing.css";
+import dunePath from "../assets/why/dune-path.jpg";
+import fern from "../assets/why/fern.jpg";
+import geese from "../assets/why/geese.jpg";
+import grass from "../assets/why/grass.jpg";
+import nest from "../assets/why/nest.jpg";
+import stream from "../assets/why/stream.jpg";
 
 // Talk about the reader's result, not about Ennodia: one claim with one
 // measured number, what you get, the result itself, how a handoff runs, the
@@ -23,13 +30,16 @@ const site = Astro.site ?? new URL("https://ennodia.cherninlab.com");
 
 // Why use Ennodia, in the reader's terms. Each line is true today. Learning
 // from receipts is marked as next, as the roadmap has it.
+// Each benefit has a 21:9 photograph above it: a stream, geese in
+// formation, open grass, a fern unfurling, a nest, and a path to the sea.
+// They set the mood and carry no claim, so their alt text is empty.
 const benefits = [
-  { title: "Keep the app you like", text: "Ennodia has no window of its own. You work in your agent as before, and it can now reach the others." },
-  { title: "Your agents work together", text: "Any agent can hand part of a task to any other and get the answer back in your chat." },
-  { title: "Nothing to pay, nothing to join", text: "Ennodia is free and open source, with no account. It uses the agents and plans you have." },
-  { title: "It grows with your agents", text: "It is a set of tools, not a framework or a method. Each new model one agent gains becomes an ability for all of them." },
-  { title: "It stays on your computer", text: "Every handoff leaves a receipt there: who did the work, how long it took, and what came back. Nothing goes to Ennodia." },
-  { title: "Less to keep up with", text: "You don’t need to follow every new model. Name the task, and your agent hands it to one that can do it." },
+  { image: stream, title: "Keep the app you like", text: "Ennodia has no window of its own. You work in your agent as before, and it can now reach the others." },
+  { image: geese, title: "Your agents work together", text: "Any agent can hand part of a task to any other and get the answer back in your chat." },
+  { image: grass, title: "Nothing to pay, nothing to join", text: "Ennodia is free and open source, with no account. It uses the agents and plans you have." },
+  { image: fern, title: "It grows with your agents", text: "It is a set of tools, not a framework or a method. Each new model one agent gains becomes an ability for all of them." },
+  { image: nest, title: "It stays on your computer", text: "Every handoff leaves a receipt there: who did the work, how long it took, and what came back. Nothing goes to Ennodia." },
+  { image: dunePath, title: "Less to keep up with", text: "You don’t need to follow every new model. Name the task, and your agent hands it to one that can do it." },
 ];
 
 const structuredData = {
@@ -76,7 +86,13 @@ const structuredData = {
   <section class="wrap why" id="why" aria-labelledby="why-title">
     <h2 id="why-title" data-reveal>Why use Ennodia</h2>
     <ul class="why-list" role="list">
-      {benefits.map((item, index) => <li data-reveal style={`--reveal-delay: ${(index % 3) * 90}ms`}><h3>{item.title}</h3><p>{item.text}</p></li>)}
+      {benefits.map((item, index) => (
+        <li data-reveal style={`--reveal-delay: ${(index % 3) * 90}ms`}>
+          <Image class="why-image" src={item.image} alt="" widths={[640, 960, 1280]} sizes="(max-width: 720px) calc(100vw - 32px), (max-width: 900px) calc(50vw - 40px), 300px" format="webp" quality={78} />
+          <h3>{item.title}</h3>
+          <p>{item.text}</p>
+        </li>
+      ))}
     </ul>
     <p class="why-next" data-reveal>
       <span>Next: Ennodia will read its receipts, so your agent stops repeating what failed.</span>

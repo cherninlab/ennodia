@@ -72,6 +72,11 @@ Each script in `bench/strips/` renders one of the others, and its header names i
 
 ## Content sources
 
+- `src/assets/why/` holds the six 21:9 photographs above the benefits on the
+  landing page, generated with ChatGPT: a stream, geese in formation, open
+  grass, a fern, a nest, and a path to the sea. They set the mood and carry
+  no claim, so their alt text is empty. Astro serves each as WebP at 640,
+  960, and 1280 pixels wide.
 - `src/data/agents.ts` holds Fig. 2, the agent graph. Agents are its boxes
   and Ennodia is the path between them. `graph-layout.ts` places both. Each agent's one strength has a
   public source in `leaders.ts`. Only the audio route has a recorded run. The

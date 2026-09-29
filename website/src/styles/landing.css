@@ -140,8 +140,18 @@
   display: grid;
   align-content: start;
   gap: var(--space-1);
-  padding-top: var(--space-2);
-  border-top: 1px solid var(--ink);
+}
+
+/* A 21:9 photograph above each benefit, square cut, with the title close
+   under it. The size is fixed in advance, so the page never shifts. */
+.why-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 21 / 9;
+  margin-bottom: var(--space-1);
+  object-fit: cover;
+  background: var(--hover);
 }
 
 .why-list h3 {
