@@ -5,8 +5,118 @@ import { ENNODIA_VERSION } from "./version";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { CORE_TOOL_NAMES, createEnnodiaServer, type EnnodiaServerOptions, type ToolSet } from "./server";
 import type { EnnodiaCore } from "./core";
+import type { HarnessDiscovery } from "./harnesses";
+import { HarnessReadinessError, type HarnessReadiness } from "./readiness";
+import { inspectInstallation } from "./installation";
+import { ElicitRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 
 describe("MCP server tool surface", () => {
+  it.each(["recheck", "verify"])("executes only the native setup %s selected for the exact route", async action => {
+    const harnesses = ["codex", "claude-code"].map(id => ({ id, name: id, kind: "cli", available: true, runnable: true, capabilities: [], notes: [] } satisfies HarnessDiscovery));
+    const checks: unknown[] = [];
+    const core = { listHarnesses: async () => harnesses, checkHarnesses: async (input: unknown) => {
+      checks.push(input); return { installation: inspectInstallation(), harnesses: [harnesses[1]], actionRequired: [] };
+    } } as unknown as EnnodiaCore;
+    const server = createEnnodiaServer(core);
+    const client = new Client({ name: "native-setup-test", version: "1" }, { capabilities: { elicitation: { form: {} } } });
+    const forms: unknown[] = [];
+    client.setRequestHandler(ElicitRequestSchema, async request => {
+      forms.push(request.params);
+      return { action: "accept", content: forms.length === 1 ? { harnessId: "claude-code" } : { action } };
+    });
+    const [ct, st] = InMemoryTransport.createLinkedPair();
+    await server.connect(st); await client.connect(ct);
+    try {
+      const result = await client.callTool({ name: "ennodia_setup", arguments: { model: "opus", cwd: "/workspace" } });
+      expect(result.isError).toBeUndefined();
+      expect(forms).toHaveLength(2);
+      expect(JSON.stringify(forms)).toContain("uses provider capacity");
+      expect(checks).toEqual([{ harnessIds: ["claude-code"], model: "opus", cwd: "/workspace", refresh: true, verify: action === "verify", upgrade: false }]);
+      expect(JSON.parse(resultText(result)).setup).toEqual({ presentation: "native", action, harnessId: "claude-code" });
+      expect(setupPanel(result)).toContain("Ennodia setup");
+    } finally { await client.close(); await server.close(); }
+  });
+
+  it.each(["unsupported", "cancel", "decline", "recovery", "invalid"])("never starts maintenance for native setup %s", async action => {
+    let checks = 0, forms = 0;
+    const harnesses = [{ id: "codex", name: "Codex", kind: "cli", available: true, runnable: true, capabilities: [], notes: [] } satisfies HarnessDiscovery];
+    const core = { listHarnesses: async () => harnesses, checkHarnesses: async () => { checks += 1; throw new Error("Unexpected check"); } } as unknown as EnnodiaCore;
+    const server = createEnnodiaServer(core);
+    const client = new Client({ name: "setup-cancel-test", version: "1" }, { capabilities: action === "unsupported" ? {} : { elicitation: { form: {} } } });
+    if (action !== "unsupported") client.setRequestHandler(ElicitRequestSchema, async () => {
+      forms += 1;
+      if (action === "cancel" || action === "decline") return { action };
+      return { action: "accept", content: { action: action === "invalid" ? "untrusted-action" : action } };
+    });
+    const [ct, st] = InMemoryTransport.createLinkedPair();
+    await server.connect(st); await client.connect(ct);
+    try {
+      const result = await client.callTool({ name: "ennodia_setup", arguments: { harnessIds: ["codex"], model: "exact-model" } });
+      expect(checks).toBe(0);
+      expect(forms).toBe(action === "unsupported" ? 0 : 1);
+      if (action === "invalid") expect(result.isError).toBe(true);
+      else {
+        expect(JSON.parse(resultText(result)).setup).toEqual({ presentation: action === "unsupported" ? "markdown" : "native", action });
+        expect(setupPanel(result)).toContain("Ennodia setup");
+        expect(setupPanel(result)).toContain('"model":"exact-model"');
+      }
+    } finally { await client.close(); await server.close(); }
+  });
+
+  it("returns a session setup panel without changing the discovery JSON contract", async () => {
+    const route = (id: string, state: HarnessReadiness["state"], model?: string): HarnessDiscovery => ({
+      id, name: id, kind: "cli", available: true, runnable: true, capabilities: [], notes: [],
+      readiness: { state, model, checkedAt: "2026-11-08T00:00:00Z", message: `Native ${state}`,
+        recovery: { command: ["/Applications/Claude's CLI/claude", "auth", "login"], instruction: `Recover ${state} in the native tool.`, recheck: { tool: "ennodia_check_harnesses", harnessIds: [id], model, verify: true } } },
+    });
+    const harnesses = [route("claude-code", "login-required", "opus"), route("codex", "unverified"), route("expired", "credentials-expired"), route("quota", "quota-exhausted"), route("ready", "ready", "exact-model"), { ...route("cline", "setup-required"), available: false, runnable: false }];
+    const installation = { ...inspectInstallation(), status: "limited", limitations: ["History storage is unavailable."] } as const;
+    const core = { listHarnesses: async () => harnesses, getInstallation: () => installation,
+      checkHarnesses: async () => ({ installation, harnesses, actionRequired: [] }) } as unknown as EnnodiaCore;
+    const server = createEnnodiaServer(core);
+    const client = new Client({ name: "setup-test", version: "1" });
+    const [ct, st] = InMemoryTransport.createLinkedPair();
+    await server.connect(st); await client.connect(ct);
+    try {
+      expect(client.getInstructions()).toContain("inside the current harness session");
+      expect(client.getInstructions()).toContain("Do not stop at a generic healthy/unverified status summary");
+      const result = await client.callTool({ name: "ennodia_list_harnesses", arguments: {} });
+      expect(JSON.parse(resultText(result))).toEqual(harnesses);
+      const panel = setupPanel(result);
+      expect(panel).toContain("| claude-code (claude-code / opus) | login-required |");
+      expect(panel).toContain("'/Applications/Claude'\\''s CLI/claude' auth login");
+      expect(panel).toContain('"harnessIds":["claude-code"],"model":"opus","refresh":true,"verify":true');
+      expect(panel).toContain("Choose this route for your task, or verify it now.");
+      expect(panel).toContain("CLI unavailable");
+      expect(panel).toContain("History storage is unavailable.");
+      expect(panel).toContain("installation guide");
+      expect(panel).toContain("supported harness guide");
+      expect(panel.match(/auth login/g)).toHaveLength(1);
+      expect(panel).not.toContain('"harnessIds":["ready"]');
+      const checked = await client.callTool({ name: "ennodia_check_harnesses", arguments: { cwd: "/workspace" } });
+      expect(JSON.parse(resultText(checked)).harnesses).toEqual(harnesses);
+      expect(setupPanel(checked)).toContain('"cwd":"/workspace"');
+    } finally { await client.close(); await server.close(); }
+  });
+
+  it("includes recovery in blocked preflight responses with no started reviewers", async () => {
+    const actionRequired = [{ harnessId: "claude-code", harnessName: "Claude Code", readiness: {
+      state: "login-required", checkedAt: "2026-11-08T00:00:00Z", model: "opus", message: "Sign-in required.",
+      recovery: { command: ["claude", "auth", "login"], instruction: "Sign in through Claude.", recheck: { tool: "ennodia_check_harnesses", harnessIds: ["claude-code"], model: "opus", verify: true } },
+    } }] satisfies ConstructorParameters<typeof HarnessReadinessError>[0];
+    const server = createEnnodiaServer({ startRun: async () => { throw new HarnessReadinessError(actionRequired); } } as unknown as EnnodiaCore);
+    const client = new Client({ name: "recovery-test", version: "1" });
+    const [ct, st] = InMemoryTransport.createLinkedPair();
+    await server.connect(st); await client.connect(ct);
+    try {
+      const result = await client.callTool({ name: "ennodia_run", arguments: { prompt: "Review this code" } });
+      expect(result.isError).toBe(true);
+      expect(JSON.parse(resultText(result))).toMatchObject({ actionRequired, coverage: { started: 0 } });
+      expect(setupPanel(result)).toContain("claude auth login");
+      expect(setupPanel(result)).toContain('"model":"opus"');
+    } finally { await client.close(); await server.close(); }
+  });
+
   it("loads only the core tools by default", async () => {
     expect(await toolNames()).toEqual([...CORE_TOOL_NAMES].sort());
     await withClient(async (client) => {
@@ -17,7 +127,7 @@ describe("MCP server tool surface", () => {
 
   it("loads every tool when the full set is requested", async () => {
     const all = await toolNames({ tools: "all" });
-    expect(all).toHaveLength(26);
+    expect(all).toHaveLength(28);
     expect(all).toEqual(expect.arrayContaining([...CORE_TOOL_NAMES, "ennodia_start_compositional", "ennodia_start_plan_advice"]));
     await withClient(async (client) => {
       const listed = await client.listTools();
@@ -41,6 +151,8 @@ describe("MCP server tool surface", () => {
         expect(tools.get(name)?.destructiveHint).toBeUndefined();
       }
       expect(tools.get("ennodia_cancel_run")).toMatchObject({ readOnlyHint: false, destructiveHint: false, idempotentHint: true });
+      expect(tools.get("ennodia_setup")).toMatchObject({ readOnlyHint: true, openWorldHint: true });
+      expect(tools.get("ennodia_check_harnesses")).toMatchObject({ readOnlyHint: false, openWorldHint: true });
     } finally {
       await client.close();
       await server.close();
@@ -396,6 +508,13 @@ function isToolError(result: unknown): boolean {
       "isError" in result &&
       result.isError,
   );
+}
+
+function setupPanel(result: unknown): string {
+  const resource = (result as { content: Array<{ type: string; resource?: { uri: string; mimeType: string; text: string } }> }).content.find(item => item.type === "resource")?.resource;
+  expect(resource?.uri).toBe("ennodia://setup");
+  expect(resource?.mimeType).toBe("text/markdown");
+  return resource!.text;
 }
 
 function resultText(result: unknown): string {

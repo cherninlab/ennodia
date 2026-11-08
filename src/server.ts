@@ -10,7 +10,9 @@ import {
 import { renderPlanMermaid } from "./planner";
 import { formatHarnessPriorityList } from "./priority";
 import { ENNODIA_VERSION } from "./version";
-import { REASONING_EFFORTS } from "./harnesses";
+import { REASONING_EFFORTS, type HarnessDiscovery } from "./harnesses";
+import { HarnessReadinessError, harnessAttention, type HarnessAttention, type HarnessCheckInput } from "./readiness";
+import type { InstallationReport } from "./installation";
 
 const defaultCore = createDefaultEnnodiaCore();
 const comparePriorityText = formatHarnessPriorityList();
@@ -60,6 +62,8 @@ export const CORE_TOOL_NAMES: readonly string[] = [
   "ennodia_get_run",
   "ennodia_cancel_run",
   "ennodia_list_harnesses",
+  "ennodia_setup",
+  "ennodia_check_harnesses",
   "ennodia_list_skills",
   "ennodia_history",
 ];
@@ -69,6 +73,7 @@ export const CORE_TOOL_NAMES: readonly string[] = [
  * model providers, and their workers can change files when the caller allows
  * it, so they claim neither read-only nor harmless. */
 export function toolAnnotations(name: string): { readOnlyHint: boolean; openWorldHint: boolean; destructiveHint?: boolean; idempotentHint?: boolean } {
+  if (name === "ennodia_setup") return { readOnlyHint: true, openWorldHint: true };
   if (/^ennodia_(?:list_|get_|history$|plan$|estimate_)/.test(name)) return { readOnlyHint: true, openWorldHint: false };
   if (name.startsWith("ennodia_cancel_")) return { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false };
   if (name === "ennodia_install_skills") return { readOnlyHint: false, destructiveHint: false, openWorldHint: false };
@@ -90,13 +95,24 @@ export function createEnnodiaServer(
   const server = new McpServer({
     name: "ennodia",
     version: ENNODIA_VERSION,
-  });
+  }, { instructions: `When the user asks to set up Ennodia or recover a blocked route, call ennodia_setup to open native setup controls inside the current harness session. Clients without form elicitation receive the Markdown fallback. The user selects a route and recovery guidance, native recheck, or model verification. Do not repeat the form after dismissal unless requested. A decline may be automatic: report it without claiming the host displayed controls or a person clicked them. Discovery, recheck and preflight errors include an ennodia://setup Markdown resource: render it as a compact card with route, access state, next action and recheck. Do not stop at a generic healthy/unverified status summary. Never claim buttons or commands executed unless they did. Explain the native sign-in or provider configuration step, then recheck the same harness/model after the user completes it. Never collect credentials in chat or silently switch account/provider/model. Unverified means unchecked, not failed. ennodia_run verifies its selected routes automatically; checking every installed harness is not a prerequisite. A verified default route does not prove access to other models. Report blockers affecting requested routes and installation limitations before starting reviews; unrelated blockers must not hold up authorized work on usable routes. Follow existing user authorization and the host's approval policy; do not invent an additional approval step. The following local installation self-check does not verify provider access or latest registry versions. Run ennodia_check_harnesses after recovery or installation changes.\n${JSON.stringify(core.getInstallation?.())}` });
 
   // Keep each registration, so the core set can drop the others below, and
   // add the annotations that tell clients which calls only read.
   const registered = new Map<string, RegisteredTool>();
   const registerTool = server.registerTool.bind(server) as (name: string, config: { annotations?: object }, ...rest: unknown[]) => RegisteredTool;
   server.registerTool = ((name: string, config: { annotations?: object }, ...rest: unknown[]) => {
+    const handler = rest[rest.length - 1] as (...args: unknown[]) => Promise<unknown>;
+    rest[rest.length - 1] = async (...args: unknown[]) => {
+      try { return await handler(...args); }
+      catch (error) {
+        if (error instanceof HarnessReadinessError) {
+          const installation = core.getInstallation?.();
+          return { ...setupResult({ error: error.message, installation, actionRequired: error.actionRequired, coverage: { started: 0 } }, error.actionRequired, installation), isError: true };
+        }
+        throw error;
+      }
+    };
     const tool = registerTool(name, { ...config, annotations: { ...toolAnnotations(name), ...config.annotations } }, ...rest);
     registered.set(name, tool);
     return tool;
@@ -107,7 +123,7 @@ export function createEnnodiaServer(
     {
       title: "List Ennodia harnesses",
       description:
-        "Discover local harnesses, availability, versions, capabilities, adapter notes, and inputGuidance. Before audio/image/video work, read inputGuidance: model capabilities do not guarantee native input through a harness. Use first when setup or routing fails.",
+        "Discover supported harness entries, installation status and cached readiness/recovery actions. Unverified means unchecked, not failed; ennodia_run verifies selected routes automatically. Report blockers with their specific recovery actions. Read inputGuidance before media work.",
       inputSchema: {
         refresh: z
           .boolean()
@@ -117,8 +133,37 @@ export function createEnnodiaServer(
           ),
       },
     },
-    async ({ refresh }) => jsonResult(await core.listHarnesses({ refresh })),
+    async ({ refresh }) => {
+      const harnesses = await core.listHarnesses({ refresh });
+      return setupResult(harnesses, harnesses, core.getInstallation?.());
+    },
   );
+
+  server.registerTool("ennodia_setup", {
+    title: "Open Ennodia setup",
+    description: "Open native route/action choices in this harness session, with Markdown fallback. Show recovery steps, recheck native status, or verify model access only when selected (uses provider capacity). Never installs, upgrades, signs in, changes credentials, or starts reviewers.",
+    inputSchema: {
+      harnessIds: z.array(z.string().min(1)).min(1).optional().describe("Limit choices to these harnesses. Pass one to open its action form directly."),
+      model: z.string().min(1).optional().describe("Exact model to retain during the selected recheck or verification."),
+      cwd: z.string().optional().describe("Workspace identity for readiness evidence."),
+    },
+  }, async (input, extra) => interactiveSetup(server, core, { ...input, refresh: true }, extra.signal));
+
+  server.registerTool("ennodia_check_harnesses", {
+    title: "Recheck or upgrade Ennodia harnesses",
+    description: "Recheck Ennodia's installation and recover affected harnesses. Return installation scope, runtime/package/storage limitations, native recovery commands and actionRequired. Target affected harnessIds; unrelated blockers do not prevent authorized work on usable routes. verify makes a small real model call; upgrade runs supported updaters before rechecking. Never switch account/provider/model silently.",
+    inputSchema: {
+      harnessIds: z.array(z.string().min(1)).min(1).optional().describe("Harnesses to recheck. Omit for all installed harnesses."),
+      model: z.string().min(1).optional().describe("Exact model to verify on the selected route."),
+      cwd: z.string().optional().describe("Workspace identity for the readiness receipt; probes run in an empty temporary directory."),
+      refresh: z.boolean().default(true).describe("Invalidate cached readiness and recheck native status."),
+      verify: z.boolean().default(false).describe("Verify each selected route with a bounded real model request. Uses provider capacity."),
+      upgrade: z.boolean().default(false).describe("Run supported updaters now, then rediscover and recheck. Deferred while Ennodia tasks are active."),
+    },
+  }, async input => {
+    const result = await core.checkHarnesses(input);
+    return setupResult(result, result.harnesses, result.installation, input.cwd);
+  });
 
   server.registerTool(
     "ennodia_list_skills",
@@ -1278,6 +1323,98 @@ export async function shutdownEnnodia(
   options: EnnodiaShutdownOptions = {},
 ): Promise<void> {
   await defaultCore.shutdown(options);
+}
+
+/** Keep the JSON text contract intact for clients that parse tool text. */
+async function interactiveSetup(server: McpServer, core: EnnodiaCore, input: HarnessCheckInput, signal: AbortSignal) {
+  let harnesses = await core.listHarnesses({ refresh: input.refresh });
+  if (input.harnessIds) {
+    for (const id of input.harnessIds) if (!harnesses.some(h => h.id === id)) throw new Error(`Unknown harness: ${id}`);
+    harnesses = harnesses.filter(h => input.harnessIds!.includes(h.id));
+  }
+  const installation = core.getInstallation?.(input.refresh);
+  const native = Boolean(server.server.getClientCapabilities()?.elicitation?.form);
+  const finish = (action: string) => setupResult({ installation, harnesses, actionRequired: harnessAttention(harnesses), setup: { presentation: native ? "native" : "markdown", action } }, harnesses, installation, input.cwd, input.model);
+  if (!native || !harnesses.length) return finish(!native ? "unsupported" : "no-routes");
+  if (harnesses.length > 1) {
+    const selected = await server.server.elicitInput({
+      mode: "form",
+      message: "Ennodia setup: choose the route to configure or recheck. No credentials are collected here.",
+      requestedSchema: { type: "object", properties: {
+        harnessId: { type: "string", title: "Route", oneOf: harnesses.map(h => ({ const: h.id, title: `${h.name} — ${!h.runnable ? "CLI unavailable" : h.readiness?.state ?? "unverified"}` })) },
+      }, required: ["harnessId"] },
+    }, { signal, timeout: 300_000 });
+    if (selected.action !== "accept") return finish(selected.action);
+    harnesses = harnesses.filter(h => h.id === selected.content?.harnessId);
+    if (!harnesses.length) throw new Error("Setup selection is not a discovered route.");
+  }
+  const route = harnesses[0]!;
+  // Discovery evidence for a default model must not authorize another model.
+  const model = input.model ?? route.readiness?.model;
+  const status = model !== route.readiness?.model ? "Access to this model has not been verified." : route.readiness?.message ?? "Model access is unchecked.";
+  const selected = await server.server.elicitInput({
+    mode: "form",
+    message: `Ennodia setup: ${route.name}${model ? ` / ${model}` : " / default model"}. ${status} Sign-in and credential changes stay in the native tool.`,
+    requestedSchema: { type: "object", properties: {
+      action: { type: "string", title: "Next step", oneOf: [
+        { const: "recovery", title: "Show sign-in / installation / recovery steps" },
+        { const: "recheck", title: "Recheck native status (no model request)" },
+        ...(route.runnable ? [{ const: "verify", title: "Verify model access (uses provider capacity)" }] : []),
+      ] },
+    }, required: ["action"] },
+  }, { signal, timeout: 300_000 });
+  if (selected.action !== "accept") return finish(selected.action);
+  if (selected.content?.action === "recovery") return finish("recovery");
+  if (selected.content?.action !== "recheck" && selected.content?.action !== "verify") throw new Error("Unknown setup action.");
+  const result = await core.checkHarnesses({ harnessIds: [route.id], ...(model ? { model } : {}), cwd: input.cwd, refresh: true, verify: selected.content.action === "verify", upgrade: false });
+  return setupResult({ ...result, setup: { presentation: "native", action: selected.content.action, harnessId: route.id } }, result.harnesses, result.installation, input.cwd);
+}
+
+function setupResult(value: unknown, routes: (HarnessDiscovery | HarnessAttention)[], installation?: InstallationReport, cwd?: string, requestedModel?: string) {
+  const lines = ["## Ennodia setup", "", "Choose a route for your task. Model verification uses provider capacity. Unchecked routes are verified automatically when selected for a run."];
+  if (installation) {
+    lines.push("", `Ennodia ${installation.version} · ${installation.scope} · installation ${installation.status}. This does not establish model access.`);
+    if (installation.limitations.length) {
+      lines.push("", ...installation.limitations.map(limit => `- ${limit}`), "", "Use the [installation guide](https://ennodia.cherninlab.com/docs/install/) to repair the reported installation. Preserve the current installation method and client configuration, then refresh the check. Restart the MCP connection after changing its installed code.");
+    }
+  }
+  lines.push("", "| Route | Access | Next step |", "| --- | --- | --- |");
+  const actions: string[] = [];
+  for (const route of routes) {
+    const discovered = "id" in route;
+    const id = discovered ? route.id : route.harnessId;
+    const name = discovered ? route.name : route.harnessName;
+    const readiness = route.readiness;
+    const model = requestedModel ?? readiness?.model;
+    const missing = discovered && !route.runnable;
+    const state = missing ? "CLI unavailable" : readiness?.state === "ready" && model !== readiness.model ? "unverified" : readiness?.state ?? "unverified";
+    const label = `${name} (${id}${model ? ` / ${model}` : " / default model"})`;
+    const next = missing ? "Install/configure the supported native CLI if you need this route."
+      : state === "ready" ? "Continue your task on this verified route."
+      : state === "unverified" ? "Choose this route for your task, or verify it now."
+      : readiness?.recovery?.instruction ?? readiness?.message ?? "Recheck this route.";
+    const cell = (text: string) => text.replaceAll("|", "\\|").replace(/[\r\n]+/g, " ");
+    lines.push(`| ${cell(label)} | ${cell(state)} | ${cell(next)} |`);
+    if (state === "ready") continue;
+    actions.push("", `### ${cell(label)}`);
+    if (missing) {
+      actions.push("Install or configure the CLI using the [supported harness guide](https://ennodia.cherninlab.com/docs/reference/supported-harnesses/). Recheck after installation.");
+    } else if (state !== "unverified") {
+      actions.push(readiness?.message ?? "Recheck this route.", next);
+      // Only a login blocker calls for running a login command. Other states
+      // require the recovery instruction (e.g. credits or key replacement).
+      if (state === "login-required" && readiness?.recovery?.command.length) {
+        const command = readiness.recovery.command.map(arg => /^[A-Za-z0-9_./:@=+-]+$/.test(arg) ? arg : `'${arg.replaceAll("'", "'\\''")}'`).join(" ");
+        const fence = "`".repeat(Math.max(3, ...[...command.matchAll(/`+/g)].map(match => match[0].length + 1)));
+        actions.push("Run in an interactive terminal:", `${fence}sh\n${command}\n${fence}`);
+      }
+    }
+    const recheck = { harnessIds: [id], ...(model ? { model } : {}), ...(cwd ? { cwd } : {}), refresh: true, verify: true };
+    actions.push("Recheck with `ennodia_check_harnesses`:", `\`\`\`json\n${JSON.stringify(recheck)}\n\`\`\``);
+  }
+  if (!routes.length) lines.push("", "No routes were returned. Refresh discovery with ennodia_list_harnesses, then use the [supported harness guide](https://ennodia.cherninlab.com/docs/reference/supported-harnesses/) to install a route.");
+  lines.push(...actions, "", "Complete sign-in and credential changes in the native tool. Never paste credentials into chat. After recovery, recheck the same route and resume the original task when ready.");
+  return { content: [...jsonResult(value).content, { type: "resource" as const, resource: { uri: "ennodia://setup", mimeType: "text/markdown", text: lines.join("\n") } }] };
 }
 
 function jsonResult(value: unknown) {

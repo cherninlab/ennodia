@@ -11,8 +11,8 @@ events, child task IDs, Judge + Result Advisor state, and the final answer.
 ## Tool sets
 
 An agent loads every tool definition into each session where Ennodia is configured, even when the session never calls Ennodia.
-By default, Ennodia loads six core tools, about 10,000 characters of definitions.
-They cover handing work to one agent or a team, Compare, waiting, cancelling, and run history.
+By default, Ennodia loads eight core tools, about 13,000 characters of definitions.
+They cover handing work to one agent or a team, Compare, waiting, cancelling, run history, and harness recovery.
 
 The full set adds 20 tools for raw tasks, compositional slices, Plan Advisor, budget estimates, separate Compare calls, and skill installation.
 It loads about 46,000 characters of definitions.
@@ -50,6 +50,7 @@ This setting approves Ennodia runs only. Codex's sandbox and its other tools kee
 
 | Goal | Tool sequence | Tool set |
 | --- | --- | --- |
+| Open native setup controls | `ennodia_setup` | core |
 | Check local setup | `ennodia_list_harnesses` | core |
 | Start a visible end-to-end run | `ennodia_run` -> `ennodia_get_run` | core |
 | Inspect terminal receipts after restart | `ennodia_history` | core |
@@ -768,3 +769,66 @@ Preserve full patch artifacts and verify them before application.
 A later Compare call and its Judge and Result Advisor have separate limits.
 `includeCompareEstimate` includes an estimate, not a reserved spending balance.
 Count these stages, retries and verification when reporting whole-task cost.
+
+### `ennodia_setup`
+
+Open native setup controls through MCP form elicitation.
+The client must advertise form support. Other clients receive the Markdown panel with `setup.presentation: "markdown"` and `setup.action: "unsupported"`.
+Use an interactive harness for this flow. Headless clients can decline forms without displaying controls.
+
+The tested Codex session declined forms under its `never` approval policy. A session with `on-request` forwarded the native form choices.
+A native result records the form protocol. It does not prove the host displayed controls or a person clicked them.
+
+Select a route, then choose recovery guidance, native status recheck, or model verification.
+The tool executes the chosen recheck for that route and model. Native status rechecks use no model request.
+Verification uses provider capacity. The form offers no credential fields or automatic installation commands.
+
+Sign-in and credential changes stay in the native tool.
+Pass one `harnessIds` entry to open its action form directly.
+The tool retains `model` and `cwd` during the selected recheck, uses fresh status, and disables upgrades.
+Decline and cancel return without executing a recheck. Unknown form values are rejected before maintenance starts.
+
+The tool declares `readOnlyHint` because it never installs software or changes credentials or workspace files.
+It declares `openWorldHint` because the selected verification can query a provider.
+Software upgrades remain in `ennodia_check_harnesses`, which does not declare `readOnlyHint`.
+Forms allow five minutes for each selection. Configure the client's tool timeout to allow for user interaction.
+For Codex MCP configuration, `tool_timeout_sec = 600` gives the setup flow time for both selections.
+
+```json
+{"harnessIds":["codex"]}
+```
+
+### `ennodia_check_harnesses`
+
+`ennodia_check_harnesses` is part of the default tool set.
+
+The result includes `installation`, a local self-check of Ennodia's loaded code root, version, installation scope, Bun runtime, core files, bundled skills, and storage access. MCP initialization also sends this report to the host. `ennodia_run` and `ennodia_get_run` include it even in compact results. Present its limitations before reviews.
+
+`refresh: true` refreshes installation evidence as well as harness readiness. Scope remains `unknown` when filesystem evidence is insufficient. The report does not verify registry freshness, provider access, disk capacity, or future writes.
+
+It accepts `harnessIds`, `model`, `cwd`, `refresh`, `verify`, and `upgrade`.
+Native status checks are the default. `verify: true` makes a bounded real model request.
+
+`unverified` means unchecked. `ennodia_run` verifies its selected routes automatically.
+Use targeted `harnessIds` for recovery checks. Unrelated blockers do not prevent work on usable requested routes.
+
+Discovery, rechecks, and blocked preflight responses include an embedded `ennodia://setup` resource with `text/markdown` content.
+The JSON text response keeps its existing shape.
+Render the resource inside the current harness session with native interface controls when available, or a Markdown card.
+Show route access, the next recovery step, and the targeted recheck action. A generic health summary does not complete setup.
+
+The panel includes native sign-in commands only for login blockers. Key expiry and quota blockers retain their specific recovery instructions.
+Use native tools for credentials. Recheck the same harness and model after recovery, then resume the original task.
+
+`upgrade: true` runs supported updaters before rediscovery and recheck.
+This tool can change installed software and call providers, so it does not declare `readOnlyHint`.
+
+Present `actionRequired` immediately, including on partial success.
+Do not wait for an explicit user question about missing reviewers.
+Run preflight errors return `isError`, recovery actions, and zero started reviewers.
+Run receipts retain `preflight`, `coverage`, and `actionRequired` in compact responses.
+Use the matching native recovery action, then recheck the same route.
+
+An expired provider API key returns `credentials-expired` and requires key replacement.
+Depleted credits return `quota-exhausted` and require capacity recovery.
+See [Recovery and updates](/docs/reference/supported-harnesses/#recovery-and-updates).

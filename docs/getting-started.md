@@ -31,8 +31,23 @@ Bring the findings back to this conversation.
 ```
 
 Start with one worker and a small set of files.
-Discovery checks installed commands, not authentication, model access, or provider quota.
-A live task establishes which configuration works in your environment.
+Discovery reports installation and native login checks.
+Ennodia checks each selected route before execution and returns recovery actions for blocked routes.
+
+For setup or recovery, give your agent this request:
+
+```text
+Show Ennodia setup in this session. Show route access and help me recover the route I choose.
+After I complete native sign-in or configuration, recheck that route and continue my task.
+```
+
+Your agent calls `ennodia_setup` to open native setup controls.
+Select a route, then choose recovery guidance, a native status recheck, or model verification.
+The verification choice uses provider capacity. A native status recheck does not call the model.
+Clients without form support receive the Markdown panel.
+
+The panel includes recovery commands and recheck actions for the same route and model.
+Complete sign-in and credential changes in the native tool. Keep credentials out of chat.
 
 Your agent can call `ennodia_list_harnesses`, then `ennodia_run` with a selected `harnessId`, `mode: "single"`, and `compare: false`.
 Poll `ennodia_get_run` with the returned run identifier (ID).
@@ -111,7 +126,7 @@ For a local checkout, use the source file:
 
 Replace `/absolute/path/to/ennodia` with your local repository path.
 
-Ennodia loads six core tools by default. For Plan Advisor, compositional slices, raw tasks, and skill installation, add `"--tools", "all"` to `args`. See [tool sets](/docs/reference/mcp-tools/#tool-sets).
+Ennodia loads eight core tools by default. For Plan Advisor, compositional slices, raw tasks, and skill installation, add `"--tools", "all"` to `args`. See [tool sets](/docs/reference/mcp-tools/#tool-sets).
 
 Use your client's supported configuration method.
 Preserve existing server entries.

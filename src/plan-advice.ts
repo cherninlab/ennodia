@@ -156,11 +156,7 @@ export class PlanAdviceManager {
     this.maxAdvice = Math.max(1, options.maxAdvice ?? DEFAULT_MAX_ADVICE);
   }
 
-  start(input: PlanAdviceManagerStartInput): PlanAdviceView {
-    if (this.shuttingDown) {
-      throw new Error("PlanAdviceManager is shutting down.");
-    }
-
+  estimateBudget(input: PlanAdviceManagerStartInput): BudgetCheck {
     const advisorPrompt = buildPlanAdvisorPrompt(input.prompt, input.inventory);
     const advisorBudget = checkBudgetLimits(
       estimateTaskBatchBudget({
@@ -173,6 +169,15 @@ export class PlanAdviceManager {
       input.budget,
     );
     assertBudgetWithinLimits(advisorBudget);
+    return advisorBudget;
+  }
+
+  start(input: PlanAdviceManagerStartInput): PlanAdviceView {
+    if (this.shuttingDown) {
+      throw new Error("PlanAdviceManager is shutting down.");
+    }
+    const advisorPrompt = buildPlanAdvisorPrompt(input.prompt, input.inventory);
+    const advisorBudget = this.estimateBudget(input);
 
     // The Advisor receives the closed inventory snapshot, not the target
     // workspace. A fresh empty cwd also avoids accidentally inheriting the
@@ -286,7 +291,7 @@ export class PlanAdviceManager {
     };
   }
 
-  authorizeExecution(
+  validateExecution(
     id: string,
     expectedPlanDigest: string,
     currentInventory: AdvisorInventorySnapshot,
@@ -324,9 +329,15 @@ export class PlanAdviceManager {
       throw new Error("Advised plan changed after approval; no tasks were started.");
     }
 
-    // Keep this final state change after every caller-supplied validation. The
-    // callback is synchronous, so no second authorization can interleave.
     validate?.(structuredClone(compiled.plan));
+    return structuredClone(compiled.plan);
+  }
+
+  authorizeExecution(id: string, expectedPlanDigest: string, currentInventory: AdvisorInventorySnapshot, validate?: (plan: AdvisorExecutionPlan) => void): AdvisorExecutionPlan {
+    const plan = this.validateExecution(id, expectedPlanDigest, currentInventory, validate);
+    const record = this.require(id);
+    // Validation and consumption remain synchronous and single-use. Async
+    // readiness checks happen before this and cannot consume a blocked plan.
     record.status = "consumed";
     record.consumedAtMs = Date.now();
     record.endedAtMs = record.consumedAtMs;
@@ -335,7 +346,7 @@ export class PlanAdviceManager {
       message: "Validated plan authorized for one execution.",
     });
 
-    return structuredClone(compiled.plan);
+    return plan;
   }
 
   async shutdown(options: { deadlineMs?: number } = {}): Promise<void> {

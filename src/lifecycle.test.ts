@@ -152,11 +152,11 @@ describe("owned task lifecycle", () => {
   it("shuts down the real MCP server and active worker on stdin EOF", async () => {
     const dir = mkdtempSync(join(tmpdir(), "ennodia-eof-test-"));
     const pidFile = join(dir, "worker.pid");
-    writeFileSync(join(dir, "codex"), '#!/bin/sh\nif [ "$1" = "--version" ]; then echo fixture; exit 0; fi\necho $$ > worker.pid\nexec /bin/sleep 30\n');
+    writeFileSync(join(dir, "codex"), '#!/bin/sh\nif [ "$1" = "--version" ]; then echo fixture; exit 0; fi\nif [ "$1" = "login" ]; then echo "Logged in using ChatGPT"; exit 0; fi\nfor arg do\ncase "$arg" in *ENNODIA_READY_*) token=${arg#*exactly }; token=${token%%.*}; echo "$token"; exit 0;; esac\ndone\necho $$ > worker.pid\nexec /bin/sleep 30\n');
     chmodSync(join(dir, "codex"), 0o755);
     const child = Bun.spawn([process.execPath, join(import.meta.dir, "cli.ts")], {
       // ennodia_start is in the full tool set.
-      cwd: dir, env: { ...process.env, PATH: dir, ENNODIA_HISTORY: "0", ENNODIA_TOOLS: "all" }, stdin: "pipe", stdout: "pipe", stderr: "pipe",
+      cwd: dir, env: { ...process.env, PATH: dir, ENNODIA_HISTORY: "0", ENNODIA_TOOLS: "all", ENNODIA_AUTO_UPDATE: "false" }, stdin: "pipe", stdout: "pipe", stderr: "pipe",
     });
     const output = new Response(child.stdout).text();
     const errors = new Response(child.stderr).text();

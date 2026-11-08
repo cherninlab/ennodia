@@ -84,6 +84,10 @@ try {
     "--eval",
     'const io = await import("@cherninlab/ennodia-io"); if (typeof io.startEnnodiaIoServer !== "function") process.exit(1);',
   ], { cwd: consumerDir });
+  await runCapture([
+    "bun", "--eval",
+    'const { inspectInstallation } = await import("ennodia"); const report = inspectInstallation(); if (report.scope !== "project-local" || report.status === "broken") throw new Error(JSON.stringify(report));',
+  ], { cwd: consumerDir });
 
   console.log(
     JSON.stringify(
@@ -177,6 +181,7 @@ function assertPackedFiles(paths: string[]): void {
     "src/diagnosis.ts",
     "src/harnesses.ts",
     "src/history.ts",
+    "src/installation.ts",
     "src/index.ts",
     "src/internal.ts",
     "src/planner.ts",
@@ -237,6 +242,11 @@ async function assertMcpHandshake(label: string, command: string[]): Promise<voi
       throw new Error(
         `${label} reported version ${version ?? "<missing>"} instead of ${ENNODIA_VERSION}.`,
       );
+    }
+    const instructions = client.getInstructions();
+    const report = JSON.parse(instructions?.slice(instructions.indexOf("\n") + 1) ?? "null");
+    if (!report || report.status === "broken" || report.version !== ENNODIA_VERSION || report.scope !== "cache" || !report.launcher || report.checks.find((c: { id: string; status: string }) => c.id === "runtime-files")?.status !== "pass") {
+      throw new Error(`${label} did not automatically report a usable cached installation: ${JSON.stringify(report)}`);
     }
   } finally {
     await client.close();

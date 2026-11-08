@@ -58,6 +58,8 @@ export class FileHistorySink implements HistorySink {
     this.maxRuns = Math.max(1, options.maxRuns ?? DEFAULT_HISTORY_MAX_RUNS);
   }
 
+  get storageDirectory(): string { return this.dir; }
+
   async recordRun(snapshot: RunHistorySnapshot): Promise<void> {
     await mkdir(this.dir, { recursive: true, mode: 0o700 });
     // Frame each append with a leading newline so a previous truncated record

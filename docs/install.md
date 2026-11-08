@@ -70,7 +70,7 @@ For a local Ennodia checkout, use:
 }
 ```
 
-Ennodia loads six core tools by default. For Plan Advisor, compositional slices, raw tasks, and skill installation, add `"--tools", "all"` to `args`. See [tool sets](/docs/reference/mcp-tools/#tool-sets).
+Ennodia loads eight core tools by default. For Plan Advisor, compositional slices, raw tasks, and skill installation, add `"--tools", "all"` to `args`. See [tool sets](/docs/reference/mcp-tools/#tool-sets).
 
 The configuration above shows the server command and arguments.
 Adapt its format to the client's documented configuration method.
@@ -78,6 +78,12 @@ Reload the tools or restart the client only when its setup instructions require 
 Tell the user which step is needed before trying to call Ennodia.
 
 ## Get one useful result
+
+Ennodia sends an installation self-check in its MCP startup instructions and includes it in run results. It uses the loaded code location to identify a source checkout, project-local dependency, global installation, package cache, or unknown scope. It checks the Bun version, package version, core files, bundled skills, and filesystem access for temporary workspaces, history, and harness update receipts. Development files are not required for a packaged install. The npm launcher stops before startup if Bun is too old.
+
+Present reported installation limitations before starting reviews. Call `ennodia_check_harnesses` with `refresh: true` to refresh the installation report and native harness status after a repair. Filesystem access checks do not prove free disk space or future writes. They do not verify provider access or the latest published package version. A global install gives no extra permissions. The user's normal permissions still apply.
+
+The report also identifies compiled code. A compiled executable does not need separate source entrypoints. Missing bundled skills remain a reported limitation. Compilation is currently an experimental build path.
 
 After the client exposes Ennodia's tools, start with one small task:
 

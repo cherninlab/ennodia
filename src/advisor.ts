@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import type { CompositionalSliceInput } from "./compositional";
 
 export const ADVISOR_PLAN_SCHEMA_VERSION = 1 as const;
+export const MAX_ADVISOR_SKILL_DESCRIPTION_CHARS = 1_000;
 
 const MAX_INVENTORY_HARNESSES = 64;
 const MAX_INVENTORY_SKILLS = 512;
@@ -106,7 +107,7 @@ export const AdvisorInventorySnapshotSchema: z.ZodType<AdvisorInventorySnapshot>
           .object({
             id: inventoryIdSchema,
             name: nonBlankString(160),
-            description: nonBlankString(1_000),
+            description: nonBlankString(MAX_ADVISOR_SKILL_DESCRIPTION_CHARS),
             harnessIds: z
               .array(inventoryIdSchema)
               .min(1)

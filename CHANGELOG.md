@@ -2,6 +2,20 @@
 
 This file records all notable Ennodia changes.
 
+## [0.5.0-rc.1] - Unreleased
+
+### Added
+
+- Installation evidence and harness readiness preflight with targeted native recovery and recheck actions.
+- In-session setup panels and native route/action forms with a Markdown fallback.
+- Native controls for recovery guidance, status rechecks, and selected model-access verification.
+
+### Fixed
+
+- Bound Advisor skill summaries while detecting changes to full descriptions during revalidation.
+- Detect native CLI installations in macOS GUI launch environments and report login, key expiry, quota, and setup blockers.
+- Reject unsupported Bun runtimes before starting the npm launcher.
+
 ## [0.4.1] - 2026-09-28
 
 ### Added

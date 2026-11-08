@@ -28,7 +28,7 @@ Each agent you call runs through its own command-line tool, with the plan or API
 ## Will it use more tokens?
 
 It can. Each agent you call reads its own prompt, and Compare reads every answer.
-Ennodia's six core tools add about 2,600 tokens to each session.
+Ennodia's eight core tools add about 3,250 tokens to each session.
 You can cap agent runs and estimated input tokens for every run. [Set limits](/docs/guides/budgets-and-limits/).
 
 ## Is it slower?

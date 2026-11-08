@@ -1,8 +1,11 @@
 import { preparePragmaticRun, type PragmaticOptions } from "./pragmatic";
+import { inspectInstallation, type InstallationReport } from "./installation";
+import { HarnessReadinessManager, HarnessReadinessError, harnessAttention, readinessBlocked, type HarnessReadinessOptions, type HarnessCheckInput, type HarnessAttention, type PreflightReport } from "./readiness";
 import { createHash } from "node:crypto";
-import type {
-  AdvisorExecutionPlan,
-  AdvisorInventorySnapshot,
+import {
+  MAX_ADVISOR_SKILL_DESCRIPTION_CHARS,
+  type AdvisorExecutionPlan,
+  type AdvisorInventorySnapshot,
 } from "./advisor";
 import {
   assertBudgetWithinLimits,
@@ -44,6 +47,7 @@ import {
 } from "./harnesses";
 import {
   createDefaultHistorySink,
+  FileHistorySink,
   noopHistorySink,
   type HistorySink,
   type RunHistoryListOptions,
@@ -95,6 +99,7 @@ import {
 } from "./plan-advice";
 
 export type EnnodiaCoreOptions = {
+  readinessOptions?: HarnessReadinessOptions;
   discoverHarnesses?: DiscoverHarnesses;
   findHarnessAdapter?: FindHarnessAdapter;
   planRoute?: PlanRoute;
@@ -110,6 +115,10 @@ export type EnnodiaCoreOptions = {
 };
 
 export type EnnodiaCoreShutdownOptions = TaskManagerShutdownOptions;
+
+function remainingPreflightBudget(limits: BudgetLimits | undefined, check: BudgetCheck): BudgetLimits | undefined {
+  return limits?.maxEstimatedInputTokens !== undefined ? { ...limits, maxEstimatedInputTokens: limits.maxEstimatedInputTokens - check.estimate.estimatedTotalInputTokens } : limits;
+}
 
 export type RunEstimateInput = {
   pragmatic?: PragmaticOptions;
@@ -148,6 +157,8 @@ export type TaskBatchStartInput = {
 };
 
 export type TaskBatchStart = {
+  preflight?: PreflightReport;
+  actionRequired?: HarnessAttention[];
   plan: RoutePlan;
   tasks: TaskView[];
   budget: BudgetCheck;
@@ -189,6 +200,7 @@ export type CompositionalTaskStart = {
 };
 
 export type CompositionalStart = {
+  preflight?: PreflightReport;
   tasks: CompositionalTaskStart[];
   budget: BudgetCheck;
   compareNext: CompositionalCompareNext;
@@ -208,6 +220,7 @@ export type CompareStartWithBudgetInput = CompareStartInput & {
 };
 
 export type CompareStart = CompareView & {
+  preflight?: PreflightReport;
   budget: BudgetCheck;
 };
 
@@ -253,6 +266,7 @@ export type AdvisedPlanTaskStart = {
 };
 
 export type AdvisedPlanStart = {
+  preflight?: PreflightReport;
   adviceId: string;
   planDigest: string;
   inventorySnapshotId: string;
@@ -275,18 +289,19 @@ type AdvisorInventoryRuntime = {
 };
 
 export class EnnodiaCore {
+  private installation?: InstallationReport;
+  readonly readinessManager?: HarnessReadinessManager;
   readonly taskManager: TaskManager;
   readonly compareManager: CompareManager;
   readonly runManager: RunManager;
   readonly planAdviceManager: PlanAdviceManager;
   readonly discoverHarnesses: DiscoverHarnesses;
+  private readonly discoverInstalledHarnesses: DiscoverHarnesses;
   readonly findHarnessAdapter: FindHarnessAdapter;
   readonly planRoute: PlanRoute;
   readonly historySink: HistorySink;
 
   constructor(options: EnnodiaCoreOptions = {}) {
-    this.discoverHarnesses = options.discoverHarnesses ??
-      defaultDiscoverHarnesses;
     this.findHarnessAdapter = options.findHarnessAdapter ??
       defaultFindHarnessAdapter;
     this.planRoute = options.planRoute ?? defaultPlanRoute;
@@ -295,6 +310,27 @@ export class EnnodiaCore {
       noopHistorySink;
     this.taskManager = options.taskManager ??
       new TaskManager(options.taskManagerOptions);
+    // Injected inventories keep their existing contract. Production inventories
+    // and explicitly configured test managers receive native readiness checks.
+    if (!options.discoverHarnesses || options.readinessOptions) {
+      this.readinessManager = new HarnessReadinessManager({ ...options.readinessOptions,
+        isBusy: options.readinessOptions?.isBusy ?? (() => this.taskManager.listViews({ includeOutput: false, includeEvents: false }).some(t => t.status === "running")),
+      });
+    }
+    const discover = options.discoverHarnesses ?? defaultDiscoverHarnesses;
+    this.discoverInstalledHarnesses = discover;
+    this.discoverHarnesses = async (settings) => {
+      const harnesses = await discover(settings);
+      if (!this.readinessManager) return harnesses;
+      return Promise.all(harnesses.map(async h => ({ ...h, readiness: await this.readinessManager!.check(h, this.findHarnessAdapter(h.id), { refresh: settings?.refresh }) })));
+    };
+    this.taskManager.onSettled((task) => {
+      if (!this.readinessManager) return;
+      void discover().then(harnesses => {
+        const h = harnesses.find(h => h.id === task.harnessId);
+        if (h) this.readinessManager!.observe(h, { model: task.model, cwd: task.isolatedFrom ?? task.cwd }, task);
+      }).catch(() => {});
+    });
     this.planAdviceManager = options.planAdviceManager ??
       new PlanAdviceManager(
         this.taskManager,
@@ -303,7 +339,7 @@ export class EnnodiaCore {
     this.compareManager = options.compareManager ??
       new CompareManager(
         this.taskManager,
-        (harnessId) => this.resolveRunnableHarness(harnessId),
+        (harnessId, model, cwd) => this.resolveRunnableHarness(harnessId, model, cwd, true),
         options.compareManagerOptions,
       );
     this.runManager = options.runManager ??
@@ -313,6 +349,17 @@ export class EnnodiaCore {
         discoverHarnesses: this.discoverHarnesses,
         findHarnessAdapter: this.findHarnessAdapter,
         planRoute: this.planRoute,
+        getInstallation: () => this.getInstallation(),
+        describeReadiness: this.readinessManager ? (h, state, model) => this.readinessManager!.describe(h, state, model) : undefined,
+        prepareHarnesses: async (harnesses, ids, input) => {
+          const routes = ids.map(harnessId => ({ harnessId, model: input.model }));
+          if (shouldPlanCompare(input.compare ?? "auto", this.planRoute(input.prompt, harnesses).compareSuggested, ids.length)) {
+            const judge = await this.resolveRunnableHarness(input.judgeHarnessId);
+            const advisor = input.advisorHarnessId || input.synthesizerHarnessId ? await this.resolveRunnableHarness(input.advisorHarnessId ?? input.synthesizerHarnessId) : judge;
+            routes.push({ harnessId: judge.adapter.id, model: input.judgeModel }, { harnessId: advisor.adapter.id, model: input.advisorModel ?? input.synthesizerModel });
+          }
+          return this.prepareHarnesses(harnesses, routes, input.cwd, input.budget);
+        },
       }, { ...options.runManagerOptions, historySink: this.historySink });
   }
 
@@ -320,6 +367,82 @@ export class EnnodiaCore {
     HarnessDiscovery[]
   > {
     return this.discoverHarnesses(options);
+  }
+
+  getInstallation(refresh = false): InstallationReport {
+    if (refresh || !this.installation || Date.now() - Date.parse(this.installation.checkedAt) >= 30_000) {
+      this.installation = inspectInstallation({
+        history: { enabled: this.historySink !== noopHistorySink, directory: this.historySink instanceof FileHistorySink ? this.historySink.storageDirectory : undefined },
+        autoUpgrade: this.readinessManager?.autoUpgrade ?? false,
+        upgradeStateDirectory: this.readinessManager?.stateDirectory,
+      });
+    }
+    return this.installation;
+  }
+
+  async checkHarnesses(input: HarnessCheckInput = {}): Promise<{ installation: InstallationReport; harnesses: HarnessDiscovery[]; actionRequired: HarnessAttention[] }> {
+    let harnesses = await this.discoverInstalledHarnesses({ refresh: input.refresh });
+    if (input.harnessIds) {
+      for (const id of input.harnessIds) if (!harnesses.some(h => h.id === id)) throw new Error(`Unknown harness: ${id}`);
+      harnesses = harnesses.filter(h => input.harnessIds!.includes(h.id));
+    }
+    if (input.upgrade && this.readinessManager) {
+      for (const h of harnesses) await this.readinessManager.upgrade(h, true);
+      const fresh = await this.discoverInstalledHarnesses({ refresh: true });
+      harnesses = fresh.filter(h => harnesses.some(selected => selected.id === h.id));
+    }
+    if (this.readinessManager) {
+      if (input.refresh) for (const h of harnesses) this.readinessManager.invalidate(h.id);
+      harnesses = await Promise.all(harnesses.map(async h => ({ ...h, readiness: await this.readinessManager!.check(h, this.findHarnessAdapter(h.id), input) })));
+    }
+    return { installation: this.getInstallation(input.refresh ?? true), harnesses, actionRequired: harnessAttention(harnesses) };
+  }
+
+  private async prepareHarnesses(harnesses: HarnessDiscovery[], routes: { harnessId: string; model?: string }[], cwd?: string, budget?: BudgetLimits, allowUpgrade = true): Promise<PreflightReport> {
+    const report: PreflightReport = { checks: [], modelProbes: 0, estimatedInputTokens: 0, usage: "unknown" };
+    if (!this.readinessManager) {
+      const blocked = harnessAttention(harnesses.filter(h => routes.some(r => r.harnessId === h.id)));
+      if (blocked.length) throw new HarnessReadinessError(blocked);
+      return report;
+    }
+    const knownBlocked = harnessAttention(harnesses.filter(h => routes.some(r => r.harnessId === h.id && (!h.readiness?.model || h.readiness.model === r.model))));
+    if (knownBlocked.length) throw new HarnessReadinessError(knownBlocked);
+    if (allowUpgrade && this.readinessManager.autoUpgrade) {
+      for (const id of new Set(routes.map(r => r.harnessId))) {
+        const h = harnesses.find(h => h.id === id);
+        if (h) await this.readinessManager.upgrade(h);
+      }
+      const refreshed = await this.discoverInstalledHarnesses({ refresh: true });
+      for (const h of harnesses) { const fresh = refreshed.find(f => f.id === h.id); if (fresh) Object.assign(h, fresh); }
+    }
+    const unique = [...new Map(routes.map(r => [JSON.stringify(r), r])).values()];
+    // Check every native login before any model probe or reviewer launch.
+    const checked = await Promise.all(unique.map(async route => {
+      const h = harnesses.find(h => h.id === route.harnessId);
+      if (!h) throw new Error(`Unknown harness: ${route.harnessId}`);
+      return { h, route, readiness: await this.readinessManager!.check(h, this.findHarnessAdapter(h.id), { model: route.model, cwd }) };
+    }));
+    const initialBlocked = checked.filter(c => readinessBlocked(c.readiness)).map(c => ({ harnessId: c.h.id, harnessName: c.h.name, readiness: c.readiness }));
+    if (initialBlocked.length) throw new HarnessReadinessError(initialBlocked);
+    for (const { h, readiness } of checked) {
+      if (readiness.state !== "ready") {
+        // Probes are real provider calls. Reserve them before starting, and
+        // expose their estimate separately rather than implying free checks.
+        report.modelProbes++; report.estimatedInputTokens += 256;
+      }
+      report.checks.push({ harnessId: h.id, harnessName: h.name, readiness });
+      if (budget?.maxChildTasks !== undefined && routes.length + report.modelProbes > budget.maxChildTasks) throw new Error("Budget limit exceeded: readiness probes also count as child calls. Verify the routes separately or increase maxChildTasks.");
+      if (budget?.maxEstimatedInputTokens !== undefined && report.estimatedInputTokens > budget.maxEstimatedInputTokens) throw new Error("Budget limit exceeded: readiness probe input reserve.");
+    }
+    const verified = await Promise.all(report.checks.map(async c => ({ ...c, readiness: await this.readinessManager!.check(harnesses.find(h => h.id === c.harnessId)!, this.findHarnessAdapter(c.harnessId), { model: c.readiness.model, cwd, verify: true }) })));
+    report.checks = verified;
+    const blocked = verified.filter(c => readinessBlocked(c.readiness));
+    if (blocked.length) throw new HarnessReadinessError(blocked);
+    for (const check of verified) {
+      const h = harnesses.find(h => h.id === check.harnessId);
+      if (h) h.readiness = check.readiness;
+    }
+    return report;
   }
 
   findAdapter(id: string): HarnessAdapter | undefined {
@@ -346,7 +469,7 @@ export class EnnodiaCore {
 
   async startPlanAdvice(
     input: PlanAdviceStartInput,
-  ): Promise<PlanAdviceView> {
+  ): Promise<PlanAdviceView & { preflight?: PreflightReport }> {
     const { inventory } = await this.buildAdvisorInventory({
       cwd: input.cwd,
       refresh: input.refresh,
@@ -361,7 +484,7 @@ export class EnnodiaCore {
     });
     const advisor = await this.resolveRunnableHarness(input.advisorHarnessId);
 
-    return this.planAdviceManager.start({
+    const advisorInput = {
       prompt: input.prompt,
       inventory,
       inventoryCwd: input.cwd,
@@ -370,7 +493,11 @@ export class EnnodiaCore {
       timeoutMs: input.timeoutMs,
       budget: input.budget,
       findHarnessAdapter: this.findHarnessAdapter,
-    });
+    };
+    const advisorBudget = this.planAdviceManager.estimateBudget(advisorInput);
+    const preflight = await this.prepareHarnesses([advisor.discovery], [{ harnessId: advisor.adapter.id, model: input.advisorModel }], undefined, remainingPreflightBudget(input.budget, advisorBudget));
+    const started = this.planAdviceManager.start(advisorInput);
+    return { ...started, ...(this.readinessManager ? { preflight } : {}) };
   }
 
   listPlanAdvice(
@@ -426,11 +553,7 @@ export class EnnodiaCore {
       skills: Skill[];
     }>;
     let requestedSkillIds: string[] = [];
-    const plan = this.planAdviceManager.authorizeExecution(
-      input.adviceId,
-      input.expectedPlanDigest,
-      currentRuntime.inventory,
-      (authorizedPlan) => {
+    const validate = (authorizedPlan: AdvisorExecutionPlan) => {
         budget = checkBudgetLimits(
           estimateTaskBatchBudget({
             tasks: authorizedPlan.slices.map((slice) => ({
@@ -489,8 +612,10 @@ export class EnnodiaCore {
           }
           return { slice, harness, skills };
         });
-      },
-    );
+    };
+    this.planAdviceManager.validateExecution(input.adviceId, input.expectedPlanDigest, currentRuntime.inventory, validate);
+    const preflight = await this.prepareHarnesses(currentRuntime.harnesses.map(h => h.discovery), resolved.map(r => ({ harnessId: r.slice.harnessId, model: r.slice.model })), executionCwd, remainingPreflightBudget(input.budget, budget), false);
+    const plan = this.planAdviceManager.authorizeExecution(input.adviceId, input.expectedPlanDigest, currentRuntime.inventory, validate);
 
     const requestedIds = new Set(requestedSkillIds);
     const unrequestedSkillsPresent = currentRuntime.projectNativeSkillIds
@@ -527,6 +652,7 @@ export class EnnodiaCore {
       inventorySnapshotId: currentRuntime.inventory.snapshotId,
       plan,
       tasks,
+      ...(this.readinessManager ? { preflight } : {}),
       budget,
       execution: {
         cwd: executionCwd,
@@ -537,7 +663,7 @@ export class EnnodiaCore {
     };
   }
 
-  async resolveRunnableHarness(harnessId?: string): Promise<ResolvedHarness> {
+  async resolveRunnableHarness(harnessId?: string, model?: string, cwd?: string, verify = false): Promise<ResolvedHarness> {
     const harnesses = await this.discoverHarnesses();
     const preferredIds = harnessId
       ? [harnessId]
@@ -547,7 +673,9 @@ export class EnnodiaCore {
       const adapter = this.findHarnessAdapter(id);
       const discovery = harnesses.find((harness) => harness.id === id);
 
-      if (adapter?.buildCommand && discovery?.runnable) {
+      if (discovery && harnessId && readinessBlocked(discovery.readiness)) throw new HarnessReadinessError(harnessAttention([discovery]));
+      if (adapter?.buildCommand && discovery?.runnable && !readinessBlocked(discovery.readiness)) {
+        if (verify) await this.prepareHarnesses(harnesses, [{ harnessId: id, model }], cwd, undefined, false);
         return { adapter, discovery };
       }
     }
@@ -604,6 +732,8 @@ export class EnnodiaCore {
     );
 
     if (selectedHarnessIds.length === 0) {
+      const blocked = harnessAttention(harnesses);
+      if (blocked.length) throw new HarnessReadinessError(blocked);
       throw new Error("No runnable harnesses were found.");
     }
 
@@ -630,6 +760,7 @@ export class EnnodiaCore {
       input.cwd,
     );
     const unrequestedSkillsPresent = await this.findUnrequestedSkills(input.cwd, skills);
+    const preflight = await this.prepareHarnesses(harnesses, selectedHarnessIds.map(harnessId => ({ harnessId, model: input.model })), input.cwd, remainingPreflightBudget(input.budget, budget));
     const tasks: TaskView[] = [];
     try {
       for (const harnessId of selectedHarnessIds) {
@@ -651,7 +782,7 @@ export class EnnodiaCore {
       throw error;
     }
 
-    return { plan, tasks, budget, unrequestedSkillsPresent };
+    return { plan, tasks, budget, unrequestedSkillsPresent, ...(this.readinessManager ? { preflight, actionRequired: plan.actionRequired } : {}) };
   }
 
   async estimateCompositional(
@@ -688,6 +819,7 @@ export class EnnodiaCore {
     assertBudgetWithinLimits(budget);
 
     const unrequestedSkillsPresent = await this.findUnrequestedSkills(input.cwd, requestedSkills);
+    const preflight = await this.prepareHarnesses(harnesses, resolvedSlices.map(s => ({ harnessId: s.harnessId, model: s.model })), input.cwd, remainingPreflightBudget(input.budget, budget));
     const tasks: CompositionalStart["tasks"] = [];
     try {
       for (const [index, slice] of resolvedSlices.entries()) {
@@ -715,6 +847,7 @@ export class EnnodiaCore {
     return {
       tasks,
       budget,
+      ...(this.readinessManager ? { preflight } : {}),
       compareNext: {
         prompt: input.prompt,
         taskIds: tasks.map((item) => item.task.id),
@@ -837,6 +970,7 @@ export class EnnodiaCore {
     );
     assertBudgetWithinLimits(budget);
 
+    const preflight = await this.prepareHarnesses([judgeHarness.discovery, advisorHarness.discovery], [{ harnessId: judgeHarness.adapter.id, model: compareInput.judgeModel }, { harnessId: advisorHarness.adapter.id, model: advisorModel }], compareInput.cwd, remainingPreflightBudget(budgetLimits, budget));
     const compare = await this.compareManager.start({
       ...compareInput,
       judgeHarnessId: judgeHarness.adapter.id,
@@ -844,7 +978,7 @@ export class EnnodiaCore {
       advisorModel,
     });
 
-    return { ...compare, budget };
+    return { ...compare, budget, ...(this.readinessManager ? { preflight } : {}) };
   }
 
   listCompares(options: CompareViewOptions = {}): CompareView[] {
@@ -872,6 +1006,7 @@ export class EnnodiaCore {
   }
 
   async shutdown(options: EnnodiaCoreShutdownOptions = {}): Promise<void> {
+    await this.readinessManager?.shutdown();
     await this.runManager.shutdown(options);
     await this.compareManager.shutdown(options);
     await this.planAdviceManager.shutdown(options);
@@ -963,7 +1098,7 @@ export class EnnodiaCore {
       skills: inventorySkills.map(({ skill, supportedHarnessIds }) => ({
         id: skill.id,
         name: skill.name,
-        description: skill.description,
+        description: skill.description.slice(0, MAX_ADVISOR_SKILL_DESCRIPTION_CHARS),
         harnessIds: supportedHarnessIds,
       })),
       limits,
@@ -979,6 +1114,8 @@ export class EnnodiaCore {
         id: skill.id,
         version: skill.version,
         hash: skill.hash,
+        // Summary truncation must not hide metadata drift during revalidation.
+        description: skill.description,
         native: skill.native,
         harnessIds: supportedHarnessIds,
       })),
@@ -1113,6 +1250,8 @@ export class EnnodiaCore {
     if (!adapter || !discovery) {
       throw new Error(`Unknown harness: ${harnessId}`);
     }
+
+    if (readinessBlocked(discovery.readiness)) throw new HarnessReadinessError(harnessAttention([discovery]));
 
     if (!discovery.runnable) {
       throw new Error(`Harness is not runnable: ${harnessId}`);

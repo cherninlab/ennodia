@@ -13,6 +13,7 @@ import type {
 import { assertHarnessSettingsSupported, DEFAULT_TASK_TIMEOUT_MS, inputGuidanceNotes, withInputGuidance } from "./harnesses";
 import { preview, tailItems } from "./internal";
 import { signalOwnedProcess } from "./process";
+import { HarnessReadinessError, readinessBlocked } from "./readiness";
 import {
   augmentPrompt,
   toAppliedSkillInfo,
@@ -191,6 +192,9 @@ export class TaskManager {
   private readonly retainedTasks = new Map<string, number>();
   private shuttingDown = false;
   private shutdownPromise?: Promise<void>;
+  private readonly settledListeners = new Set<(task: TaskView) => void>();
+
+  onSettled(listener: (task: TaskView) => void): void { this.settledListeners.add(listener); }
 
   constructor(options: TaskManagerOptions = {}) {
     this.drainTimeoutMs = options.drainTimeoutMs ?? DEFAULT_DRAIN_TIMEOUT_MS;
@@ -211,6 +215,8 @@ export class TaskManager {
     if (this.shuttingDown) {
       throw new Error("TaskManager is shutting down.");
     }
+
+    if (readinessBlocked(discovery.readiness)) throw new HarnessReadinessError([{ harnessId: discovery.id, harnessName: discovery.name, readiness: discovery.readiness! }]);
 
     if (!adapter.buildCommand || !discovery.commandPath || !discovery.runnable) {
       throw new Error(`${adapter.name} is not runnable through Ennodia yet.`);
@@ -583,6 +589,9 @@ ${noticeLines.join("\n")}
       task.endedAtMs = Date.now();
       this.touch(task);
       this.pruneTasks(task.id);
+      for (const listener of this.settledListeners) {
+        try { listener(this.get(task.id)!); } catch { /* readiness observers cannot alter execution */ }
+      }
     }
   }
 

@@ -149,7 +149,7 @@ export type ResolvedHarness = {
   discovery: HarnessDiscovery;
 };
 
-export type ResolveHarness = (harnessId?: string) => Promise<ResolvedHarness>;
+export type ResolveHarness = (harnessId?: string, model?: string, cwd?: string) => Promise<ResolvedHarness>;
 
 type InternalCompare = {
   id: string;
@@ -363,7 +363,7 @@ export class CompareManager {
     input: CompareStartInput,
   ): Promise<void> {
     try {
-      const judgeHarness = await this.resolveHarness(input.judgeHarnessId);
+      const judgeHarness = await this.resolveHarness(input.judgeHarnessId, input.judgeModel, input.cwd);
       if (isCompareStatus(compare, "cancelled")) {
         return;
       }
@@ -419,6 +419,8 @@ export class CompareManager {
         input.advisorHarnessId ??
           input.synthesizerHarnessId ??
           input.judgeHarnessId,
+        input.advisorModel ?? input.synthesizerModel,
+        input.cwd,
       );
       if (isCompareStatus(compare, "cancelled")) {
         return;

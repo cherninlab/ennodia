@@ -7,6 +7,12 @@ Ennodia coordinates local agents through thin adapters. Each harness uses a
 local command-line interface (CLI). Use `ennodia_list_harnesses` to see what is
 installed and runnable on the current machine.
 
+On macOS, discovery checks the existing `PATH` first, then `/opt/homebrew/bin`,
+`/usr/local/bin`, and `~/.local/bin`. This covers restricted GUI and MCP launch
+paths without changing the selected account, model, or child process environment.
+Explicit command paths and routes with no command candidates stay unchanged.
+Restart the MCP server after updating Ennodia to load discovery changes.
+
 ## Adapter IDs
 
 | ID | Tool | Notes |
@@ -32,15 +38,18 @@ installed and runnable on the current machine.
 ```
 
 The response reports availability, runnable state, command path, version,
-capabilities, adapter notes, and optional `inputGuidance`.
+capabilities, adapter notes, optional `inputGuidance`, and `readiness`.
 
 `inputGuidance` is a bounded `string[]` of adapter observations and input advice.
 It does not guarantee media support, authentication, or access to a requested model.
 Plan Advisor receives this guidance in its harness inventory.
 
-Discovery checks installed commands, not active authentication or model access.
-A stalled version probe stops at its deadline and adds an adapter note.
-Use a small real task to check the selected agent before sending larger work.
+Discovery checks installation and native login status through supported commands.
+Model access remains unverified until a small real request or a recent successful task returns an answer.
+A stalled check stops at its deadline and reports a blocker.
+Ennodia checks selected worker, Judge, and Advisor routes before execution.
+Known blockers prevent requested work from starting.
+Automatic routing excludes blocked routes and reports missing coverage.
 
 ## Media inputs
 
@@ -110,6 +119,75 @@ agy --version
 agy models
 ```
 
-If the shell cannot find `agy` at all, open Antigravity and use its supported
-CLI install or shell-integration flow first. Then restart the Model Context
+If neither `PATH` nor the native install roots contain `agy`, open Antigravity
+and use its supported CLI install or shell-integration flow first. Then restart the Model Context
 Protocol (MCP) client and call `ennodia_list_harnesses` again.
+
+## Recovery and updates
+
+Run the native command returned in `readiness.recovery` in an interactive terminal.
+Keep the intended account, provider, and model.
+Call `ennodia_check_harnesses` after sign-in:
+
+```json
+{
+  "harnessIds": ["codex"],
+  "refresh": true,
+  "verify": true
+}
+```
+
+Pass the same `model` and `cwd` when rechecking an explicit route.
+The check returns `actionRequired` for login, setup, model, capacity, and connectivity blockers.
+A missing CLI requires installation. A capacity failure requires capacity recovery.
+Neither is fixed by repeated sign-in.
+
+`credentials-expired` means the configured provider API key has expired.
+Replace the key through the native credential flow for the intended provider.
+Signing in again does not renew an expired API key.
+`quota-exhausted` includes depleted credits.
+Restore credits or quota through the intended provider before rechecking.
+Ennodia reads terminal-formatted native errors and returns the matching recovery action.
+
+Hermes uses the full `hermes chat` CLI. The legacy `hermes-agent` executable is not compatible.
+
+Native checks cache for 30 seconds. Verified routes cache for five minutes.
+A native authentication failure invalidates the route immediately.
+Concurrent checks of the same route share one request.
+
+`unverified` means unchecked. It does not mean a failed harness.
+`ennodia_run` verifies its selected routes before launching workers.
+Checking every supported harness is not a prerequisite for a run.
+
+Unrelated harness blockers do not prevent work on a usable requested route.
+A verified default route does not prove access to other models.
+Use the existing user authorization and the host approval policy.
+Ennodia does not require an additional approval step.
+
+Model probes run in an empty temporary directory with normal native permissions.
+A temporary directory is not a security sandbox.
+
+Probes use provider capacity and reserve 256 input tokens per route for budget checks.
+The reserve is an estimate, not a measurement of provider usage.
+Probe calls count toward `maxChildTasks`. Usage remains unknown when the provider reports no measurement.
+
+Before ordinary execution, Ennodia attempts supported upgrades once per day while no Ennodia task is active.
+Homebrew installations use their installed formula or cask.
+An npm Codex installation uses its supported npm update command.
+Other supported installations use native updaters.
+
+Updates preserve the installed distribution and channel and use no force flags.
+Pinned or unsupported installations and failed updates require native maintenance.
+Updater success is not proof of model readiness.
+Ennodia rediscovers the version and rechecks the route.
+
+Set `ENNODIA_AUTO_UPDATE=false` in the MCP server environment to disable automatic upgrades.
+Call `ennodia_check_harnesses` with `upgrade: true` for an immediate update attempt and recheck.
+The response includes `readiness.upgrade` with the update result and native command.
+Approved Advisor plans do not upgrade during execution, so their frozen inventory remains stable.
+Automatic updates run on use.
+Ennodia does not install a background daemon.
+
+Report `actionRequired` and reduced `coverage` to the user on the first response that contains them.
+Compact run responses retain these fields.
+MCP clients control how those responses appear in the conversation.
