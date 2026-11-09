@@ -162,6 +162,25 @@ jobs:
             npm publish --provenance --tag "${{ steps.release_mode.outputs.dist_tag }}"
           fi
 
+      - name: Wait for public npm packages
+        if: steps.release_mode.outputs.dry_run != 'true'
+        run: |
+          package_version="$(node -p "require('./package.json').version")"
+          # A successful publish can precede visibility on npm's public reads.
+          # Check metadata for the MCP Registry and tarballs for fresh installs.
+          for attempt in {1..36}; do
+            if npm view "ennodia@${package_version}" version --prefer-online >/dev/null 2>&1 &&
+               npm view "@cherninlab/ennodia-io@${package_version}" version --prefer-online >/dev/null 2>&1 &&
+               curl --fail --silent --head "https://registry.npmjs.org/ennodia/-/ennodia-${package_version}.tgz" >/dev/null &&
+               curl --fail --silent --head "https://registry.npmjs.org/@cherninlab/ennodia-io/-/ennodia-io-${package_version}.tgz" >/dev/null; then
+              exit 0
+            fi
+            echo "Waiting for npm to expose both ${package_version} packages (${attempt}/36)."
+            sleep 10
+          done
+          echo "npm did not expose both packages within six minutes. Retry the release after they are public."
+          exit 1
+
       - name: Install MCP publisher
         if: steps.release_mode.outputs.dry_run != 'true'
         run: |
