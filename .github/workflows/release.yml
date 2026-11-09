@@ -125,12 +125,8 @@ jobs:
         if: steps.release_mode.outputs.dry_run == 'true'
         run: npx jsr publish --dry-run
 
-      - name: Verify npm authentication
-        if: steps.release_mode.outputs.dry_run != 'true'
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm whoami
-
+      # npm publish authenticates with OIDC or the configured token. npm whoami
+      # cannot validate OIDC and would reject a valid trusted publisher.
       - name: Publish core to npm
         if: steps.release_mode.outputs.dry_run != 'true'
         env:
