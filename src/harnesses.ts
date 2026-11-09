@@ -87,6 +87,8 @@ export type HarnessAdapter = {
   /** Whether the adapter supports manager-owned native session continuation. */
   supportsSessionContinuation?: boolean;
   buildCommand?: (commandPath: string, input: HarnessRunInput) => CommandSpec;
+  /** Extract only the final answer from structured readiness-probe output. */
+  readinessAnswer?: (stdout: string) => string | undefined;
   /** Best-effort usage extraction from a finished task's captured output. */
   extractUsage?: (stdout: string, stderr: string) => HarnessUsage | undefined;
   /** Extract a native session ID from captured stdout as it arrives. */
@@ -423,6 +425,18 @@ export const harnessAdapters: HarnessAdapter[] = [
     notes: [
       "Runs through `cline` with auto-approval explicitly disabled.",
     ],
+    readinessAnswer: (stdout) => {
+      // Public CLI JSON contract: docs/cli/cli-reference.mdx in cline/cline.
+      for (const line of stdout.trim().split(/\r?\n/).reverse()) {
+        try {
+          const event = JSON.parse(line);
+          if (event.type === "run_result") {
+            return event.finishReason !== "aborted" && typeof event.text === "string" ? event.text : undefined;
+          }
+        } catch { /* Ignore diagnostics outside the JSON result. */ }
+      }
+      return undefined;
+    },
     buildCommand: (commandPath, input) => {
       const args = ["--auto-approve", "false", "--json"];
 

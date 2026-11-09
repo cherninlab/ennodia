@@ -17,6 +17,8 @@ This file records all notable Ennodia changes.
 
 ### Fixed
 
+- Accept Cline's final JSON answer in readiness probes while rejecting prompt echoes and aborted results.
+
 - Reject unsupported Bun runtimes in the npm launcher before starting the server.
 - Preserve approved plans until readiness checks pass and include preflight in budget decisions.
 - Correct Hermes detection and report setup-required harnesses before launching work.

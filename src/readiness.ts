@@ -209,7 +209,7 @@ export class HarnessReadinessManager {
       const failure = nativeReadinessFailure(result.stdout, result.stderr);
       if (failure) return this.value(h, failure, input.model);
       if (result.timedOut || result.exitCode !== 0 || adapter.failureReason?.(result.stdout, result.stderr)) return this.value(h, "unreachable", input.model);
-      let answer = result.stdout;
+      let answer = adapter.readinessAnswer ? adapter.readinessAnswer(result.stdout) ?? "" : result.stdout;
       try { answer = readFileSync(join(dir, "answer.txt"), "utf8"); } catch { /* native text output */ }
       // An echoed prompt is not success. Require a standalone returned nonce.
       if (!stripVTControlCharacters(answer).split(/\r?\n/).some(line => line.trim() === nonce)) return this.value(h, "setup-required", input.model);

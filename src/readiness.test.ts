@@ -21,6 +21,21 @@ function fixture(runCommand: MaintenanceCommandRunner = reply) {
 }
 
 describe("harness readiness", () => {
+  it("verifies Cline's final JSON answer without accepting echoed or aborted events", async () => {
+    const cline = harnessAdapters.find(a => a.id === "cline")!;
+    const discovery = { ...harness, id: "cline", commandPath: "/fake/cline" };
+    for (const kind of ["result", "echo", "aborted"] as const) {
+      const manager = new HarnessReadinessManager({ autoUpgrade: false, runCommand: async spec => {
+        const nonce = /ENNODIA_READY_[a-f0-9]+/.exec(spec.args.join(" "))![0];
+        return ok(JSON.stringify(kind === "echo"
+          ? { type: "run_start", text: nonce }
+          : { type: "run_result", finishReason: kind === "aborted" ? "aborted" : "completed", text: nonce }));
+      } });
+      try {
+        expect((await manager.check(discovery, cline, { verify: true })).state).toBe(kind === "result" ? "ready" : "setup-required");
+      } finally { await manager.shutdown(); }
+    }
+  });
   it("selects the full Hermes CLI, never the incompatible legacy runner", () => {
     const hermes = harnessAdapters.find(a => a.id === "hermes-agent")!;
     expect(hermes.commandCandidates).toEqual(["hermes"]);

@@ -244,10 +244,11 @@ async function assertMcpHandshake(label: string, command: string[]): Promise<voi
         `${label} reported version ${version ?? "<missing>"} instead of ${ENNODIA_VERSION}.`,
       );
     }
-    const instructions = client.getInstructions();
-    const report = JSON.parse(instructions?.slice(instructions.indexOf("\n") + 1) ?? "null");
+    const result = await client.callTool({ name: "ennodia_check_harnesses", arguments: { verify: false, upgrade: false } });
+    const content = result.content as { type: string; text?: string }[];
+    const report = JSON.parse(content.find(block => block.type === "text")?.text ?? "null")?.installation;
     if (!report || report.status === "broken" || report.version !== ENNODIA_VERSION || report.scope !== "cache" || !report.launcher || report.checks.find((c: { id: string; status: string }) => c.id === "runtime-files")?.status !== "pass") {
-      throw new Error(`${label} did not automatically report a usable cached installation: ${JSON.stringify(report)}`);
+      throw new Error(`${label} did not report a usable cached installation: ${JSON.stringify(report)}`);
     }
   } finally {
     await client.close();
