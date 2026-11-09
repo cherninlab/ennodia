@@ -1,7 +1,7 @@
 {
   "manifest_version": "0.2",
   "name": "ennodia",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "description": "Connects the AI agents you use: your agent hands a task to another and gets the answer back",
   "author": {
     "name": "Cherninlab"
@@ -23,7 +23,8 @@
   "tools": [
     {
       "name": "ennodia_list_harnesses",
-      "description": "Discover local harnesses, availability, versions, capabilities, adapter notes, and inputGuidance. Before audio/image/video work, read inputGuidance: model capabilities do not guarantee native input through a harness. Use first when setup or routing fails.",
+      "title": "List Ennodia harnesses",
+      "description": "Discover supported agents and cached readiness for routing. Do not summarize it for the user; for setup or status requests call ennodia_setup. Read inputGuidance before media work.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -35,41 +36,84 @@
         },
         "$schema": "http://json-schema.org/draft-07/schema#"
       },
-      "outputSchema": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "ennodia_setup",
+      "title": "Show Ennodia setup",
+      "description": "Show the user Ennodia's agents: each agent's status and the exact fix for blocked ones. Refreshes native sign-in status without model requests. Hosts that render MCP Apps show a card with check buttons; others get a Markdown panel to show the user.",
+      "inputSchema": {
         "type": "object",
-        "properties": {
-          "content": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "type": {
-                  "type": "string",
-                  "const": "text"
-                },
-                "text": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "type",
-                "text"
-              ],
-              "additionalProperties": false
-            }
-          }
-        },
-        "required": [
-          "content"
-        ],
-        "additionalProperties": false
+        "properties": {}
       },
       "annotations": {
-        "readOnlyHint": true
+        "readOnlyHint": true,
+        "openWorldHint": false
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "ennodia_check_harnesses",
+      "title": "Recheck or upgrade Ennodia harnesses",
+      "description": "Recheck Ennodia's installation and recover affected harnesses. Return installation scope, runtime/package/storage limitations, native recovery commands and actionRequired. Target affected harnessIds; unrelated blockers do not prevent authorized work on usable routes. verify makes a small real model call; upgrade runs supported updaters before rechecking. Never switch account/provider/model silently.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "harnessIds": {
+            "description": "Harnesses to recheck. Omit for all installed harnesses.",
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "model": {
+            "description": "Exact model to verify on the selected route.",
+            "type": "string",
+            "minLength": 1
+          },
+          "cwd": {
+            "description": "Workspace identity for the readiness receipt; probes run in an empty temporary directory.",
+            "type": "string"
+          },
+          "refresh": {
+            "default": true,
+            "description": "Invalidate cached readiness and recheck native status.",
+            "type": "boolean"
+          },
+          "verify": {
+            "default": false,
+            "description": "Verify each selected route with a bounded real model request. Uses provider capacity.",
+            "type": "boolean"
+          },
+          "upgrade": {
+            "default": false,
+            "description": "Run supported updaters now, then rediscover and recheck. Deferred while Ennodia tasks are active.",
+            "type": "boolean"
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": true
+      },
+      "execution": {
+        "taskSupport": "forbidden"
       }
     },
     {
       "name": "ennodia_list_skills",
+      "title": "List Ennodia skills",
       "description": "Discover prompt-only skills from project, user, and built-in skill directories without returning full instruction text.",
       "inputSchema": {
         "type": "object",
@@ -81,41 +125,17 @@
         },
         "$schema": "http://json-schema.org/draft-07/schema#"
       },
-      "outputSchema": {
-        "type": "object",
-        "properties": {
-          "content": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "type": {
-                  "type": "string",
-                  "const": "text"
-                },
-                "text": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "type",
-                "text"
-              ],
-              "additionalProperties": false
-            }
-          }
-        },
-        "required": [
-          "content"
-        ],
-        "additionalProperties": false
-      },
       "annotations": {
-        "readOnlyHint": true
+        "readOnlyHint": true,
+        "openWorldHint": false
+      },
+      "execution": {
+        "taskSupport": "forbidden"
       }
     },
     {
       "name": "ennodia_run",
+      "title": "Run Ennodia",
       "description": "Start a high-level Ennodia orchestration. Set pragmatic for evidence-focused investigation or patch proposals with one or more independent workers. Use Plan Advisor for tailored model and skill assignments. Use this as the default entrypoint: it plans routing, starts one or more local harness tasks, optionally compares successful outputs, and returns a run ID. Runs usually take minutes; use ennodia_get_run with waitMs: 30000 and includeEvents: false until terminal, then consume and verify its answer. A wait timeout does not cancel or finish the run.",
       "inputSchema": {
         "type": "object",
@@ -148,7 +168,7 @@
           "prompt": {
             "type": "string",
             "minLength": 1,
-            "description": "The user task to route to local AI harnesses. For native media, first read ennodia_list_harnesses inputGuidance, specify local paths and a harness/model, then verify one small sample with mode single and compare false. Ennodia sends text, not media attachments."
+            "description": "The user task to route to local AI harnesses. Include relevant Keep in mind constraints, evidence, and unresolved assumptions in this prompt. For native media, first read ennodia_list_harnesses inputGuidance, specify local paths and a harness/model, then verify one small sample with mode single and compare false. Ennodia sends text, not media attachments."
           },
           "category": {
             "type": "string",
@@ -305,41 +325,17 @@
         ],
         "$schema": "http://json-schema.org/draft-07/schema#"
       },
-      "outputSchema": {
-        "type": "object",
-        "properties": {
-          "content": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "type": {
-                  "type": "string",
-                  "const": "text"
-                },
-                "text": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "type",
-                "text"
-              ],
-              "additionalProperties": false
-            }
-          }
-        },
-        "required": [
-          "content"
-        ],
-        "additionalProperties": false
-      },
       "annotations": {
-        "readOnlyHint": false
+        "readOnlyHint": false,
+        "openWorldHint": true
+      },
+      "execution": {
+        "taskSupport": "forbidden"
       }
     },
     {
       "name": "ennodia_history",
+      "title": "List durable Ennodia run history",
       "description": "Read terminal run receipts persisted under the local Ennodia history directory. Use after a restart to inspect previous final answers and Judge disagreement analysis.",
       "inputSchema": {
         "type": "object",
@@ -354,42 +350,18 @@
         },
         "$schema": "http://json-schema.org/draft-07/schema#"
       },
-      "outputSchema": {
-        "type": "object",
-        "properties": {
-          "content": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "type": {
-                  "type": "string",
-                  "const": "text"
-                },
-                "text": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "type",
-                "text"
-              ],
-              "additionalProperties": false
-            }
-          }
-        },
-        "required": [
-          "content"
-        ],
-        "additionalProperties": false
-      },
       "annotations": {
-        "readOnlyHint": true
+        "readOnlyHint": true,
+        "openWorldHint": false
+      },
+      "execution": {
+        "taskSupport": "forbidden"
       }
     },
     {
       "name": "ennodia_get_run",
-      "description": "Inspect a run or wait up to waitMs for completion. Prefer waitMs: 30000, compact: true and includeEvents: false while awaiting results. A nonterminal response means work continues; do not claim its findings were consumed.",
+      "title": "Get Ennodia run",
+      "description": "Inspect a run or wait up to waitMs for completion, including task-specific keepInMind notes when Compare returns them. Prefer waitMs: 30000, compact: true and includeEvents: false while awaiting results. A nonterminal response means work continues; do not claim its findings were consumed.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -435,41 +407,17 @@
         ],
         "$schema": "http://json-schema.org/draft-07/schema#"
       },
-      "outputSchema": {
-        "type": "object",
-        "properties": {
-          "content": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "type": {
-                  "type": "string",
-                  "const": "text"
-                },
-                "text": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "type",
-                "text"
-              ],
-              "additionalProperties": false
-            }
-          }
-        },
-        "required": [
-          "content"
-        ],
-        "additionalProperties": false
-      },
       "annotations": {
-        "readOnlyHint": true
+        "readOnlyHint": true,
+        "openWorldHint": false
+      },
+      "execution": {
+        "taskSupport": "forbidden"
       }
     },
     {
       "name": "ennodia_cancel_run",
+      "title": "Cancel Ennodia run",
       "description": "Cancel a high-level run and any active child task, Judge, or Result Advisor.",
       "inputSchema": {
         "type": "object",
@@ -485,37 +433,14 @@
         ],
         "$schema": "http://json-schema.org/draft-07/schema#"
       },
-      "outputSchema": {
-        "type": "object",
-        "properties": {
-          "content": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "type": {
-                  "type": "string",
-                  "const": "text"
-                },
-                "text": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "type",
-                "text"
-              ],
-              "additionalProperties": false
-            }
-          }
-        },
-        "required": [
-          "content"
-        ],
-        "additionalProperties": false
-      },
       "annotations": {
-        "readOnlyHint": false
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "execution": {
+        "taskSupport": "forbidden"
       }
     }
   ],
@@ -523,7 +448,7 @@
     "tools": {
       "type": "string",
       "title": "Tool set",
-      "description": "core loads the six tools for handing work to agents. all loads every Ennodia tool, which adds about 9,000 tokens of tool definitions to each session.",
+      "description": "core loads seven tools for handing work to agents and checking readiness. all loads every Ennodia tool.",
       "default": "core",
       "required": false
     }

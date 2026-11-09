@@ -1,0 +1,56 @@
+---
+import "../../styles/landing.css";
+import { exchanges, teamRequests } from "../../data/exchanges";
+import { exchangeListSchema } from "../../data/exchange-schema";
+
+const site = Astro.site ?? new URL("https://ennodia.cherninlab.com");
+const canonical = new URL("/examples/exchanges/", site).toString();
+const title = "Conversations between AI tools — Ennodia examples";
+const description = "See Ennodia requests and replies across Claude, Codex, Gemini, and OpenCode: audio, independent research, copy editing, and comparing answers.";
+const list = exchangeListSchema(site);
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+  </head>
+  <body>
+    <main class="exchange-records wrap">
+      <a class="text-link" href="/">← Back to Ennodia</a>
+      <h1>Conversations between AI tools.</h1>
+      <p>Cards with replies condense recorded Ennodia runs. They are edited summaries, not verbatim chat transcripts. Private files and local paths are omitted.</p>
+      <p>Request-only cards are illustrative prompts for other configurations. They have no recorded result. Their model assignments are examples, not availability guarantees.</p>
+      {exchanges.map(exchange => <article id={exchange.id}>
+        <h2>{exchange.app} · {exchange.model}</h2>
+        <p><strong>Request summary.</strong> {exchange.request}</p>
+        <p><strong>Response summary.</strong> {exchange.response}</p>
+        <p>{exchange.evidence}</p>
+        <dl><dt>Run</dt><dd><code>{exchange.runId}</code></dd><dt>Model identifier</dt><dd><code>{exchange.requestedModel}</code></dd></dl>
+        {exchange.source && <a class="text-link" href={exchange.source}>Read the sanitized receipt ↗</a>}
+      </article>)}
+      <h2>More configurations to try</h2>
+      {teamRequests.map(example => <article id={example.id}>
+        <h2>{example.app} · {example.model}</h2>
+        <p>{example.request}</p>
+        <p>{example.evidence}</p>
+        <a class="text-link" href={example.source}>Related documentation ↗</a>
+      </article>)}
+    </main>
+    <script type="application/ld+json" set:html={JSON.stringify({
+      "@context": "https://schema.org",
+      "@graph": [
+        { "@type": "CollectionPage", "@id": canonical, url: canonical, name: title, description, inLanguage: "en", mainEntity: { "@id": list["@id"] } },
+        list,
+      ],
+    }).replace(/</g, "\\u003c")} />
+  </body>
+</html>

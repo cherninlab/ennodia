@@ -1,0 +1,40 @@
+---
+import { CornerDownRight, Pause, Play } from "@lucide/astro";
+import { conversationRows } from "../data/exchanges";
+import codex from "../../../docs/assets/agents/codex-color.svg?url";
+import opencode from "../../../docs/assets/agents/opencode-light.svg?url";
+import antigravity from "../../../docs/assets/agents/antigravity-color.svg?url";
+import claude from "../../../docs/assets/agents/claudecode-color.svg?url";
+
+const icons: Record<string, string> = { codex, opencode, antigravity, claude };
+---
+<section class="exchange-wall" aria-labelledby="exchanges-title" data-exchange-wall>
+  <div class="exchange-heading wrap">
+    <div>
+      <h2 id="exchanges-title">A few conversations to try.</h2>
+
+    </div>
+    <button class="motion-toggle" type="button" aria-pressed="false" data-motion-toggle hidden>
+      <Pause class="pause-symbol" size={16} aria-hidden="true" />
+      <Play class="play-symbol" size={16} aria-hidden="true" />
+      <span>Pause motion</span>
+    </button>
+  </div>
+  <div class="exchange-rows">
+    {conversationRows.map((row, index) => <div class:list={["exchange-row", { "exchange-row-reverse": index === 1 }]}>
+      <div class="exchange-track">
+        {[false, true].map(duplicate => <div class:list={["exchange-group", { "exchange-duplicate": duplicate }]} aria-hidden={duplicate ? "true" : undefined} inert={duplicate}>
+          {row.map(exchange => <article class="exchange-card">
+            <header>
+              <div class="exchange-icons">{("icons" in exchange ? exchange.icons : [exchange.icon]).map(icon => <img src={icons[icon]} width="34" height="34" alt="" />)}</div>
+              <div><h3>{exchange.app}</h3><span class="exchange-model">{exchange.model}</span></div>
+            </header>
+            <div class="exchange-request"><p>{exchange.request.split(exchange.emphasis).map((part, index) => <>{index > 0 && <strong>{exchange.emphasis}</strong>}{part}</>)}</p></div>
+            {exchange.response && <div class="exchange-reply"><CornerDownRight size={17} aria-hidden="true" /><p>{exchange.response}</p></div>}
+          </article>)}
+        </div>)}
+      </div>
+    </div>)}
+  </div>
+  <div class="exchange-footnote wrap"><a href="/examples/exchanges/">Run summaries and example requests ↗</a></div>
+</section>

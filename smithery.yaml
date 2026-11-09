@@ -14,4 +14,4 @@ configSchema:
       type: string
       enum: ["core", "all"]
       default: "core"
-      description: "core loads the six tools for handing work to agents. all loads every Ennodia tool, which adds about 9,000 tokens of tool definitions to each session."
+      description: "core loads the eight tools for handing work to agents and setting them up. all loads every Ennodia tool, which adds about 9,000 tokens of tool definitions to each session."

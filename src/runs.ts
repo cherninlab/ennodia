@@ -6,8 +6,9 @@ import {
   type BudgetCheck,
   type BudgetLimits,
 } from "./budget";
-import { MAX_PROMPT_CANDIDATE_CHARS, type CompareManager, type CompareView } from "./compare";
+import { MAX_PROMPT_CANDIDATE_CHARS, type CompareManager, type CompareView, type KeepInMindNote } from "./compare";
 import { diagnoseTasks, type TaskDiagnosis } from "./diagnosis";
+import { HarnessReadinessError, harnessAttention, nativeReadinessFailure, type HarnessAttention, type PreflightReport, type HarnessReadiness, type ReadinessState } from "./readiness";
 import type {
   DiscoverHarnessesOptions,
   HarnessAdapter,
@@ -98,6 +99,10 @@ export type RunStartInput = {
 };
 
 export type RunView = {
+  installation?: InstallationReport;
+  actionRequired?: HarnessAttention[];
+  preflight?: PreflightReport;
+  coverage?: { requested: number; succeeded: number; failed: number; skipped: number };
   id: string;
   status: RunStatus;
   mode: RunMode;
@@ -126,6 +131,8 @@ export type RunView = {
   etaConfidence: "timeout-budget" | "unknown" | "complete";
   finalAnswer?: string;
   finalAnswerChars: number;
+  /** Recipient context from Compare, kept separate from answer artifacts. */
+  keepInMind?: KeepInMindNote[];
   error?: string;
   diagnosis?: TaskDiagnosis;
   failedTaskDiagnosis?: TaskDiagnosis;
@@ -158,11 +165,14 @@ export type PlanRoute = (
 ) => RoutePlan;
 
 export type RunManagerDependencies = {
+  getInstallation?: () => InstallationReport;
   taskManager: TaskManager;
   compareManager: CompareManager;
   discoverHarnesses: DiscoverHarnesses;
   findHarnessAdapter: FindHarnessAdapter;
   planRoute: PlanRoute;
+  prepareHarnesses?: (harnesses: HarnessDiscovery[], ids: string[], input: RunStartInput) => Promise<PreflightReport>;
+  describeReadiness?: (harness: HarnessDiscovery, state: ReadinessState, model?: string) => HarnessReadiness;
 };
 
 export type RunManagerShutdownOptions = {
@@ -175,6 +185,8 @@ export type RunManagerOptions = {
 };
 
 type InternalRun = {
+  actionRequired?: HarnessAttention[];
+  preflight?: PreflightReport;
   id: string;
   status: RunStatus;
   mode: RunMode;
@@ -191,6 +203,7 @@ type InternalRun = {
   taskIds: string[];
   compareId?: string;
   finalAnswer?: string;
+  keepInMind?: KeepInMindNote[];
   error?: string;
   diagnosis?: TaskDiagnosis;
   failedTaskDiagnosis?: TaskDiagnosis;
@@ -258,6 +271,8 @@ export class RunManager {
     const selectedHarnessIds = selectHarnessIds(input.harnessId, mode, plan);
 
     if (selectedHarnessIds.length === 0) {
+      const blocked = harnessAttention(harnesses);
+      if (blocked.length) throw new HarnessReadinessError(blocked);
       throw new Error("No runnable harnesses were found.");
     }
 
@@ -290,6 +305,9 @@ export class RunManager {
       throw new Error(`Budget limit exceeded: ${budget.issues.join(" ")}`);
     }
 
+    const preflight = await this.dependencies.prepareHarnesses?.(harnesses, selectedHarnessIds, {
+      ...input, budget: input.budget?.maxEstimatedInputTokens !== undefined ? { ...input.budget, maxEstimatedInputTokens: input.budget.maxEstimatedInputTokens - budget.estimate.estimatedTotalInputTokens } : input.budget,
+    });
     const now = Date.now();
     const run: InternalRun = {
       id: randomUUID(),
@@ -309,6 +327,8 @@ export class RunManager {
       createdAtMs: now,
       updatedAtMs: now,
       events: [],
+      preflight,
+      actionRequired: input.harnessId ? undefined : plan.actionRequired,
       appliedSkills: input.skills?.map(toAppliedSkillInfo),
       budget,
     };
@@ -460,6 +480,11 @@ export class RunManager {
       const task = await this.dependencies.taskManager.waitForTerminal(taskId);
       if (task && run.status !== "cancelled") {
         this.pushEvent(run, eventFromTask(task));
+        const state = task.status === "failed" ? nativeReadinessFailure(task.stdout, task.stderr) : undefined;
+        if (state) {
+          const discovery = (await this.dependencies.discoverHarnesses()).find(h => h.id === task.harnessId);
+          if (discovery?.readiness) run.actionRequired = [...(run.actionRequired ?? []).filter(a => a.harnessId !== task.harnessId), { harnessId: task.harnessId, harnessName: task.harnessName, readiness: this.dependencies.describeReadiness?.(discovery, state, task.model) ?? { ...discovery.readiness, state, model: task.model } }];
+        }
       }
       return task;
     });
@@ -568,6 +593,9 @@ export class RunManager {
       ? `${advice}\n\nChosen answer from ${chosen.label ?? chosen.id}, unchanged:\n\n${chosen.content}`
       : advice;
     if (result.status === "succeeded" && finalAnswer) {
+      if (result.advisor?.keepInMind?.length) {
+        run.keepInMind = result.advisor.keepInMind;
+      }
       this.pushEvent(run, {
         type: "compare-succeeded",
         compareId: compare.id,
@@ -667,9 +695,19 @@ export class RunManager {
       etaConfidence: eta.etaConfidence,
       finalAnswer: finalAnswer ? truncate(finalAnswer, maxAnswerChars) : undefined,
       finalAnswerChars: finalAnswer?.length ?? 0,
+      keepInMind: run.keepInMind,
       error: run.error,
       diagnosis: run.diagnosis,
       failedTaskDiagnosis: run.failedTaskDiagnosis,
+      actionRequired: run.actionRequired,
+      installation: this.dependencies.getInstallation?.(),
+      preflight: run.preflight,
+      coverage: {
+        requested: run.selectedHarnessIds.length + (run.harnessOverridden ? 0 : run.plan.actionRequired?.length ?? 0),
+        succeeded: run.taskIds.filter(id => this.dependencies.taskManager.get(id, { includeOutput: false, includeEvents: false })?.status === "succeeded").length,
+        failed: run.taskIds.filter(id => ["failed", "cancelled"].includes(this.dependencies.taskManager.get(id, { includeOutput: false, includeEvents: false })?.status ?? "")).length,
+        skipped: run.harnessOverridden ? 0 : run.plan.actionRequired?.length ?? 0,
+      },
       eventCount: run.events.length,
       events: options.includeEvents === false ? [] : tailItems(run.events, maxEvents),
       appliedSkills: run.appliedSkills,
@@ -1094,3 +1132,4 @@ async function settleWithDeadline(
     });
   });
 }
+import type { InstallationReport } from "./installation";

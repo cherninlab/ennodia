@@ -3,7 +3,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { AdvisorPlanProposal } from "./advisor";
+import { MAX_ADVISOR_SKILL_DESCRIPTION_CHARS, type AdvisorPlanProposal } from "./advisor";
 import { EnnodiaCore } from "./core";
 import type { HarnessAdapter, HarnessDiscovery } from "./harnesses";
 import { TaskManager } from "./tasks";
@@ -310,6 +310,34 @@ describe("EnnodiaCore advised plans", () => {
     }
   });
 
+  it("bounds Advisor skill summaries while detecting changes beyond the summary", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "ennodia-advised-long-description-"));
+    const directory = join(cwd, ".agents", "skills", "audit-skill");
+    const skillPath = join(directory, "SKILL.md");
+    mkdirSync(directory, { recursive: true });
+    const summary = "x".repeat(MAX_ADVISOR_SKILL_DESCRIPTION_CHARS);
+    writeSkill(skillPath, "Check the implementation.", `${summary} original suffix`);
+    const core = createSkillAdvisorCore();
+    try {
+      const started = await core.startPlanAdvice({
+        prompt: "Audit with the installed skill.", cwd,
+        advisorHarnessId: "codex", allowedHarnessIds: ["codex"], timeoutMs: 5_000,
+      });
+      const ready = await core.waitForPlanAdvice(started.id, 10_000);
+      expect(ready?.status).toBe("ready");
+      const inventory = core.planAdviceManager.getRevalidationContext(started.id).inventory;
+      expect(inventory.skills.find(skill => skill.id === "audit-skill")?.description).toBe(summary);
+      writeSkill(skillPath, "Check the implementation.", `${summary} changed suffix`);
+      await expect(core.startAdvisedPlan({
+        adviceId: started.id, expectedPlanDigest: ready!.planDigest!, cwd,
+      })).rejects.toThrow("inventory changed");
+      expect(core.listTasks()).toHaveLength(1);
+    } finally {
+      await core.shutdown();
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
   it("does not let an identical legacy skill duplicate wildcard native support", async () => {
     const cwd = await mkdtemp(join(tmpdir(), "ennodia-advised-legacy-skill-"));
     const nativePath = join(cwd, ".agents", "skills", "audit-skill", "SKILL.md");
@@ -548,13 +576,13 @@ function advisorFixtureAdapter(
   };
 }
 
-function writeSkill(path: string, instructions: string): void {
+function writeSkill(path: string, instructions: string, description = "Audit the implementation."): void {
   writeFileSync(
     path,
     [
       "---",
       "name: audit-skill",
-      "description: Audit the implementation.",
+      `description: ${description}`,
       "---",
       instructions,
     ].join("\n"),

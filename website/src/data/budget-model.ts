@@ -3,10 +3,12 @@
 
 const CHARS_PER_TOKEN = 4;
 const CANDIDATE_CAP_CHARS = 24_000;
-const JUDGE_OVERHEAD_CHARS = 2_400;
-const ADVISOR_OVERHEAD_CHARS = 1_600;
+const JUDGE_OVERHEAD_CHARS = 2_600;
+// Includes the recipient notes schema and evidence/uncertainty instructions.
+const ADVISOR_OVERHEAD_CHARS = 3_600;
 const SKILL_POINTER_CHARS = 220;
-const EXECUTION_NOTICE_CHARS = 1_600;
+// Reserve covers execution allowances and recipient notes guidance for workers.
+const EXECUTION_NOTICE_CHARS = 2_400;
 
 export type BudgetInput = {
   promptChars: number;

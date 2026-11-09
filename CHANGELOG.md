@@ -2,6 +2,39 @@
 
 This file records all notable Ennodia changes.
 
+## [0.5.0] - 2026-11-09
+
+### Added
+
+- Installation and harness readiness evidence, native recovery instructions, and an explicit harness recheck tool.
+- Readiness preflight before orchestration, with bounded model-access checks and supported harness maintenance.
+- Attributed “Keep in mind” notes in comparison results and run history, separate from the chosen answer.
+- `ennodia_setup` shows each agent's status and the exact fix for blocked agents, without a model request. It only reads, so clients such as Codex run it without an approval prompt. Hosts that render MCP Apps show it as a card with check buttons. Other hosts get a Markdown panel.
+
+### Changed
+
+- Ennodia stays quiet about its own status. Startup instructions carry only installation problems, and agents mention an agent only when a requested agent is blocked. Discovery returns JSON only, with no setup panel.
+
+### Fixed
+
+- Accept Cline's final JSON answer in readiness probes while rejecting prompt echoes and aborted results.
+
+- Reject unsupported Bun runtimes in the npm launcher before starting the server.
+- Preserve approved plans until readiness checks pass and include preflight in budget decisions.
+- Correct Hermes detection and report setup-required harnesses before launching work.
+- Read terminal-formatted native errors and distinguish expired API keys from depleted credits, with specific recovery actions.
+- Clarify selected-route verification and existing authorization so unrelated harness blockers do not hold up usable routes.
+
+### Website and release maintenance
+
+- Publish the conversation examples and landing-page refinements.
+- Attach npm provenance to new core and IO releases.
+- Update the pinned GitHub Actions for checkout, Node setup, and GitHub Releases.
+
+### Development
+
+- Start Ennodia Mobile in `apps/mobile`: Flutter for Android and iOS, scoped discovery, and a tested setup/undo foundation. Mobile has its own version and is not part of the npm or JSR artifact. Assistant connections and store releases are not available yet.
+
 ## [0.4.1] - 2026-09-28
 
 ### Added

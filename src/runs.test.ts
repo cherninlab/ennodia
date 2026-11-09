@@ -161,6 +161,7 @@ describe("RunManager", () => {
         basis: "judge-analysis",
         confidence: "high",
         openQuestions: [],
+        keepInMind: [],
         taskId: "advisor-task",
       },
       synthesis: {
@@ -200,6 +201,7 @@ describe("RunManager", () => {
 
     expect(result.status).toBe("succeeded");
     expect(result.finalAnswer).toBe("Preferred Advisor answer.");
+    expect(result.keepInMind).toBeUndefined();
   });
 
   it("returns a candidate the Result Advisor chose, unchanged, after its reason", async () => {
@@ -231,6 +233,13 @@ describe("RunManager", () => {
             basis: "judge-analysis",
             confidence: "high",
             openQuestions: [],
+            keepInMind: [{
+              note: "Agent B's file still needs an integration check.",
+              whyItMatters: "A complete file can affect callers outside the reviewed slice.",
+              evidence: "The candidates returned file text without integration-test results.",
+              sourceIds: [candidates[1]!.id],
+              status: "unverified",
+            }],
             chosenSourceId: candidates[1]!.id,
             taskId: "advisor-task",
           },
@@ -269,6 +278,9 @@ describe("RunManager", () => {
     const chosen = view!.candidates[1]!.content;
     expect(chosen.length).toBeGreaterThan(0);
     expect(result.finalAnswer).toBe(`Agent B's file is complete.\n\nChosen answer from Agent B, unchanged:\n\n${chosen}`);
+    expect(result.keepInMind).toEqual(view!.advisor!.keepInMind);
+    expect(manager.get(started.id, { maxAnswerChars: 0 })?.keepInMind)
+      .toEqual(result.keepInMind);
   });
 
   it("rejects conflicting Result Advisor aliases before starting child tasks", async () => {

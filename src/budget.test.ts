@@ -5,7 +5,7 @@ import {
   estimateRunBudget,
   estimateTaskBatchBudget,
 } from "./budget";
-import { buildJudgePrompt, MAX_PROMPT_CANDIDATE_CHARS } from "./compare";
+import { buildAdvisorPrompt, buildJudgePrompt, MAX_PROMPT_CANDIDATE_CHARS } from "./compare";
 import { harnessAdapters, type HarnessAdapter } from "./harnesses";
 import { TaskManager } from "./tasks";
 
@@ -109,6 +109,33 @@ describe("budget estimates", () => {
     expect(estimate.assumptions.join(" ")).toContain(
       "one Judge task and one Result Advisor task",
     );
+  });
+
+  it("covers current Judge and Advisor prompts including execution notices", async () => {
+    const prompt = "Review the candidate.";
+    const candidate = { id: "agent-a", content: "Check the retry path." };
+    const adapter: HarnessAdapter = {
+      id: "budget-fixture", name: "Budget fixture", kind: "cli", commandCandidates: ["sh"], capabilities: [],
+      buildCommand: (command, input) => ({ command, args: ["-c", 'printf "%s" "$1"', "budget-fixture", input.prompt] }),
+    };
+    const manager = new TaskManager();
+    let actualPromptTokens = 0;
+    try {
+      for (const comparePrompt of [buildJudgePrompt(prompt, [candidate]), buildAdvisorPrompt(prompt, [candidate])]) {
+        const { task } = manager.start(adapter, {
+          id: adapter.id, name: adapter.name, kind: adapter.kind, available: true, runnable: true,
+          commandPath: "/bin/sh", capabilities: [], notes: [],
+        }, { prompt: comparePrompt, timeoutMs: 5_000 });
+        const result = await manager.waitForTerminal(task.id, 5_000);
+        expect(result?.status).toBe("succeeded");
+        expect(result?.stdout).toContain("Execution allowance:");
+        actualPromptTokens += Math.ceil(result!.stdout.length / 4);
+      }
+      const estimate = estimateCompareBudget({ prompt, taskCandidateCount: 0, responseCandidateChars: candidate.content.length });
+      expect(estimate.estimatedCompareInputTokens).toBeGreaterThanOrEqual(actualPromptTokens);
+    } finally {
+      await manager.shutdown();
+    }
   });
 
   it("prefers advisorHarnessId while accepting the deprecated alias", () => {

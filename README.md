@@ -57,7 +57,7 @@ For manual setup, add this Model Context Protocol (MCP) server to your client:
 }
 ```
 
-Ennodia loads six core tools by default: about 10,000 characters of tool definitions in each session.
+Ennodia loads eight core tools by default: about 13,000 characters of tool definitions in each session.
 Add `"--tools", "all"` to `args` for the [full tool set](https://ennodia.cherninlab.com/docs/reference/mcp-tools/#tool-sets).
 
 Requirements: Bun `1.3.14` or newer, a compatible MCP client, and a supported agent with working provider access.
@@ -69,18 +69,23 @@ Requirements: Bun `1.3.14` or newer, a compatible MCP client, and a supported ag
 ## How a handoff works
 
 1. Your agent calls `ennodia_run` with the task, the agent or model to use, and a time limit.
-2. Ennodia starts that agent's own command-line tool in a fresh session, with its own tools and your account for it.
+2. Ennodia checks the selected route, then starts that agent's own command-line tool in a fresh session, with its own tools and your account for it.
 3. The answer comes back to your conversation, with its status and a receipt saved on your computer.
 
 Your conversation history stays in your agent.
 For two or more answers, Compare maps agreements, contradictions, and gaps.
 When one answer is complete as it stands, Compare can choose it, and `ennodia_run` returns it unchanged.
 
+Include relevant constraints and prior decisions in your task prompt under **Keep in mind**.
+Ennodia asks workers and Compare to return useful reminders with reasons and evidence.
+Your agent verifies them before carrying them into the next task.
+See [how to read these notes](https://ennodia.cherninlab.com/docs/guides/understand-results/#keep-in-mind).
+
 ## Supported agents
 
 Codex CLI, Claude Code, OpenCode, Kilo Code, Kiro CLI, Cline, Hermes Agent, and Antigravity.
 Model availability and tool permissions depend on the installed agent and its provider configuration.
-Discovery finds executable commands. It does not verify authentication or model access.
+Discovery reports native login checks and recovery actions. Before execution, Ennodia verifies each selected model route with a small request when recent success is unavailable.
 Codex workers use a read-only sandbox by default.
 
 Ennodia discovers native Agent Skills and can request them for specific tasks.
@@ -131,3 +136,26 @@ bun run verify
 [Pragmatic mode](docs/guides/pragmatic-mode.md) runs independent model attempts, tailored plans, and skill trials, then compares the evidence.
 It keeps bulky evidence outside the main conversation and returns findings for your agent to verify.
 Savings are not yet validated.
+
+## Login recovery and updates
+
+Ennodia checks selected workers, Judge, and Advisor routes before execution.
+Blocked routes return a native recovery action before reviewers start.
+Ennodia says nothing about its own status unless an agent you asked for is blocked.
+Rechecks, setup, and blocked starts include a setup panel with the exact fix.
+
+Your agent calls `ennodia_setup` to show each agent's status and fix in your current session.
+Hosts that render MCP Apps, such as Claude Desktop and Visual Studio Code, can show it as a card with check buttons.
+Other hosts, such as Codex and Claude Code, show the Markdown panel.
+
+Run that action in an interactive terminal, then call `ennodia_check_harnesses` with the same harness and model and `refresh: true, verify: true`.
+Run receipts keep missing reviewer coverage visible, including in compact responses.
+
+Supported harness upgrades run once per day on use while Ennodia has no active tasks.
+Set `ENNODIA_AUTO_UPDATE=false` to disable them.
+Use `ennodia_check_harnesses` with `upgrade: true` to update and recheck immediately.
+
+Ennodia also checks its own installation automatically. Run results report the loaded code location, version, runtime, and installation scope. The report checks required files, bundled skills, and storage access. The recheck tool refreshes this report. MCP startup instructions carry only installation problems.
+
+Mention installation limitations when they affect the request. Cache installs can change on a future unpinned launch. These local checks do not verify the latest registry version or provider access.
+See [recovery and updates](https://ennodia.cherninlab.com/docs/reference/supported-harnesses/#recovery-and-updates).

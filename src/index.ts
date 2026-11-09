@@ -146,6 +146,7 @@ export {
   parseJudgeAnalysis,
   type CompareAnalysis,
   type AdvisorResult,
+  type KeepInMindNote,
   type CompareCandidate,
   type CompareCandidateInput,
   type CompareEvent,
@@ -176,6 +177,8 @@ export {
   type TaskOutputPreview,
 } from "./diagnosis";
 export { ENNODIA_VERSION } from "./version";
+export { inspectInstallation, MIN_BUN_VERSION, type InstallationReport, type InstallationScope, type InstallationCheck, type InstallationOptions } from "./installation";
+export { HarnessReadinessManager, HarnessReadinessError, readinessBlocked, harnessAttention, harnessUpgradeCommand, nativeReadinessFailure, type HarnessReadiness, type HarnessReadinessOptions, type HarnessAttention, type HarnessCheckInput, type PreflightReport, type ReadinessState, type MaintenanceCommandRunner } from "./readiness";
 export {
   discoverSkills,
   discoverSkillsWithWarnings,

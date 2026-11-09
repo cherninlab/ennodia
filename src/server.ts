@@ -10,7 +10,10 @@ import {
 import { renderPlanMermaid } from "./planner";
 import { formatHarnessPriorityList } from "./priority";
 import { ENNODIA_VERSION } from "./version";
-import { REASONING_EFFORTS } from "./harnesses";
+import { REASONING_EFFORTS, type HarnessDiscovery } from "./harnesses";
+import { HarnessReadinessError, harnessAttention, type HarnessAttention } from "./readiness";
+import type { InstallationReport } from "./installation";
+import { ACCESS_TEXT, HARNESS_GUIDE_URL, INSTALL_GUIDE_URL, MCP_APP_MIME_TYPE, SETUP_APP_HTML, SETUP_APP_TOOL_META, SETUP_APP_URI, accessRank, type AccessKey } from "./setup-app";
 
 const defaultCore = createDefaultEnnodiaCore();
 const comparePriorityText = formatHarnessPriorityList();
@@ -60,6 +63,8 @@ export const CORE_TOOL_NAMES: readonly string[] = [
   "ennodia_get_run",
   "ennodia_cancel_run",
   "ennodia_list_harnesses",
+  "ennodia_setup",
+  "ennodia_check_harnesses",
   "ennodia_list_skills",
   "ennodia_history",
 ];
@@ -69,7 +74,7 @@ export const CORE_TOOL_NAMES: readonly string[] = [
  * model providers, and their workers can change files when the caller allows
  * it, so they claim neither read-only nor harmless. */
 export function toolAnnotations(name: string): { readOnlyHint: boolean; openWorldHint: boolean; destructiveHint?: boolean; idempotentHint?: boolean } {
-  if (/^ennodia_(?:list_|get_|history$|plan$|estimate_)/.test(name)) return { readOnlyHint: true, openWorldHint: false };
+  if (/^ennodia_(?:list_|get_|history$|plan$|estimate_|setup$)/.test(name)) return { readOnlyHint: true, openWorldHint: false };
   if (name.startsWith("ennodia_cancel_")) return { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false };
   if (name === "ennodia_install_skills") return { readOnlyHint: false, destructiveHint: false, openWorldHint: false };
   return { readOnlyHint: false, openWorldHint: true };
@@ -90,13 +95,24 @@ export function createEnnodiaServer(
   const server = new McpServer({
     name: "ennodia",
     version: ENNODIA_VERSION,
-  });
+  }, { instructions: serverInstructions(core.getInstallation?.()) });
 
   // Keep each registration, so the core set can drop the others below, and
   // add the annotations that tell clients which calls only read.
   const registered = new Map<string, RegisteredTool>();
   const registerTool = server.registerTool.bind(server) as (name: string, config: { annotations?: object }, ...rest: unknown[]) => RegisteredTool;
   server.registerTool = ((name: string, config: { annotations?: object }, ...rest: unknown[]) => {
+    const handler = rest[rest.length - 1] as (...args: unknown[]) => Promise<unknown>;
+    rest[rest.length - 1] = async (...args: unknown[]) => {
+      try { return await handler(...args); }
+      catch (error) {
+        if (error instanceof HarnessReadinessError) {
+          const installation = core.getInstallation?.();
+          return { ...setupResult({ error: error.message, installation, actionRequired: error.actionRequired, coverage: { started: 0 } }, error.actionRequired, installation), isError: true };
+        }
+        throw error;
+      }
+    };
     const tool = registerTool(name, { ...config, annotations: { ...toolAnnotations(name), ...config.annotations } }, ...rest);
     registered.set(name, tool);
     return tool;
@@ -107,7 +123,7 @@ export function createEnnodiaServer(
     {
       title: "List Ennodia harnesses",
       description:
-        "Discover local harnesses, availability, versions, capabilities, adapter notes, and inputGuidance. Before audio/image/video work, read inputGuidance: model capabilities do not guarantee native input through a harness. Use first when setup or routing fails.",
+        "Discover supported agents and cached readiness for routing. Do not summarize it for the user; for setup or status requests call ennodia_setup. Read inputGuidance before media work.",
       inputSchema: {
         refresh: z
           .boolean()
@@ -119,6 +135,42 @@ export function createEnnodiaServer(
     },
     async ({ refresh }) => jsonResult(await core.listHarnesses({ refresh })),
   );
+
+  // Read-only, so clients such as Codex show setup without an approval prompt.
+  server.registerTool("ennodia_setup", {
+    title: "Show Ennodia setup",
+    description: "Show the user Ennodia's agents: each agent's status and the exact fix for blocked ones. Refreshes native sign-in status without model requests. Hosts that render MCP Apps show a card with check buttons; others get a Markdown panel to show the user.",
+    _meta: SETUP_APP_TOOL_META,
+  }, async () => {
+    const harnesses = await core.listHarnesses({ refresh: true });
+    const installation = core.getInstallation?.(true);
+    return setupResult({ installation, harnesses, actionRequired: harnessAttention(harnesses) }, harnesses, installation);
+  });
+
+  server.registerTool("ennodia_check_harnesses", {
+    title: "Recheck or upgrade Ennodia harnesses",
+    description: "Recheck Ennodia's installation and recover affected harnesses. Return installation scope, runtime/package/storage limitations, native recovery commands and actionRequired. Target affected harnessIds; unrelated blockers do not prevent authorized work on usable routes. verify makes a small real model call; upgrade runs supported updaters before rechecking. Never switch account/provider/model silently.",
+    _meta: SETUP_APP_TOOL_META,
+    inputSchema: {
+      harnessIds: z.array(z.string().min(1)).min(1).optional().describe("Harnesses to recheck. Omit for all installed harnesses."),
+      model: z.string().min(1).optional().describe("Exact model to verify on the selected route."),
+      cwd: z.string().optional().describe("Workspace identity for the readiness receipt; probes run in an empty temporary directory."),
+      refresh: z.boolean().default(true).describe("Invalidate cached readiness and recheck native status."),
+      verify: z.boolean().default(false).describe("Verify each selected route with a bounded real model request. Uses provider capacity."),
+      upgrade: z.boolean().default(false).describe("Run supported updaters now, then rediscover and recheck. Deferred while Ennodia tasks are active."),
+    },
+  }, async input => {
+    const result = await core.checkHarnesses(input);
+    return setupResult(result, result.harnesses, result.installation);
+  });
+
+  // Hosts that render MCP Apps show this card for the two tools above.
+  // Other hosts ignore the resource and keep the Markdown panel.
+  server.registerResource("ennodia-setup", SETUP_APP_URI, {
+    title: "Ennodia setup",
+    description: "Setup card for hosts that render MCP Apps.",
+    mimeType: MCP_APP_MIME_TYPE,
+  }, async () => ({ contents: [{ uri: SETUP_APP_URI, mimeType: MCP_APP_MIME_TYPE, text: SETUP_APP_HTML, _meta: { ui: { prefersBorder: true, permissions: { clipboardWrite: {} } } } }] }));
 
   server.registerTool(
     "ennodia_list_skills",
@@ -690,7 +742,7 @@ export function createEnnodiaServer(
         prompt: z
           .string()
           .min(1)
-          .describe("The user task to route to local AI harnesses. For native media, first read ennodia_list_harnesses inputGuidance, specify local paths and a harness/model, then verify one small sample with mode single and compare false. Ennodia sends text, not media attachments."),
+          .describe("The user task to route to local AI harnesses. Include relevant Keep in mind constraints, evidence, and unresolved assumptions in this prompt. For native media, first read ennodia_list_harnesses inputGuidance, specify local paths and a harness/model, then verify one small sample with mode single and compare false. Ennodia sends text, not media attachments."),
         category: categorySchema.optional(),
         harnessId: z
           .string()
@@ -850,7 +902,7 @@ export function createEnnodiaServer(
     {
       title: "Get Ennodia run",
       description:
-        "Inspect a run or wait up to waitMs for completion. Prefer waitMs: 30000, compact: true and includeEvents: false while awaiting results. A nonterminal response means work continues; do not claim its findings were consumed.",
+        "Inspect a run or wait up to waitMs for completion, including task-specific keepInMind notes when Compare returns them. Prefer waitMs: 30000, compact: true and includeEvents: false while awaiting results. A nonterminal response means work continues; do not claim its findings were consumed.",
       inputSchema: {
         runId: z.string().min(1).describe("Run ID returned by ennodia_run."),
         compact: z.boolean().default(false).describe("Omit repeated routing, budget, prompt preview and skill metadata. Preserve status, timing, task IDs, answers and errors. Answer and event limits still apply. Use false for full diagnostics."),
@@ -1141,7 +1193,7 @@ export function createEnnodiaServer(
     {
       title: "Get Ennodia Judge + Result Advisor comparison",
       description:
-        "Inspect comparison status, candidate inputs, Judge analysis, Result Advisor answer, child task IDs, degradation state, and ETA.",
+        "Inspect comparison status, candidate inputs, Judge analysis, Result Advisor answer and keepInMind notes with evidence and uncertainty, child task IDs, degradation state, and ETA.",
       inputSchema: {
         compareId: z
           .string()
@@ -1278,6 +1330,53 @@ export async function shutdownEnnodia(
   options: EnnodiaShutdownOptions = {},
 ): Promise<void> {
   await defaultCore.shutdown(options);
+}
+
+/** Startup instructions load into every session that has Ennodia configured,
+ * so they stay short and keep Ennodia quiet until there is something to fix. */
+export function serverInstructions(installation?: InstallationReport): string {
+  const lines = [
+    "Ennodia hands work to the user's other local agents. Do not open with Ennodia's status or list agents the user did not ask about: ennodia_run checks the agents it selects before starting.",
+    "If a requested agent is blocked, the result carries an ennodia://setup panel: show the user its fix as written. After the user fixes it, recheck that agent and model with ennodia_check_harnesses (verify: true), then continue the task. If a run skipped agents (actionRequired), say so in one line. Unrelated blockers must not hold up work on usable agents.",
+    "For setup or status requests, call ennodia_setup and show its panel. Hosts that render MCP Apps show it as a card; then add one line at most.",
+    "Unverified means not checked yet, not failed. A verified default model does not prove access to other models. Never collect credentials in chat, never switch account, provider or model silently, and never claim a check ran when it did not. Follow the user's existing authorization and the host's approval policy; add no approval step of your own.",
+  ];
+  if (installation?.status === "broken") lines.push(`Ennodia's installation is broken: ${installation.limitations.join(" ")} Tell the user before starting work and link ${INSTALL_GUIDE_URL}.`);
+  else if (installation?.status === "limited") lines.push(`Installation notes, to mention only when they affect the request: ${installation.limitations.join(" ")}`);
+  return lines.join("\n");
+}
+
+function accessKey(route: HarnessDiscovery | HarnessAttention): AccessKey {
+  return "id" in route && !route.runnable ? "missing" : route.readiness?.state ?? "unverified";
+}
+
+/** Keep the JSON text contract intact for clients that parse tool text, and
+ * add the panel an agent shows when the host has no card: each agent's status
+ * in plain words, then the exact sign-in commands. */
+function setupResult(value: unknown, routes: (HarnessDiscovery | HarnessAttention)[], installation?: InstallationReport) {
+  const cell = (text: string) => text.replaceAll("|", "\\|").replace(/[\r\n]+/g, " ");
+  const lines = ["## Ennodia agents"];
+  if (installation && installation.status !== "healthy") {
+    lines.push("", `Installation ${installation.status}:`, ...installation.limitations.map(limit => `- ${limit}`), "", `Repair it with the [installation guide](${INSTALL_GUIDE_URL}), then restart the MCP connection.`);
+  }
+  const rows = routes.map(route => {
+    const key = accessKey(route);
+    return { name: "id" in route ? route.name : route.harnessName, model: route.readiness?.model, key, command: key === "login-required" ? route.readiness?.recovery?.command ?? [] : [] };
+  }).sort((a, b) => accessRank(a.key) - accessRank(b.key));
+  if (rows.length) lines.push("", "| Agent | Status | Next step |", "| --- | --- | --- |");
+  else lines.push("", `No supported agents were found. Install one with the [harness guide](${HARNESS_GUIDE_URL}).`);
+  for (const row of rows) {
+    const next = row.key === "missing" ? `${ACCESS_TEXT.missing.next} [Install guide](${HARNESS_GUIDE_URL})` : ACCESS_TEXT[row.key].next;
+    lines.push(`| ${cell(row.name + (row.model ? ` · ${row.model}` : ""))} | ${ACCESS_TEXT[row.key].label} | ${cell(next)} |`);
+  }
+  // Only a login blocker calls for a command. Other blockers need credits or a new key.
+  for (const row of rows.filter(row => row.command.length)) {
+    const command = row.command.map(arg => /^[A-Za-z0-9_./:@=+-]+$/.test(arg) ? arg : `'${arg.replaceAll("'", "'\\''")}'`).join(" ");
+    const fence = "`".repeat(Math.max(3, ...[...command.matchAll(/`+/g)].map(match => match[0].length + 1)));
+    lines.push("", `Sign in to ${row.name} in a terminal:`, "", `${fence}sh\n${command}\n${fence}`);
+  }
+  if (rows.some(row => accessRank(row.key) === 0)) lines.push("", "Keep sign-in and API keys in each agent's own CLI, never in this chat.");
+  return { content: [...jsonResult(value).content, { type: "resource" as const, resource: { uri: "ennodia://setup", mimeType: "text/markdown", text: lines.join("\n") } }] };
 }
 
 function jsonResult(value: unknown) {

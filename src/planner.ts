@@ -1,11 +1,13 @@
 import type { HarnessDiscovery } from "./harnesses";
 import { hasMultimodalInput, MULTIMODAL_INPUT_GUIDANCE } from "./harnesses";
+import { harnessAttention, readinessBlocked, type HarnessAttention } from "./readiness";
 import {
   CATEGORY_HARNESS_PRIORITIES,
   type RouteCategory,
 } from "./priority";
 
 export type RoutePlan = {
+  actionRequired?: HarnessAttention[];
   category: RouteCategory;
   reasons: string[];
   candidates: string[];
@@ -25,7 +27,7 @@ export function planRoute(
   options: PlanRouteOptions = {},
 ): RoutePlan {
   const lower = prompt.toLowerCase();
-  const runnable = harnesses.filter((harness) => harness.runnable);
+  const runnable = harnesses.filter((harness) => harness.runnable && !readinessBlocked(harness.readiness));
   const runnableIds = new Set(runnable.map((harness) => harness.id));
   const reasons: string[] = [];
   const audioInspectionSignals = /\bnative audio\b|\baudio listening\b|\blistening comparison\b|\blisten to\b[^.!?\n]{0,80}\b(audio|recordings?|files?|samples?)\b|\b(compare|assess|judge)\b[^.!?\n]{0,60}\b(audio|recordings?|voice|sound)\b/.test(lower);
@@ -92,6 +94,7 @@ export function planRoute(
   const compareSuggested = parallelSuggested;
 
   return {
+    ...(harnessAttention(harnesses.filter(h => h.runnable)).length ? { actionRequired: harnessAttention(harnesses.filter(h => h.runnable)) } : {}),
     category,
     reasons,
     candidates,

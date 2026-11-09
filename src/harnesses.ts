@@ -1,6 +1,9 @@
 import { existsSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { signalOwnedProcess } from "./process";
 import { type Skill } from "./skills";
+import type { HarnessReadiness } from "./readiness";
 
 export type HarnessKind = "cli" | "app";
 
@@ -84,6 +87,8 @@ export type HarnessAdapter = {
   /** Whether the adapter supports manager-owned native session continuation. */
   supportsSessionContinuation?: boolean;
   buildCommand?: (commandPath: string, input: HarnessRunInput) => CommandSpec;
+  /** Extract only the final answer from structured readiness-probe output. */
+  readinessAnswer?: (stdout: string) => string | undefined;
   /** Best-effort usage extraction from a finished task's captured output. */
   extractUsage?: (stdout: string, stderr: string) => HarnessUsage | undefined;
   /** Extract a native session ID from captured stdout as it arrives. */
@@ -133,6 +138,7 @@ export type HarnessDiscovery = {
   capabilities: string[];
   notes: string[];
   inputGuidance?: string[];
+  readiness?: HarnessReadiness;
 };
 
 export type DiscoverHarnessesOptions = {
@@ -357,7 +363,8 @@ export const harnessAdapters: HarnessAdapter[] = [
     id: "hermes-agent",
     name: "Hermes Agent",
     kind: "cli",
-    commandCandidates: ["hermes-agent", "hermes"],
+    // hermes-agent is the legacy single-query runner, not the chat CLI.
+    commandCandidates: ["hermes"],
     versionArgs: ["--version"],
     capabilities: ["reasoning", "code", "agents", "non-interactive-cli"],
     notes: [
@@ -418,6 +425,18 @@ export const harnessAdapters: HarnessAdapter[] = [
     notes: [
       "Runs through `cline` with auto-approval explicitly disabled.",
     ],
+    readinessAnswer: (stdout) => {
+      // Public CLI JSON contract: docs/cli/cli-reference.mdx in cline/cline.
+      for (const line of stdout.trim().split(/\r?\n/).reverse()) {
+        try {
+          const event = JSON.parse(line);
+          if (event.type === "run_result") {
+            return event.finishReason !== "aborted" && typeof event.text === "string" ? event.text : undefined;
+          }
+        } catch { /* Ignore diagnostics outside the JSON result. */ }
+      }
+      return undefined;
+    },
     buildCommand: (commandPath, input) => {
       const args = ["--auto-approve", "false", "--json"];
 
@@ -627,7 +646,13 @@ async function discoverHarness(
 ): Promise<HarnessDiscovery> {
   const commandPath = adapter.commandCandidates
     .map((candidate) => Bun.which(candidate))
-    .find((match): match is string => Boolean(match));
+    .find((match): match is string => Boolean(match))
+    // GUI/MCP launches may omit native install roots; keep every existing PATH candidate first.
+    ?? (process.platform === "darwin" ? adapter.commandCandidates
+      .map((candidate) => Bun.which(candidate, {
+        PATH: ["/opt/homebrew/bin", "/usr/local/bin", join(homedir(), ".local", "bin")].join(":"),
+      }))
+      .find((match): match is string => Boolean(match)) : undefined);
 
   const appPath = adapter.appPaths?.find((path) => existsSync(path));
   let version: string | undefined;
