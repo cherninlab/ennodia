@@ -76,6 +76,11 @@ Your conversation history stays in your agent.
 For two or more answers, Compare maps agreements, contradictions, and gaps.
 When one answer is complete as it stands, Compare can choose it, and `ennodia_run` returns it unchanged.
 
+Include relevant constraints and prior decisions in your task prompt under **Keep in mind**.
+Ennodia asks workers and Compare to return useful reminders with reasons and evidence.
+Your agent verifies them before carrying them into the next task.
+See [how to read these notes](https://ennodia.cherninlab.com/docs/guides/understand-results/#keep-in-mind).
+
 ## Supported agents
 
 Codex CLI, Claude Code, OpenCode, Kilo Code, Kiro CLI, Cline, Hermes Agent, and Antigravity.
@@ -136,11 +141,12 @@ Savings are not yet validated.
 
 Ennodia checks selected workers, Judge, and Advisor routes before execution.
 Blocked routes return a native recovery action before reviewers start.
-Discovery, rechecks, and blocked starts include a setup panel for the current agent session.
+Ennodia says nothing about its own status unless an agent you asked for is blocked.
+Rechecks, setup, and blocked starts include a setup panel with the exact fix.
 
-Use `ennodia_setup` for native route and action controls.
-Supported clients show form choices for recovery guidance, native status recheck, and model verification.
-Other clients receive the Markdown panel. Dismissing a form performs no recovery action.
+Your agent calls `ennodia_setup` to show each agent's status and fix in your current session.
+Hosts that render MCP Apps, such as Claude Desktop and Visual Studio Code, can show it as a card with check buttons.
+Other hosts, such as Codex and Claude Code, show the Markdown panel.
 
 Run that action in an interactive terminal, then call `ennodia_check_harnesses` with the same harness and model and `refresh: true, verify: true`.
 Run receipts keep missing reviewer coverage visible, including in compact responses.
@@ -149,7 +155,7 @@ Supported harness upgrades run once per day on use while Ennodia has no active t
 Set `ENNODIA_AUTO_UPDATE=false` to disable them.
 Use `ennodia_check_harnesses` with `upgrade: true` to update and recheck immediately.
 
-Ennodia also checks its own installation automatically. MCP startup instructions and run results report the loaded code location, version, runtime, and installation scope. The report checks required files, bundled skills, and storage access. The recheck tool refreshes this report.
+Ennodia also checks its own installation automatically. Run results report the loaded code location, version, runtime, and installation scope. The report checks required files, bundled skills, and storage access. The recheck tool refreshes this report. MCP startup instructions carry only installation problems.
 
-Present installation limitations before reviews. Cache installs can change on a future unpinned launch. These local checks do not verify the latest registry version or provider access.
+Mention installation limitations when they affect the request. Cache installs can change on a future unpinned launch. These local checks do not verify the latest registry version or provider access.
 See [recovery and updates](https://ennodia.cherninlab.com/docs/reference/supported-harnesses/#recovery-and-updates).

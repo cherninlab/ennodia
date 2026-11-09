@@ -1,7 +1,7 @@
 {
   "manifest_version": "0.2",
   "name": "ennodia",
-  "version": "0.5.0-rc.1",
+  "version": "0.5.0",
   "description": "Connects the AI agents you use: your agent hands a task to another and gets the answer back",
   "author": {
     "name": "Cherninlab"
@@ -24,7 +24,7 @@
     {
       "name": "ennodia_list_harnesses",
       "title": "List Ennodia harnesses",
-      "description": "Discover supported harness entries, installation status and cached readiness/recovery actions. Unverified means unchecked, not failed; ennodia_run verifies selected routes automatically. Report blockers with their specific recovery actions. Read inputGuidance before media work.",
+      "description": "Discover supported agents and cached readiness for routing. Do not summarize it for the user; for setup or status requests call ennodia_setup. Read inputGuidance before media work.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -46,35 +46,15 @@
     },
     {
       "name": "ennodia_setup",
-      "title": "Open Ennodia setup",
-      "description": "Open native route/action choices in this harness session, with Markdown fallback. Show recovery steps, recheck native status, or verify model access only when selected (uses provider capacity). Never installs, upgrades, signs in, changes credentials, or starts reviewers.",
+      "title": "Show Ennodia setup",
+      "description": "Show the user Ennodia's agents: each agent's status and the exact fix for blocked ones. Refreshes native sign-in status without model requests. Hosts that render MCP Apps show a card with check buttons; others get a Markdown panel to show the user.",
       "inputSchema": {
         "type": "object",
-        "properties": {
-          "harnessIds": {
-            "description": "Limit choices to these harnesses. Pass one to open its action form directly.",
-            "minItems": 1,
-            "type": "array",
-            "items": {
-              "type": "string",
-              "minLength": 1
-            }
-          },
-          "model": {
-            "description": "Exact model to retain during the selected recheck or verification.",
-            "type": "string",
-            "minLength": 1
-          },
-          "cwd": {
-            "description": "Workspace identity for readiness evidence.",
-            "type": "string"
-          }
-        },
-        "$schema": "http://json-schema.org/draft-07/schema#"
+        "properties": {}
       },
       "annotations": {
         "readOnlyHint": true,
-        "openWorldHint": true
+        "openWorldHint": false
       },
       "execution": {
         "taskSupport": "forbidden"
@@ -188,7 +168,7 @@
           "prompt": {
             "type": "string",
             "minLength": 1,
-            "description": "The user task to route to local AI harnesses. For native media, first read ennodia_list_harnesses inputGuidance, specify local paths and a harness/model, then verify one small sample with mode single and compare false. Ennodia sends text, not media attachments."
+            "description": "The user task to route to local AI harnesses. Include relevant Keep in mind constraints, evidence, and unresolved assumptions in this prompt. For native media, first read ennodia_list_harnesses inputGuidance, specify local paths and a harness/model, then verify one small sample with mode single and compare false. Ennodia sends text, not media attachments."
           },
           "category": {
             "type": "string",
@@ -381,7 +361,7 @@
     {
       "name": "ennodia_get_run",
       "title": "Get Ennodia run",
-      "description": "Inspect a run or wait up to waitMs for completion. Prefer waitMs: 30000, compact: true and includeEvents: false while awaiting results. A nonterminal response means work continues; do not claim its findings were consumed.",
+      "description": "Inspect a run or wait up to waitMs for completion, including task-specific keepInMind notes when Compare returns them. Prefer waitMs: 30000, compact: true and includeEvents: false while awaiting results. A nonterminal response means work continues; do not claim its findings were consumed.",
       "inputSchema": {
         "type": "object",
         "properties": {

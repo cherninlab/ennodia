@@ -6,7 +6,7 @@ import {
   type BudgetCheck,
   type BudgetLimits,
 } from "./budget";
-import { MAX_PROMPT_CANDIDATE_CHARS, type CompareManager, type CompareView } from "./compare";
+import { MAX_PROMPT_CANDIDATE_CHARS, type CompareManager, type CompareView, type KeepInMindNote } from "./compare";
 import { diagnoseTasks, type TaskDiagnosis } from "./diagnosis";
 import { HarnessReadinessError, harnessAttention, nativeReadinessFailure, type HarnessAttention, type PreflightReport, type HarnessReadiness, type ReadinessState } from "./readiness";
 import type {
@@ -131,6 +131,8 @@ export type RunView = {
   etaConfidence: "timeout-budget" | "unknown" | "complete";
   finalAnswer?: string;
   finalAnswerChars: number;
+  /** Recipient context from Compare, kept separate from answer artifacts. */
+  keepInMind?: KeepInMindNote[];
   error?: string;
   diagnosis?: TaskDiagnosis;
   failedTaskDiagnosis?: TaskDiagnosis;
@@ -201,6 +203,7 @@ type InternalRun = {
   taskIds: string[];
   compareId?: string;
   finalAnswer?: string;
+  keepInMind?: KeepInMindNote[];
   error?: string;
   diagnosis?: TaskDiagnosis;
   failedTaskDiagnosis?: TaskDiagnosis;
@@ -590,6 +593,9 @@ export class RunManager {
       ? `${advice}\n\nChosen answer from ${chosen.label ?? chosen.id}, unchanged:\n\n${chosen.content}`
       : advice;
     if (result.status === "succeeded" && finalAnswer) {
+      if (result.advisor?.keepInMind?.length) {
+        run.keepInMind = result.advisor.keepInMind;
+      }
       this.pushEvent(run, {
         type: "compare-succeeded",
         compareId: compare.id,
@@ -689,6 +695,7 @@ export class RunManager {
       etaConfidence: eta.etaConfidence,
       finalAnswer: finalAnswer ? truncate(finalAnswer, maxAnswerChars) : undefined,
       finalAnswerChars: finalAnswer?.length ?? 0,
+      keepInMind: run.keepInMind,
       error: run.error,
       diagnosis: run.diagnosis,
       failedTaskDiagnosis: run.failedTaskDiagnosis,

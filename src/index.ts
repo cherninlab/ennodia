@@ -146,6 +146,7 @@ export {
   parseJudgeAnalysis,
   type CompareAnalysis,
   type AdvisorResult,
+  type KeepInMindNote,
   type CompareCandidate,
   type CompareCandidateInput,
   type CompareEvent,

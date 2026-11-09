@@ -9,7 +9,8 @@ Future items are proposals, not available behavior or release dates.
 | Stage | User outcome | Product work |
 | --- | --- | --- |
 | Current | Try another agent or skill from the same conversation. | Discovery, focused tasks, explicit choices, optional team advice, Compare, and local history. |
-| Next release candidate | Trust the reported outcome and recover from failed attempts. | Process cleanup, valid comparison evidence, safer local server requests, clearer errors, and task-based guides. |
+| 0.5.0 release candidate | Find setup problems before work starts and retain useful advice. | Harness readiness, recovery, installation checks, and attributed result notes. |
+| Mobile foundation | Start using Ennodia on Android and iOS. | Flutter app, permitted discovery, setup journal, cancellation, and verified undo. Assistant connections are not available yet. |
 | Next | Avoid repeating unsuccessful attempts. | Local outcome notes with task, model, version, skill, and relevant conditions. |
 | Later | Spend less time inspecting tool configuration. | Supported version and capability checks, clearer execution settings, and useful progress checkpoints. |
 | Later | Get useful suggestions for the next attempt. | Recommendations grounded in recorded outcomes, with reasons and uncertainty. |
@@ -21,3 +22,6 @@ Recorded outcomes need a way to inspect, correct, and delete them.
 
 The [measurement plan](/docs/evidence/measurement/) covers task correctness, time, resources, and human work.
 General savings claims will need comparative evidence.
+
+Ennodia Mobile has a separate development version. The implementation and device
+validation plan live in `apps/mobile/README.md` in the repository.

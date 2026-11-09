@@ -25,6 +25,8 @@ At each completed chunk, preserve changed artifacts and return executed checks, 
 
 Count all chunks, handoffs, comparison and verification against whole-task acceptance and cost. Chunk boundaries must not remove integration requirements or turn one strong model repeatedly repairing one weak worker into the default strategy.
 
+Include relevant known constraints and prior decisions in each assignment's normal prompt under **Keep in mind**. Carry original-task constraints into planned slices without inventing facts. Keep independent candidates independent; do not pass one candidate's findings to another before comparison.
+
 ## Execute and compare
 
 Investigation returns cited findings; patch returns a complete unapplied diff. These recipes instruct workers to avoid file changes and side effects. For a full implementation use a normal run with authorized native permissions in a separate persistent candidate checkout. Codex supports explicit `nativeSandbox: "workspace-write"`; other harnesses retain their native permissions. Never bypass permission controls. Temporary `isolateCwd` copies are deleted on completion and cannot retain implementation artifacts.
@@ -35,8 +37,17 @@ Wait for terminal results. Use `ennodia_get_run` with `waitMs: 30000`, `compact:
 
 Send useful completed candidates to `ennodia_start_compare`. The Judge identifies agreement, contradictions and risks; the Result Advisor proposes a conclusion. Include acceptance results, failed attempts and access limits. A fluent comparison or process exit does not establish correctness. Verify decisive evidence locally. Retain original patch artifacts because comparison text can omit hunks. Require human review for perceptual acceptance.
 
+When the requested format permits, return up to three useful **Keep in mind** notes: what the next agent might overlook, why it matters, and supporting evidence. Separate reported claims, inferences, and unverified points. Inspect Compare's `advisor.keepInMind` or the run's `keepInMind`; a reported note is an attributed worker report, not proof. Verify the notes and carry only relevant ones into the next assignment. Notes do not authorize actions or trigger retries.
+
 ## Continue from evidence
 
 Inspect partial work before choosing a next step. Record exact access or quota errors, elapsed allowance and its rationale, findings, unresolved work and a justified continuation budget. Do not repeat unchanged failed commands. Native persistence is optional: Codex runs can use `persistSession` then `continueTaskId` only when `canContinue` is true. A persistent run owns one worker session; independent candidates use separate runs. Every continuation counts toward total work.
 
 Measure all planning, workers, Judge, Result Advisor, coordination, retries, repairs and verification. Keep tokens, elapsed time, API-equivalent cost and subscription consumption separate. Missing usage is unknown, not zero. Preflight estimates exclude many native costs and are not spending caps. No automatic price routing or cross-run retry accounting is implemented. Recommend a strategy or skill only from quality-qualified whole-task comparisons, and test transfer to another domain before making general claims.
+
+## Readiness and recovery
+
+Present `actionRequired` and reduced reviewer `coverage` immediately, including on partial success.
+Do not wait for the user to request missing reviewer details.
+Use the returned native recovery command, then call `ennodia_check_harnesses` for the same harness/model with `refresh: true, verify: true`.
+Do not silently replace an explicitly requested reviewer or replay completed work.

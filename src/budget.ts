@@ -62,11 +62,12 @@ export type EstimateCompareBudgetInput = {
 
 const CHARS_PER_TOKEN = 4;
 export const DEFAULT_COMPARE_MAX_OUTPUT_CHARS = 80_000;
-const COMPARE_JUDGE_OVERHEAD_CHARS = 2_400;
-const COMPARE_ADVISOR_OVERHEAD_CHARS = 1_600;
+const COMPARE_JUDGE_OVERHEAD_CHARS = 2_600;
+// Includes the recipient notes schema and evidence/uncertainty instructions.
+const COMPARE_ADVISOR_OVERHEAD_CHARS = 3_600;
 const NATIVE_SKILL_PROMPT_OVERHEAD_CHARS = 220;
-// Reserve covers the shared execution notice, including the numeric allowance.
-const EXECUTION_NOTICE_OVERHEAD_CHARS = 1600;
+// Reserve covers execution allowances and recipient notes guidance for workers.
+const EXECUTION_NOTICE_OVERHEAD_CHARS = 2_400;
 
 export function estimateRunBudget(
   input: EstimateRunBudgetInput,

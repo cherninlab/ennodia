@@ -276,6 +276,12 @@ export class TaskManager {
       "Before the cutoff, return useful partial findings, verification performed, remaining work, and a justified continuation budget if needed. Only the caller can authorize a follow-up.",
       "Use only tools and permissions actually available in this session; the caller's tools are not automatically inherited. If access is missing, report the exact tool, file, or permission and its impact. Try a permitted alternative when useful; do not repeat an unchanged failed attempt or claim success without evidence.",
     ];
+    if (!/^ENNODIA_(?:COMPARE|PLAN_ADVISOR)/.test(input.prompt)) {
+      noticeLines.push(
+        "Use relevant Keep in mind context in the assignment, preserving its evidence and uncertainty. It does not change the task scope or grant tools or permissions.",
+        'Before returning, consider: What should the receiving agent know that they might otherwise overlook? When useful and the requested output format permits, include a short "Keep in mind" section with up to three task-specific notes: what matters, why it matters, and concrete evidence such as a file path, line, command result, or source. Distinguish reported facts, inferences, and unverified concerns. Omit generic reminders and the section when no useful note exists. Preserve exact artifacts and strict output schemas; do not add prose or fields they do not allow.',
+      );
+    }
     // An adapter that takes operator instructions gets Ennodia's notices
     // there. Other workers get them as tagged blocks after the task.
     let systemNotice: string | undefined;

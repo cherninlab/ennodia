@@ -111,14 +111,15 @@ describe("Ennodia installation evidence", () => {
     expect(inspectInstallation({ temporaryDirectory: join(dir, "missing-temp") }).checks.find(c => c.id === "temporary-storage")?.status).toBe("fail");
   });
 
-  it("automatically exposes installation evidence in MCP initialization and refreshes it without provider calls", async () => {
+  it("sends only installation problems at MCP initialization and the full report on recheck, without provider calls", async () => {
     const core = createDefaultEnnodiaCore({ discoverHarnesses: async () => [] });
     const server = createEnnodiaServer(core); const client = new Client({ name: "installation-test", version: "1" });
     const [ct, st] = InMemoryTransport.createLinkedPair();
     try {
       await server.connect(st); await client.connect(ct);
-      expect(client.getInstructions()).toContain("installation limitations");
-      expect(client.getInstructions()).toContain('"scope":"source-checkout"');
+      // This core runs without harness maintenance, which is a limitation.
+      expect(client.getInstructions()).toContain("Installation notes, to mention only when they affect the request: Automatic harness upgrades are disabled.");
+      expect(client.getInstructions()).not.toContain('"scope"');
       const reply = await client.callTool({ name: "ennodia_check_harnesses", arguments: {} });
       const text = reply.content as { type: "text"; text: string }[];
       expect(JSON.parse(text[0]!.text)).toMatchObject({ harnesses: [], actionRequired: [], installation: { scope: "source-checkout", version: ENNODIA_VERSION } });

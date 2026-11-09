@@ -289,6 +289,9 @@ describe("Plan Advisor", () => {
     expect(prompt).toContain("Review this repository.");
     expect(prompt).toContain("Do not include cwd, env, argv");
     expect(prompt).toContain('"task": "Review this repository."');
+    expect(prompt).toContain('each slice.prompt as a short "Keep in mind" section');
+    expect(prompt).toContain("Preserve supplied evidence and uncertainty");
+    expect(prompt).toContain("independent candidates");
   });
 });
 

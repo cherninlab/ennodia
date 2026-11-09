@@ -122,6 +122,12 @@ the root install. `bun run release:check` enforces these rules.
 The workflow passes it to npm as `NODE_AUTH_TOKEN`. JSR uses GitHub Actions
 OpenID Connect (OIDC) without a JSR token.
 
+Both npm packages publish with `--provenance` from the GitHub-hosted runner.
+The existing `id-token: write` permission lets npm attach a signed record of
+the source and build. This requires a public repository matching each
+package's `repository.url`. Previously published versions keep their
+original metadata. Provenance takes effect on the next new version.
+
 Link scope `@cherninlab`, package `ennodia`, to
 `cherninlab/ennodia` in JSR package settings. The workflow's `id-token: write`
 permission enables that authentication. To reconfigure npm, ensure the token

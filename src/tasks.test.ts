@@ -4,6 +4,7 @@ import {
   mkdtempSync,
   symlinkSync,
   readFileSync,
+  realpathSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -49,6 +50,9 @@ describe("TaskManager", () => {
     expect(result.stdout).toContain("Check actual UTC time");
     expect(result.stdout).toContain("remaining work, and a justified continuation budget");
     expect(result.stdout).toContain("not automatically inherited");
+    expect(result.stdout).toContain('"Keep in mind" section');
+    expect(result.stdout).toContain("Distinguish reported facts, inferences, and unverified concerns");
+    expect(result.stdout).toContain("Preserve exact artifacts and strict output schemas");
     expect(result.stderr).toBe("stderr:trace\n");
     expect(result.stdoutChars).toBe(result.stdout.length);
     expect(result.stderrChars).toBe(result.stderr.length);
@@ -118,6 +122,8 @@ describe("TaskManager", () => {
           expect(result.stdout).toStartWith(`${prompt}\n\n<ennodia-execution-notice>`);
           expect(events).toHaveLength(0);
         }
+        expect(result.stdout.includes('"Keep in mind" section'))
+          .toBe(!prompt.startsWith("ENNODIA_"));
       }
     } finally {
       await manager.shutdown();
@@ -296,6 +302,8 @@ describe("TaskManager", () => {
     expect(notice).toStartWith("notice:Ennodia, the local tool that started this session");
     expect(notice).toContain("5000 ms from task launch (caller supplied)");
     expect(notice).toContain("When the task needs native media inspection:");
+    expect(notice).toContain('"Keep in mind" section');
+    expect(notice).toContain("does not change the task scope or grant tools or permissions");
     expect(result.command).toContain("<ennodia-notice>");
     expect(result.command.join(" ")).not.toContain("Execution allowance");
     expect(result.events.map((event) => event.type)).toContain("input-guidance");
@@ -912,32 +920,39 @@ describe("TaskManager", () => {
   });
 
   it("isolates the process cwd when cwd is omitted", async () => {
-    const manager = new TaskManager();
-    let isolatedCwd: string | undefined;
-
+    // Exercise an omitted cwd in a separate process so unrelated ignored
+    // checkout artifacts and symlinks cannot contaminate this fixture.
+    const dir = mkdtempSync(join(tmpdir(), "ennodia-default-cwd-test-"));
+    writeFileSync(join(dir, "source.txt"), "fixture source");
+    const script = `
+      import { TaskManager } from ${JSON.stringify(join(import.meta.dir, "tasks.ts"))};
+      import { readFileSync } from "node:fs";
+      import { join } from "node:path";
+      const manager = new TaskManager();
+      const adapter = { id: "fixture", name: "Fixture", kind: "cli", commandCandidates: [], capabilities: [],
+        buildCommand: (path, input) => ({command: path, args: ["-e", "console.log(process.argv[1])", input.prompt], cwd: input.cwd}) };
+      const discovery = {...adapter, available: true, runnable: true, commandPath: process.execPath, notes: []};
+      try {
+        const {task} = manager.start(adapter, discovery, {prompt: "default cwd", isolateCwd: true, timeoutMs: 5000});
+        const copied = readFileSync(join(task.cwd, "source.txt"), "utf8");
+        const result = await manager.waitForTerminal(task.id, 5000);
+        console.log(JSON.stringify({task, copied, result}));
+      } finally { await manager.shutdown(); }
+    `;
     try {
-      const { task } = manager.start(writeMarkerAdapter, echoDiscovery, {
-        prompt: "default cwd",
-        isolateCwd: true,
-        timeoutMs: 5_000,
-      });
-      isolatedCwd = task.cwd;
-
-      expect(task.cwd).not.toBe(process.cwd());
-      expect(task.isolatedFrom).toBe(process.cwd());
-
-      const result = await waitForTask(manager, task.id);
-
+      const child = Bun.spawn([process.execPath, "-e", script], {cwd: dir, stdout: "pipe", stderr: "pipe"});
+      const [stdout, stderr, exit] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited]);
+      expect(stderr).toBe("");
+      expect(exit).toBe(0);
+      const {task, copied, result} = JSON.parse(stdout);
+      expect(task.cwd).not.toBe(dir);
+      expect(task.isolatedFrom).toBe(realpathSync(dir));
+      expect(copied).toBe("fixture source");
       expect(result.status).toBe("succeeded");
       expect(result.stdout).toStartWith("default cwd\n\n<ennodia-execution-notice>");
-      expect(result.isolatedFrom).toBe(process.cwd());
+      expect(result.isolatedFrom).toBe(realpathSync(dir));
       expect(existsSync(result.cwd)).toBe(false);
-    } finally {
-      await manager.shutdown();
-      if (isolatedCwd) {
-        rmSync(isolatedCwd, { recursive: true, force: true });
-      }
-    }
+    } finally { rmSync(dir, {recursive: true, force: true}); }
   });
 
   it("captures a clean final message from an adapter-written file, separate from raw stdout", async () => {

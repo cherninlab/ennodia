@@ -50,8 +50,9 @@ This setting approves Ennodia runs only. Codex's sandbox and its other tools kee
 
 | Goal | Tool sequence | Tool set |
 | --- | --- | --- |
-| Open native setup controls | `ennodia_setup` | core |
-| Check local setup | `ennodia_list_harnesses` | core |
+| Show agent status and fixes in this session | `ennodia_setup` | core |
+| Recheck an agent after a fix | `ennodia_check_harnesses` | core |
+| List agents for routing | `ennodia_list_harnesses` | core |
 | Start a visible end-to-end run | `ennodia_run` -> `ennodia_get_run` | core |
 | Inspect terminal receipts after restart | `ennodia_history` | core |
 | Preview route and cost | `ennodia_estimate_budget` | full |
@@ -173,6 +174,9 @@ Version probes have bounded deadlines. A failed probe appears in adapter notes w
 | --- | --- | --- |
 | `refresh` | `false` | Ignore the short discovery cache and re-scan. |
 
+The result is JSON only. Agents call this tool for routing, so it carries no setup panel.
+Use `ennodia_setup` to show the user each agent's status and fix.
+
 Use this first when a client setup, command path, or adapter is not behaving as
 expected.
 
@@ -239,6 +243,8 @@ arguments, permissions, isolation, timeouts, retries, or budgets.
 Harness inventory entries preserve optional `inputGuidance: string[]` from discovery.
 Plan Advisor treats this bounded guidance as observations, not proof of native media support.
 Slices execute concurrently. For unverified native access, its instructions request a probe-only plan, followed by a new plan after the probe.
+Plan Advisor also asks each slice prompt to carry relevant constraints and prior decisions from the original task under **Keep in mind**.
+This guidance does not pass one independent candidate's findings to another.
 
 The lifecycle is deliberately two-phase: request and inspect advice first, then
 launch the exact validated plan in a separate call. Ennodia rejects invalid
@@ -419,6 +425,12 @@ comparison ID when one exists, events, timing, ETA, and budget estimate/check.
 It also returns the final answer when available. The important value is `id`.
 Poll it with
 `ennodia_get_run`.
+
+Include relevant constraints and prior decisions under **Keep in mind** in the normal `prompt`.
+There is no separate input field.
+Workers are asked to return up to three useful notes with reasons and evidence when the requested answer format permits.
+For compared runs, nonempty Result Advisor notes appear in `keepInMind`, separate from `finalAnswer`.
+Normal and compact run views preserve this field.
 
 ### `ennodia_get_run`
 
@@ -616,6 +628,23 @@ blind spots, and risks. The Result Advisor uses that analysis plus the original
 candidates to return a typed answer, basis, confidence, and open questions.
 This is model-led comparison, not formal voting.
 
+The Result Advisor also returns `keepInMind`: up to three task-specific notes that the receiving agent could overlook.
+The field defaults to `[]` when omitted or when no useful notes are available.
+Each note has these fields:
+
+| Field | Meaning |
+| --- | --- |
+| `note` | Constraint, connection, assumption, or gap to carry forward (at most 1000 characters). |
+| `whyItMatters` | Effect on the task or next decision (at most 1000 characters). |
+| `evidence` | Supporting observation or explicit evidence gap (at most 2000 characters). |
+| `sourceIds` | Up to 64 listed candidate IDs supporting the note. A `reported` note requires a source. Use `[]` for inferred or unverified missing coverage. |
+| `status` | `reported` for an attributed candidate report, `inferred` for a conclusion from available answers, or `unverified` for a point that needs evidence. |
+
+A `reported` note is not independent proof.
+Invalid optional notes are omitted with an `advisor-notes-ignored` event. The valid answer and candidate choice are preserved.
+The primary agent verifies notes and carries only relevant ones into later prompts.
+These notes do not change permissions, start another run, or create memory across runs.
+
 When one candidate fully answers the prompt as it stands, such as a complete
 file, the Result Advisor names it in `chosenSourceId`. A caller can then use
 that candidate's own text, not a rewrite. `ennodia_run` does this for you: its
@@ -772,37 +801,34 @@ Count these stages, retries and verification when reporting whole-task cost.
 
 ### `ennodia_setup`
 
-Open native setup controls through MCP form elicitation.
-The client must advertise form support. Other clients receive the Markdown panel with `setup.presentation: "markdown"` and `setup.action: "unsupported"`.
-Use an interactive harness for this flow. Headless clients can decline forms without displaying controls.
+Show the user each agent's status and the exact fix for blocked agents.
+The tool takes no input. It refreshes native sign-in status without a model request.
+It declares `readOnlyHint`, so clients such as Codex run it without an approval prompt.
 
-The tested Codex session declined forms under its `never` approval policy. A session with `on-request` forwarded the native form choices.
-A native result records the form protocol. It does not prove the host displayed controls or a person clicked them.
+The result has the same JSON shape as `ennodia_check_harnesses`, plus the `ennodia://setup` panel.
+Hosts that render MCP Apps show the [setup card](#setup-card) in place of the panel.
+Sign-in and credential changes stay in each agent's own CLI.
 
-Select a route, then choose recovery guidance, native status recheck, or model verification.
-The tool executes the chosen recheck for that route and model. Native status rechecks use no model request.
-Verification uses provider capacity. The form offers no credential fields or automatic installation commands.
+#### Setup card
 
-Sign-in and credential changes stay in the native tool.
-Pass one `harnessIds` entry to open its action form directly.
-The tool retains `model` and `cwd` during the selected recheck, uses fresh status, and disables upgrades.
-Decline and cancel return without executing a recheck. Unknown form values are rejected before maintenance starts.
+`ennodia_setup` and `ennodia_check_harnesses` name the `ui://ennodia/setup.html` resource in `_meta.ui.resourceUri`.
+The resource uses the MCP Apps type `text/html;profile=mcp-app`.
+Hosts that render MCP Apps show the card inside the conversation. Other hosts ignore it and keep the Markdown panel.
 
-The tool declares `readOnlyHint` because it never installs software or changes credentials or workspace files.
-It declares `openWorldHint` because the selected verification can query a provider.
-Software upgrades remain in `ennodia_check_harnesses`, which does not declare `readOnlyHint`.
-Forms allow five minutes for each selection. Configure the client's tool timeout to allow for user interaction.
-For Codex MCP configuration, `tool_timeout_sec = 600` gives the setup flow time for both selections.
+The card lists agents that need the user first, with the next step for each.
+A login blocker shows its sign-in command with a copy button.
+Each check button calls `ennodia_check_harnesses` for that agent and model with `verify: true`.
+A check sends at most one small model request.
+When an agent becomes ready, the card can send a short note to the chat.
 
-```json
-{"harnessIds":["codex"]}
-```
+The card loads no external code and makes no network requests.
+It never collects credentials.
 
 ### `ennodia_check_harnesses`
 
 `ennodia_check_harnesses` is part of the default tool set.
 
-The result includes `installation`, a local self-check of Ennodia's loaded code root, version, installation scope, Bun runtime, core files, bundled skills, and storage access. MCP initialization also sends this report to the host. `ennodia_run` and `ennodia_get_run` include it even in compact results. Present its limitations before reviews.
+The result includes `installation`, a local self-check of Ennodia's loaded code root, version, installation scope, Bun runtime, core files, bundled skills, and storage access. MCP initialization sends only its problems to the host, and a healthy installation adds nothing. `ennodia_run` and `ennodia_get_run` include the full report even in compact results. Mention its limitations when they affect the request.
 
 `refresh: true` refreshes installation evidence as well as harness readiness. Scope remains `unknown` when filesystem evidence is insufficient. The report does not verify registry freshness, provider access, disk capacity, or future writes.
 
@@ -812,13 +838,12 @@ Native status checks are the default. `verify: true` makes a bounded real model 
 `unverified` means unchecked. `ennodia_run` verifies its selected routes automatically.
 Use targeted `harnessIds` for recovery checks. Unrelated blockers do not prevent work on usable requested routes.
 
-Discovery, rechecks, and blocked preflight responses include an embedded `ennodia://setup` resource with `text/markdown` content.
+Rechecks, `ennodia_setup`, and blocked preflight responses include an embedded `ennodia://setup` resource with `text/markdown` content.
 The JSON text response keeps its existing shape.
-Render the resource inside the current harness session with native interface controls when available, or a Markdown card.
-Show route access, the next recovery step, and the targeted recheck action. A generic health summary does not complete setup.
 
-The panel includes native sign-in commands only for login blockers. Key expiry and quota blockers retain their specific recovery instructions.
-Use native tools for credentials. Recheck the same harness and model after recovery, then resume the original task.
+The panel is a table of agents, with agents that need the user first. Each row gives the status in plain words and the next step.
+Sign-in commands follow the table, for login blockers only. Key expiry and quota blockers name their own recovery.
+Show the panel when the host displays no setup card. Recheck the same harness and model after recovery, then resume the original task.
 
 `upgrade: true` runs supported updaters before rediscovery and recheck.
 This tool can change installed software and call providers, so it does not declare `readOnlyHint`.

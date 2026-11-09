@@ -1,6 +1,6 @@
 {
   "name": "ennodia",
-  "version": "0.5.0-rc.1",
+  "version": "0.5.0",
   "mcpName": "io.github.cherninlab/ennodia",
   "description": "Connects the AI agents you use: your agent hands a task to another and gets the answer back",
   "license": "MIT",
@@ -50,6 +50,7 @@
     "src/priority.ts",
     "src/runs.ts",
     "src/server.ts",
+    "src/setup-app.ts",
     "src/skills.ts",
     "src/tasks.ts",
     "src/version.ts",
@@ -93,7 +94,8 @@
     "website:dev": "bun run --cwd website dev",
     "website:build": "bun run --cwd website build",
     "website:deploy": "bun run --cwd website deploy",
-    "verify": "bun run check && bun run lint && bun run test && bun run website:build && bun run controlled-english:check && bun run task:smoke && bun run mcp:smoke && bun run io:smoke"
+    "verify": "bun run check && bun run lint && bun run test && bun run website:build && bun run controlled-english:check && bun run task:smoke && bun run mcp:smoke && bun run io:smoke",
+    "mobile:verify": "cd apps/mobile && flutter analyze && flutter test"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",

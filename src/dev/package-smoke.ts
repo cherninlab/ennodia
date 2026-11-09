@@ -190,6 +190,7 @@ function assertPackedFiles(paths: string[]): void {
     "src/priority.ts",
     "src/runs.ts",
     "src/server.ts",
+    "src/setup-app.ts",
     "src/skills.ts",
     "src/tasks.ts",
     "src/version.ts",

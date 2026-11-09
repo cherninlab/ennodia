@@ -3,7 +3,8 @@ import { StdioClientTransport, getDefaultEnvironment } from "@modelcontextprotoc
 import { describe, expect, it } from "bun:test";
 import { ENNODIA_VERSION } from "./version";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { CORE_TOOL_NAMES, createEnnodiaServer, type EnnodiaServerOptions, type ToolSet } from "./server";
+import { CORE_TOOL_NAMES, createEnnodiaServer, serverInstructions, type EnnodiaServerOptions, type ToolSet } from "./server";
+import { HARNESS_GUIDE_URL, MCP_APPS_EXTENSION, MCP_APP_MIME_TYPE, SETUP_APP_HTML, SETUP_APP_URI } from "./setup-app";
 import type { EnnodiaCore } from "./core";
 import type { HarnessDiscovery } from "./harnesses";
 import { HarnessReadinessError, type HarnessReadiness } from "./readiness";
@@ -11,59 +12,7 @@ import { inspectInstallation } from "./installation";
 import { ElicitRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 
 describe("MCP server tool surface", () => {
-  it.each(["recheck", "verify"])("executes only the native setup %s selected for the exact route", async action => {
-    const harnesses = ["codex", "claude-code"].map(id => ({ id, name: id, kind: "cli", available: true, runnable: true, capabilities: [], notes: [] } satisfies HarnessDiscovery));
-    const checks: unknown[] = [];
-    const core = { listHarnesses: async () => harnesses, checkHarnesses: async (input: unknown) => {
-      checks.push(input); return { installation: inspectInstallation(), harnesses: [harnesses[1]], actionRequired: [] };
-    } } as unknown as EnnodiaCore;
-    const server = createEnnodiaServer(core);
-    const client = new Client({ name: "native-setup-test", version: "1" }, { capabilities: { elicitation: { form: {} } } });
-    const forms: unknown[] = [];
-    client.setRequestHandler(ElicitRequestSchema, async request => {
-      forms.push(request.params);
-      return { action: "accept", content: forms.length === 1 ? { harnessId: "claude-code" } : { action } };
-    });
-    const [ct, st] = InMemoryTransport.createLinkedPair();
-    await server.connect(st); await client.connect(ct);
-    try {
-      const result = await client.callTool({ name: "ennodia_setup", arguments: { model: "opus", cwd: "/workspace" } });
-      expect(result.isError).toBeUndefined();
-      expect(forms).toHaveLength(2);
-      expect(JSON.stringify(forms)).toContain("uses provider capacity");
-      expect(checks).toEqual([{ harnessIds: ["claude-code"], model: "opus", cwd: "/workspace", refresh: true, verify: action === "verify", upgrade: false }]);
-      expect(JSON.parse(resultText(result)).setup).toEqual({ presentation: "native", action, harnessId: "claude-code" });
-      expect(setupPanel(result)).toContain("Ennodia setup");
-    } finally { await client.close(); await server.close(); }
-  });
-
-  it.each(["unsupported", "cancel", "decline", "recovery", "invalid"])("never starts maintenance for native setup %s", async action => {
-    let checks = 0, forms = 0;
-    const harnesses = [{ id: "codex", name: "Codex", kind: "cli", available: true, runnable: true, capabilities: [], notes: [] } satisfies HarnessDiscovery];
-    const core = { listHarnesses: async () => harnesses, checkHarnesses: async () => { checks += 1; throw new Error("Unexpected check"); } } as unknown as EnnodiaCore;
-    const server = createEnnodiaServer(core);
-    const client = new Client({ name: "setup-cancel-test", version: "1" }, { capabilities: action === "unsupported" ? {} : { elicitation: { form: {} } } });
-    if (action !== "unsupported") client.setRequestHandler(ElicitRequestSchema, async () => {
-      forms += 1;
-      if (action === "cancel" || action === "decline") return { action };
-      return { action: "accept", content: { action: action === "invalid" ? "untrusted-action" : action } };
-    });
-    const [ct, st] = InMemoryTransport.createLinkedPair();
-    await server.connect(st); await client.connect(ct);
-    try {
-      const result = await client.callTool({ name: "ennodia_setup", arguments: { harnessIds: ["codex"], model: "exact-model" } });
-      expect(checks).toBe(0);
-      expect(forms).toBe(action === "unsupported" ? 0 : 1);
-      if (action === "invalid") expect(result.isError).toBe(true);
-      else {
-        expect(JSON.parse(resultText(result)).setup).toEqual({ presentation: action === "unsupported" ? "markdown" : "native", action });
-        expect(setupPanel(result)).toContain("Ennodia setup");
-        expect(setupPanel(result)).toContain('"model":"exact-model"');
-      }
-    } finally { await client.close(); await server.close(); }
-  });
-
-  it("returns a session setup panel without changing the discovery JSON contract", async () => {
+  it("keeps discovery quiet and puts the setup panel on rechecks", async () => {
     const route = (id: string, state: HarnessReadiness["state"], model?: string): HarnessDiscovery => ({
       id, name: id, kind: "cli", available: true, runnable: true, capabilities: [], notes: [],
       readiness: { state, model, checkedAt: "2026-11-08T00:00:00Z", message: `Native ${state}`,
@@ -78,25 +27,81 @@ describe("MCP server tool surface", () => {
     const [ct, st] = InMemoryTransport.createLinkedPair();
     await server.connect(st); await client.connect(ct);
     try {
-      expect(client.getInstructions()).toContain("inside the current harness session");
-      expect(client.getInstructions()).toContain("Do not stop at a generic healthy/unverified status summary");
-      const result = await client.callTool({ name: "ennodia_list_harnesses", arguments: {} });
-      expect(JSON.parse(resultText(result))).toEqual(harnesses);
-      const panel = setupPanel(result);
-      expect(panel).toContain("| claude-code (claude-code / opus) | login-required |");
-      expect(panel).toContain("'/Applications/Claude'\\''s CLI/claude' auth login");
-      expect(panel).toContain('"harnessIds":["claude-code"],"model":"opus","refresh":true,"verify":true');
-      expect(panel).toContain("Choose this route for your task, or verify it now.");
-      expect(panel).toContain("CLI unavailable");
+      const instructions = client.getInstructions() ?? "";
+      expect(instructions).toContain("Do not open with Ennodia's status");
+      expect(instructions).toContain("Installation notes, to mention only when they affect the request: History storage is unavailable.");
+      expect(instructions).not.toContain("codeRoot");
+      const listed = await client.callTool({ name: "ennodia_list_harnesses", arguments: {} });
+      expect(JSON.parse(resultText(listed))).toEqual(harnesses);
+      expect((listed as { content: unknown[] }).content).toHaveLength(1);
+      const checked = await client.callTool({ name: "ennodia_check_harnesses", arguments: {} });
+      expect(JSON.parse(resultText(checked)).harnesses).toEqual(harnesses);
+      const panel = setupPanel(checked);
+      // Agents that need the user come first, unavailable ones last.
+      const rows = panel.split("\n").filter(line => /^\| (?!Agent|---)/.test(line));
+      expect(rows).toEqual([
+        "| claude-code · opus | Needs sign-in | Sign in with the command below, then check again. |",
+        "| expired | API key expired | Replace the key in the agent's own settings, then check again. Signing in does not renew it. |",
+        "| quota | Out of quota | Restore credits or quota with the provider, then check again. Signing in does not help. |",
+        "| codex | Not checked yet | Ennodia checks it on first use. |",
+        "| ready · exact-model | Ready |  |",
+        `| cline | Not available | Not installed, or it cannot run without a terminal. [Install guide](${HARNESS_GUIDE_URL}) |`,
+      ]);
+      expect(panel).toContain("Sign in to claude-code in a terminal:\n\n```sh\n'/Applications/Claude'\\''s CLI/claude' auth login\n```");
+      expect(panel.match(/auth login/g)).toHaveLength(1);
       expect(panel).toContain("History storage is unavailable.");
       expect(panel).toContain("installation guide");
-      expect(panel).toContain("supported harness guide");
-      expect(panel.match(/auth login/g)).toHaveLength(1);
-      expect(panel).not.toContain('"harnessIds":["ready"]');
-      const checked = await client.callTool({ name: "ennodia_check_harnesses", arguments: { cwd: "/workspace" } });
-      expect(JSON.parse(resultText(checked)).harnesses).toEqual(harnesses);
-      expect(setupPanel(checked)).toContain('"cwd":"/workspace"');
+      expect(panel).toContain("never in this chat");
+      for (const plumbing of ["ennodia_check_harnesses", "harnessIds", "route", "Recover credentials-expired"]) expect(panel).not.toContain(plumbing);
     } finally { await client.close(); await server.close(); }
+  });
+
+  it("shows setup read-only, with the card for MCP Apps hosts and no forms or model requests", async () => {
+    let checks = 0, forms = 0;
+    const discovery: unknown[] = [];
+    const harnesses = [{ id: "claude-code", name: "Claude Code", kind: "cli", available: true, runnable: true, capabilities: [], notes: [],
+      readiness: { state: "login-required", checkedAt: "2026-11-08T00:00:00Z", message: "Sign-in is required before review.",
+        recovery: { command: ["claude", "auth", "login"], instruction: "Sign in.", recheck: { tool: "ennodia_check_harnesses", harnessIds: ["claude-code"], verify: true } } } } satisfies HarnessDiscovery];
+    const installation = inspectInstallation();
+    const core = { listHarnesses: async (options: unknown) => { discovery.push(options); return harnesses; }, getInstallation: () => installation,
+      checkHarnesses: async () => { checks += 1; throw new Error("Unexpected check"); } } as unknown as EnnodiaCore;
+    const server = createEnnodiaServer(core);
+    const client = new Client({ name: "apps-host", version: "1" }, { capabilities: { elicitation: { form: {} }, extensions: { [MCP_APPS_EXTENSION]: { mimeTypes: [MCP_APP_MIME_TYPE] } } } });
+    client.setRequestHandler(ElicitRequestSchema, async () => { forms += 1; return { action: "decline" }; });
+    const [ct, st] = InMemoryTransport.createLinkedPair();
+    await server.connect(st); await client.connect(ct);
+    try {
+      const tools = new Map((await client.listTools()).tools.map(tool => [tool.name, tool._meta]));
+      for (const name of ["ennodia_setup", "ennodia_check_harnesses"]) expect(tools.get(name)).toEqual({ ui: { resourceUri: SETUP_APP_URI }, "ui/resourceUri": SETUP_APP_URI });
+      expect(tools.get("ennodia_list_harnesses")).toBeUndefined();
+      expect(tools.get("ennodia_run")).toBeUndefined();
+      expect((await client.listResources()).resources).toContainEqual(expect.objectContaining({ uri: SETUP_APP_URI, mimeType: MCP_APP_MIME_TYPE }));
+      const [card] = (await client.readResource({ uri: SETUP_APP_URI })).contents as Array<{ mimeType: string; text: string; _meta?: unknown }>;
+      expect(card).toMatchObject({ mimeType: MCP_APP_MIME_TYPE, _meta: { ui: { prefersBorder: true, permissions: { clipboardWrite: {} } } } });
+      expect(card!.text).toContain('"ui/initialize"');
+      expect(card!.text).not.toMatch(/__[A-Z]+__/);
+      const result = await client.callTool({ name: "ennodia_setup", arguments: {} });
+      expect(forms).toBe(0);
+      expect(checks).toBe(0);
+      expect(discovery).toEqual([{ refresh: true }]);
+      expect(JSON.parse(resultText(result))).toEqual(JSON.parse(JSON.stringify({ installation, harnesses, actionRequired: [{ harnessId: "claude-code", harnessName: "Claude Code", readiness: harnesses[0]!.readiness }] })));
+      expect(setupPanel(result)).toContain("| Claude Code | Needs sign-in |");
+      expect(setupPanel(result)).toContain("claude auth login");
+    } finally { await client.close(); await server.close(); }
+  });
+
+  it("keeps the setup card script valid and its labels complete", () => {
+    const script = /<script>([\s\S]*)<\/script>/.exec(SETUP_APP_HTML)?.[1] ?? "";
+    expect(() => new Function(script)).not.toThrow();
+    const states: Array<HarnessReadiness["state"]> = ["unverified", "ready", "login-required", "credentials-expired", "setup-required", "model-unavailable", "quota-exhausted", "unreachable", "updating"];
+    for (const state of states) expect(SETUP_APP_HTML).toContain(JSON.stringify(state));
+    expect(SETUP_APP_HTML).not.toMatch(/https?:\/\/(?!ennodia\.cherninlab\.com\/)/);
+  });
+
+  it("adds installation problems to startup instructions only when present", () => {
+    const healthy = { ...inspectInstallation(), status: "healthy" as const, limitations: [] };
+    expect(serverInstructions(healthy)).not.toContain("nstallation");
+    expect(serverInstructions({ ...healthy, status: "broken", limitations: ["Bun >=1.3.14 is required."] })).toContain("Ennodia's installation is broken: Bun >=1.3.14 is required. Tell the user before starting work");
   });
 
   it("includes recovery in blocked preflight responses with no started reviewers", async () => {
@@ -112,8 +117,8 @@ describe("MCP server tool surface", () => {
       const result = await client.callTool({ name: "ennodia_run", arguments: { prompt: "Review this code" } });
       expect(result.isError).toBe(true);
       expect(JSON.parse(resultText(result))).toMatchObject({ actionRequired, coverage: { started: 0 } });
+      expect(setupPanel(result)).toContain("| Claude Code · opus | Needs sign-in |");
       expect(setupPanel(result)).toContain("claude auth login");
-      expect(setupPanel(result)).toContain('"model":"opus"');
     } finally { await client.close(); await server.close(); }
   });
 
@@ -143,7 +148,7 @@ describe("MCP server tool surface", () => {
     await client.connect(clientTransport);
     try {
       const tools = new Map((await client.listTools()).tools.map((tool) => [tool.name, tool.annotations]));
-      for (const name of ["ennodia_get_run", "ennodia_list_harnesses", "ennodia_history", "ennodia_get_task", "ennodia_estimate_budget", "ennodia_plan"]) {
+      for (const name of ["ennodia_get_run", "ennodia_list_harnesses", "ennodia_setup", "ennodia_history", "ennodia_get_task", "ennodia_estimate_budget", "ennodia_plan"]) {
         expect(tools.get(name)).toMatchObject({ readOnlyHint: true, openWorldHint: false });
       }
       for (const name of ["ennodia_run", "ennodia_start", "ennodia_start_compare"]) {
@@ -151,7 +156,6 @@ describe("MCP server tool surface", () => {
         expect(tools.get(name)?.destructiveHint).toBeUndefined();
       }
       expect(tools.get("ennodia_cancel_run")).toMatchObject({ readOnlyHint: false, destructiveHint: false, idempotentHint: true });
-      expect(tools.get("ennodia_setup")).toMatchObject({ readOnlyHint: true, openWorldHint: true });
       expect(tools.get("ennodia_check_harnesses")).toMatchObject({ readOnlyHint: false, openWorldHint: true });
     } finally {
       await client.close();
@@ -202,6 +206,7 @@ describe("MCP server tool surface", () => {
   it("compact polling keeps answers and failure evidence without repeated setup metadata", async () => {
     const receipt = { id: "run", status: "failed", taskIds: ["worker"], remainingMs: 0,
       finalAnswer: "partial evidence", finalAnswerChars: 16, error: "deadline interrupted",
+      keepInMind: [{note: "Retry path remains unchecked.", whyItMatters: "Normal requests do not cover retries.", evidence: "Worker inspected only the normal path.", sourceIds: ["task:worker"], status: "unverified"}],
       diagnosis: {summary: "worker cutoff"}, events: [], plan: {selected: "codex"},
       budget: {estimate: "repeated setup"}, promptPreview: "request", appliedSkills: [] };
     const core = {getRun: () => receipt} as unknown as EnnodiaCore;
@@ -215,7 +220,7 @@ describe("MCP server tool surface", () => {
       const compact = JSON.parse(resultText(await client.callTool({name: "ennodia_get_run", arguments: {runId: "run", compact: true}})));
       expect(compact.plan).toBeUndefined(); expect(compact.budget).toBeUndefined();
       expect(compact.promptPreview).toBeUndefined(); expect(compact.appliedSkills).toBeUndefined();
-      for (const key of ["status", "taskIds", "remainingMs", "finalAnswer", "finalAnswerChars", "error", "diagnosis", "events"]) {
+      for (const key of ["status", "taskIds", "remainingMs", "finalAnswer", "finalAnswerChars", "keepInMind", "error", "diagnosis", "events"]) {
         expect(compact[key]).toEqual(full[key]);
       }
     } finally { await client.close(); await server.close(); }
