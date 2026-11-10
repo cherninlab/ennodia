@@ -147,7 +147,9 @@ Replace the key through the native credential flow for the intended provider.
 Signing in again does not renew an expired API key.
 `quota-exhausted` includes depleted credits.
 Restore credits or quota through the intended provider before rechecking.
+
 Ennodia reads terminal-formatted native errors and returns the matching recovery action.
+A worker's plain-text answer does not trigger a sign-in or capacity recovery action.
 
 Hermes uses the full `hermes chat` CLI. The legacy `hermes-agent` executable is not compatible.
 

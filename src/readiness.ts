@@ -41,16 +41,20 @@ export class HarnessReadinessError extends Error {
 }
 
 /** Recognize native failure envelopes, never quoted prose inside an answer. */
-export function nativeReadinessFailure(stdout: string, stderr: string): ReadinessState | undefined {
-  const lines = [...stripVTControlCharacters(stderr).split(/\r?\n/), ...stripVTControlCharacters(stdout).split(/\r?\n/)];
-  for (const line of lines) {
+export function nativeReadinessFailure(stdout: string, stderr: string, allowPlainStdout = false): ReadinessState | undefined {
+  const stderrLines = stripVTControlCharacters(stderr).split(/\r?\n/);
+  const lines = [...stderrLines, ...stripVTControlCharacters(stdout).split(/\r?\n/)];
+  for (const [index, line] of lines.entries()) {
     let message = line.trim();
     try {
       const event = JSON.parse(line);
       if (event.type === "error") message = typeof event.message === "string" ? event.message : event.error?.message ?? "";
       else if (event.type === "turn.failed") message = event.error?.message ?? "";
       else continue;
-    } catch { /* native text CLIs have no JSON envelope */ }
+    } catch {
+      // Only status/nonce checks can distinguish plain stdout from worker prose.
+      if (index >= stderrLines.length && !allowPlainStdout) continue;
+    }
     message = stripVTControlCharacters(message).trim();
     if (/^(?:Error:\s*)?(?:This |The |Your )?API key (?:has expired|is expired)\b/i.test(message)) return "credentials-expired";
     if (/^(?:(?:API )?Error:\s*)?(?:Failed to authenticate\b|OAuth session expired\b|Authentication failed\b|Not logged in\b|Unauthorized\b|401\b|Re-authentication required\b|No access token found\b|Token refresh failed\b|Failed to refresh (?:OAuth|token)\b|Your authentication token .*expired\b)/i.test(message)) return "login-required";
@@ -192,7 +196,7 @@ export class HarnessReadinessManager {
     const auth = recipe(h.id).auth;
     if (auth) {
       const result = await this.runner({ command: h.commandPath, args: auth }, 5_000);
-      const state = nativeReadinessFailure(result.stdout, result.stderr);
+      const state = nativeReadinessFailure(result.stdout, result.stderr, true);
       if (state) return this.value(h, state, input.model);
       if (h.id === "claude-code") {
         try { if (JSON.parse(result.stdout).loggedIn === false) return this.value(h, "login-required", input.model); } catch { /* verification below */ }
@@ -206,7 +210,7 @@ export class HarnessReadinessManager {
     try {
       const spec = adapter.buildCommand(h.commandPath, { prompt: `Reply with exactly ${nonce}. Do not use tools, read files, or perform any other work.`, cwd: dir, model: input.model, timeoutMs: 20_000, finalMessagePath: join(dir, "answer.txt"), nativeSandbox: adapter.supportsNativeSandbox ? "read-only" : undefined });
       const result = await this.runner(spec, 25_000);
-      const failure = nativeReadinessFailure(result.stdout, result.stderr);
+      const failure = nativeReadinessFailure(result.stdout, result.stderr, true);
       if (failure) return this.value(h, failure, input.model);
       if (result.timedOut || result.exitCode !== 0 || adapter.failureReason?.(result.stdout, result.stderr)) return this.value(h, "unreachable", input.model);
       let answer = adapter.readinessAnswer ? adapter.readinessAnswer(result.stdout) ?? "" : result.stdout;

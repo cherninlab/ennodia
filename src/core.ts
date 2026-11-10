@@ -882,9 +882,9 @@ export class EnnodiaCore {
   }
 
   async startRun(input: RunStartWithSkillIdsInput): Promise<RunView> {
-    if (input.continueTaskId && !input.cwd) {
+    if (input.continueTaskId) {
       const previous = this.taskManager.get(input.continueTaskId, { includeOutput: false, includeEvents: false });
-      if (previous) input = { ...input, cwd: previous.cwd };
+      if (previous) input = { ...input, cwd: input.cwd ?? previous.cwd, model: input.model ?? previous.model };
     }
     const { skillIds, ...runInput } = input;
     const skills = runInput.skills ??
