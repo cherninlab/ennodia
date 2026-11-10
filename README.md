@@ -85,7 +85,7 @@ See [how to read these notes](https://ennodia.cherninlab.com/docs/guides/underst
 
 Codex CLI, Claude Code, OpenCode, Kilo Code, Kiro CLI, Cline, Hermes Agent, and Antigravity.
 Model availability and tool permissions depend on the installed agent and its provider configuration.
-Discovery reports native login checks and recovery actions. Before execution, Ennodia verifies each selected model route with a small request when recent success is unavailable.
+Discovery reports native login checks and confirmed recovery actions. The requested task verifies model access without a separate model call first.
 Codex workers use a read-only sandbox by default.
 
 Ennodia discovers native Agent Skills and can request them for specific tasks.
@@ -142,7 +142,7 @@ Savings are not yet validated.
 Ennodia checks selected workers, Judge, and Advisor routes before execution.
 Blocked routes return a native recovery action before reviewers start.
 Ennodia says nothing about its own status unless an agent you asked for is blocked.
-Rechecks, setup, and blocked starts include a setup panel with the exact fix.
+Rechecks and blocked starts return compact diagnostics. The full setup panel appears only for an explicit setup request.
 
 Your agent calls `ennodia_setup` to show each agent's status and fix in your current session.
 Hosts that render MCP Apps, such as Claude Desktop and Visual Studio Code, can show it as a card with check buttons.

@@ -416,7 +416,7 @@ export class EnnodiaCore {
       for (const h of harnesses) { const fresh = refreshed.find(f => f.id === h.id); if (fresh) Object.assign(h, fresh); }
     }
     const unique = [...new Map(routes.map(r => [JSON.stringify(r), r])).values()];
-    // Check every native login before any model probe or reviewer launch.
+    // Native checks catch known blockers; the requested task verifies model access.
     const checked = await Promise.all(unique.map(async route => {
       const h = harnesses.find(h => h.id === route.harnessId);
       if (!h) throw new Error(`Unknown harness: ${route.harnessId}`);
@@ -425,23 +425,10 @@ export class EnnodiaCore {
     const initialBlocked = checked.filter(c => readinessBlocked(c.readiness)).map(c => ({ harnessId: c.h.id, harnessName: c.h.name, readiness: c.readiness }));
     if (initialBlocked.length) throw new HarnessReadinessError(initialBlocked);
     for (const { h, readiness } of checked) {
-      if (readiness.state !== "ready") {
-        // Probes are real provider calls. Reserve them before starting, and
-        // expose their estimate separately rather than implying free checks.
-        report.modelProbes++; report.estimatedInputTokens += 256;
-      }
       report.checks.push({ harnessId: h.id, harnessName: h.name, readiness });
-      if (budget?.maxChildTasks !== undefined && routes.length + report.modelProbes > budget.maxChildTasks) throw new Error("Budget limit exceeded: readiness probes also count as child calls. Verify the routes separately or increase maxChildTasks.");
-      if (budget?.maxEstimatedInputTokens !== undefined && report.estimatedInputTokens > budget.maxEstimatedInputTokens) throw new Error("Budget limit exceeded: readiness probe input reserve.");
+      h.readiness = readiness;
     }
-    const verified = await Promise.all(report.checks.map(async c => ({ ...c, readiness: await this.readinessManager!.check(harnesses.find(h => h.id === c.harnessId)!, this.findHarnessAdapter(c.harnessId), { model: c.readiness.model, cwd, verify: true }) })));
-    report.checks = verified;
-    const blocked = verified.filter(c => readinessBlocked(c.readiness));
-    if (blocked.length) throw new HarnessReadinessError(blocked);
-    for (const check of verified) {
-      const h = harnesses.find(h => h.id === check.harnessId);
-      if (h) h.readiness = check.readiness;
-    }
+    if (budget?.maxChildTasks !== undefined && routes.length > budget.maxChildTasks) throw new Error("Budget limit exceeded: selected routes exceed maxChildTasks.");
     return report;
   }
 

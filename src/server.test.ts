@@ -12,7 +12,7 @@ import { inspectInstallation } from "./installation";
 import { ElicitRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 
 describe("MCP server tool surface", () => {
-  it("keeps discovery quiet and puts the setup panel on rechecks", async () => {
+  it("keeps discovery and rechecks quiet and shows the panel only for explicit setup", async () => {
     const route = (id: string, state: HarnessReadiness["state"], model?: string): HarnessDiscovery => ({
       id, name: id, kind: "cli", available: true, runnable: true, capabilities: [], notes: [],
       readiness: { state, model, checkedAt: "2026-11-08T00:00:00Z", message: `Native ${state}`,
@@ -36,21 +36,22 @@ describe("MCP server tool surface", () => {
       expect((listed as { content: unknown[] }).content).toHaveLength(1);
       const checked = await client.callTool({ name: "ennodia_check_harnesses", arguments: {} });
       expect(JSON.parse(resultText(checked)).harnesses).toEqual(harnesses);
-      const panel = setupPanel(checked);
+      expect((checked as { content: unknown[] }).content).toHaveLength(1);
+      const panel = setupPanel(await client.callTool({ name: "ennodia_setup", arguments: {} }));
       // Agents that need the user come first, unavailable ones last.
       const rows = panel.split("\n").filter(line => /^\| (?!Agent|---)/.test(line));
       expect(rows).toEqual([
         "| claude-code · opus | Needs sign-in | Sign in with the command below, then check again. |",
         "| expired | API key expired | Replace the key in the agent's own settings, then check again. Signing in does not renew it. |",
         "| quota | Out of quota | Restore credits or quota with the provider, then check again. Signing in does not help. |",
-        "| codex | Not checked yet | Ennodia checks it on first use. |",
+        "| codex | Not verified | Native unverified |",
         "| ready · exact-model | Ready |  |",
         `| cline | Not available | Not installed, or it cannot run without a terminal. [Install guide](${HARNESS_GUIDE_URL}) |`,
       ]);
       expect(panel).toContain("Sign in to claude-code in a terminal:\n\n```sh\n'/Applications/Claude'\\''s CLI/claude' auth login\n```");
       expect(panel.match(/auth login/g)).toHaveLength(1);
       expect(panel).toContain("History storage is unavailable.");
-      expect(panel).toContain("installation guide");
+      expect(panel).toContain("Installation guide");
       expect(panel).toContain("never in this chat");
       for (const plumbing of ["ennodia_check_harnesses", "harnessIds", "route", "Recover credentials-expired"]) expect(panel).not.toContain(plumbing);
     } finally { await client.close(); await server.close(); }
@@ -72,7 +73,8 @@ describe("MCP server tool surface", () => {
     await server.connect(st); await client.connect(ct);
     try {
       const tools = new Map((await client.listTools()).tools.map(tool => [tool.name, tool._meta]));
-      for (const name of ["ennodia_setup", "ennodia_check_harnesses"]) expect(tools.get(name)).toEqual({ ui: { resourceUri: SETUP_APP_URI }, "ui/resourceUri": SETUP_APP_URI });
+      expect(tools.get("ennodia_setup")).toEqual({ ui: { resourceUri: SETUP_APP_URI }, "ui/resourceUri": SETUP_APP_URI });
+      expect(tools.get("ennodia_check_harnesses")).toBeUndefined();
       expect(tools.get("ennodia_list_harnesses")).toBeUndefined();
       expect(tools.get("ennodia_run")).toBeUndefined();
       expect((await client.listResources()).resources).toContainEqual(expect.objectContaining({ uri: SETUP_APP_URI, mimeType: MCP_APP_MIME_TYPE }));
@@ -96,12 +98,31 @@ describe("MCP server tool surface", () => {
     const states: Array<HarnessReadiness["state"]> = ["unverified", "ready", "login-required", "credentials-expired", "setup-required", "model-unavailable", "quota-exhausted", "unreachable", "updating"];
     for (const state of states) expect(SETUP_APP_HTML).toContain(JSON.stringify(state));
     expect(SETUP_APP_HTML).not.toMatch(/https?:\/\/(?!ennodia\.cherninlab\.com\/)/);
+    expect(SETUP_APP_HTML).not.toContain("No change yet.");
   });
 
   it("adds installation problems to startup instructions only when present", () => {
     const healthy = { ...inspectInstallation(), status: "healthy" as const, limitations: [] };
-    expect(serverInstructions(healthy)).not.toContain("nstallation");
+    expect(serverInstructions(healthy)).not.toContain("Installation notes:");
+    expect(serverInstructions(healthy)).not.toContain("Ennodia's installation is broken:");
     expect(serverInstructions({ ...healthy, status: "broken", limitations: ["Bun >=1.3.14 is required."] })).toContain("Ennodia's installation is broken: Bun >=1.3.14 is required. Tell the user before starting work");
+  });
+
+  it("shows an installed update as a reconnect notice without repair instructions", async () => {
+    const installation = { ...inspectInstallation(), status: "limited" as const, restartRequired: true, packageVersion: "99.0.0", limitations: ["Installed 99.0.0; running 0.5.1. Reconnect the Ennodia MCP connection to load the installed version."] };
+    const server = createEnnodiaServer({ listHarnesses: async () => [], getInstallation: () => installation } as unknown as EnnodiaCore);
+    const client = new Client({ name: "reload-test", version: "1" });
+    const [ct, st] = InMemoryTransport.createLinkedPair();
+    try {
+      await server.connect(st); await client.connect(ct);
+      const result = await client.callTool({ name: "ennodia_setup", arguments: {} });
+      expect(setupPanel(result)).toContain("Ennodia update ready:");
+      expect(setupPanel(result)).toContain("Reconnect");
+      expect(setupPanel(result)).not.toContain("Installation broken");
+      expect(setupPanel(result)).not.toContain("Repair");
+      expect(setupPanel(result)).not.toContain("[Installation guide]");
+      expect(client.getInstructions()).not.toContain("Tell the user before starting work");
+    } finally { await client.close(); await server.close(); }
   });
 
   it("includes recovery in blocked preflight responses with no started reviewers", async () => {
@@ -117,8 +138,7 @@ describe("MCP server tool surface", () => {
       const result = await client.callTool({ name: "ennodia_run", arguments: { prompt: "Review this code" } });
       expect(result.isError).toBe(true);
       expect(JSON.parse(resultText(result))).toMatchObject({ actionRequired, coverage: { started: 0 } });
-      expect(setupPanel(result)).toContain("| Claude Code · opus | Needs sign-in |");
-      expect(setupPanel(result)).toContain("claude auth login");
+      expect((result as { content: unknown[] }).content).toHaveLength(1);
     } finally { await client.close(); await server.close(); }
   });
 

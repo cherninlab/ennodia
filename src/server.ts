@@ -108,7 +108,7 @@ export function createEnnodiaServer(
       catch (error) {
         if (error instanceof HarnessReadinessError) {
           const installation = core.getInstallation?.();
-          return { ...setupResult({ error: error.message, installation, actionRequired: error.actionRequired, coverage: { started: 0 } }, error.actionRequired, installation), isError: true };
+          return { ...jsonResult({ error: error.message, installation, actionRequired: error.actionRequired, coverage: { started: 0 } }), isError: true };
         }
         throw error;
       }
@@ -149,8 +149,7 @@ export function createEnnodiaServer(
 
   server.registerTool("ennodia_check_harnesses", {
     title: "Recheck or upgrade Ennodia harnesses",
-    description: "Recheck Ennodia's installation and recover affected harnesses. Return installation scope, runtime/package/storage limitations, native recovery commands and actionRequired. Target affected harnessIds; unrelated blockers do not prevent authorized work on usable routes. verify makes a small real model call; upgrade runs supported updaters before rechecking. Never switch account/provider/model silently.",
-    _meta: SETUP_APP_TOOL_META,
+    description: "Recheck selected harnesses and return compact diagnostics. Target affected harnessIds; unrelated blockers do not prevent work. verify makes an optional real model call; a timeout leaves access unverified and does not block tasks. upgrade runs supported updaters before rechecking. Never switch account/provider/model silently. Show a brief changed result; use ennodia_setup only when the user asks for the full setup view.",
     inputSchema: {
       harnessIds: z.array(z.string().min(1)).min(1).optional().describe("Harnesses to recheck. Omit for all installed harnesses."),
       model: z.string().min(1).optional().describe("Exact model to verify on the selected route."),
@@ -161,7 +160,7 @@ export function createEnnodiaServer(
     },
   }, async input => {
     const result = await core.checkHarnesses(input);
-    return setupResult(result, result.harnesses, result.installation);
+    return jsonResult(result);
   });
 
   // Hosts that render MCP Apps show this card for the two tools above.
@@ -1337,9 +1336,9 @@ export async function shutdownEnnodia(
 export function serverInstructions(installation?: InstallationReport): string {
   const lines = [
     "Ennodia hands work to the user's other local agents. Do not open with Ennodia's status or list agents the user did not ask about: ennodia_run checks the agents it selects before starting.",
-    "If a requested agent is blocked, the result carries an ennodia://setup panel: show the user its fix as written. After the user fixes it, recheck that agent and model with ennodia_check_harnesses (verify: true), then continue the task. If a run skipped agents (actionRequired), say so in one line. Unrelated blockers must not hold up work on usable agents.",
+    "For a confirmed blocker on a requested agent, state its cause and native recovery action in one short line. Do not repeat unchanged warnings or automatically retry checks. After recovery, recheck that harness and model. If agents were skipped (actionRequired), say so in one line. Unrelated blockers must not hold up usable agents.",
     "For setup or status requests, call ennodia_setup and show its panel. Hosts that render MCP Apps show it as a card; then add one line at most.",
-    "Unverified means not checked yet, not failed. A verified default model does not prove access to other models. Never collect credentials in chat, never switch account, provider or model silently, and never claim a check ran when it did not. Follow the user's existing authorization and the host's approval policy; add no approval step of your own.",
+    "Unverified means model access is unknown, not failed; the requested task can verify it. Use a separate model probe only when needed. A reload notice after an update is not a broken installation; mention it once when relevant. Never collect credentials in chat, switch account/provider/model silently, or claim a check ran when it did not. Follow existing authorization; add no approval step of your own.",
   ];
   if (installation?.status === "broken") lines.push(`Ennodia's installation is broken: ${installation.limitations.join(" ")} Tell the user before starting work and link ${INSTALL_GUIDE_URL}.`);
   else if (installation?.status === "limited") lines.push(`Installation notes, to mention only when they affect the request: ${installation.limitations.join(" ")}`);
@@ -1357,16 +1356,17 @@ function setupResult(value: unknown, routes: (HarnessDiscovery | HarnessAttentio
   const cell = (text: string) => text.replaceAll("|", "\\|").replace(/[\r\n]+/g, " ");
   const lines = ["## Ennodia agents"];
   if (installation && installation.status !== "healthy") {
-    lines.push("", `Installation ${installation.status}:`, ...installation.limitations.map(limit => `- ${limit}`), "", `Repair it with the [installation guide](${INSTALL_GUIDE_URL}), then restart the MCP connection.`);
+    lines.push("", installation.status !== "broken" && installation.restartRequired ? "Ennodia update ready:" : `Installation ${installation.status}:`, ...installation.limitations.map(limit => `- ${limit}`));
+    if (!installation.restartRequired || installation.status === "broken") lines.push("", `[Installation guide](${INSTALL_GUIDE_URL})`);
   }
   const rows = routes.map(route => {
     const key = accessKey(route);
-    return { name: "id" in route ? route.name : route.harnessName, model: route.readiness?.model, key, command: key === "login-required" ? route.readiness?.recovery?.command ?? [] : [] };
+    return { name: "id" in route ? route.name : route.harnessName, model: route.readiness?.model, message: route.readiness?.message, key, command: key === "login-required" ? route.readiness?.recovery?.command ?? [] : [] };
   }).sort((a, b) => accessRank(a.key) - accessRank(b.key));
   if (rows.length) lines.push("", "| Agent | Status | Next step |", "| --- | --- | --- |");
   else lines.push("", `No supported agents were found. Install one with the [harness guide](${HARNESS_GUIDE_URL}).`);
   for (const row of rows) {
-    const next = row.key === "missing" ? `${ACCESS_TEXT.missing.next} [Install guide](${HARNESS_GUIDE_URL})` : ACCESS_TEXT[row.key].next;
+    const next = row.key === "missing" ? `${ACCESS_TEXT.missing.next} [Install guide](${HARNESS_GUIDE_URL})` : row.key === "unverified" && row.message ? row.message : ACCESS_TEXT[row.key].next;
     lines.push(`| ${cell(row.name + (row.model ? ` · ${row.model}` : ""))} | ${ACCESS_TEXT[row.key].label} | ${cell(next)} |`);
   }
   // Only a login blocker calls for a command. Other blockers need credits or a new key.

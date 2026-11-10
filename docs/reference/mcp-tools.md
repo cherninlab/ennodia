@@ -733,7 +733,7 @@ pass that task ID as `continueTaskId` in the next run. The follow-up keeps the
 harness and directory. It inherits the model and reasoning effort unless you
 supply new values. Each follow-up has a new task ID and execution allowance.
 
-Readiness checks use the inherited or explicitly supplied model before the follow-up starts.
+Native status checks use the inherited or explicitly supplied model before the follow-up starts.
 An earlier turn cannot be used once a follow-up has started.
 
 Continuation requires a task still held by the same running Ennodia server.
@@ -813,7 +813,7 @@ Sign-in and credential changes stay in each agent's own CLI.
 
 #### Setup card
 
-`ennodia_setup` and `ennodia_check_harnesses` name the `ui://ennodia/setup.html` resource in `_meta.ui.resourceUri`.
+Only `ennodia_setup` names the `ui://ennodia/setup.html` resource in `_meta.ui.resourceUri`.
 The resource uses the MCP Apps type `text/html;profile=mcp-app`.
 Hosts that render MCP Apps show the card inside the conversation. Other hosts ignore it and keep the Markdown panel.
 
@@ -837,15 +837,25 @@ The result includes `installation`, a local self-check of Ennodia's loaded code 
 It accepts `harnessIds`, `model`, `cwd`, `refresh`, `verify`, and `upgrade`.
 Native status checks are the default. `verify: true` makes a bounded real model request.
 
-`unverified` means unchecked. `ennodia_run` verifies its selected routes automatically.
+`unverified` means model access is unknown. Normal runs use native status checks and let the task verify model access.
+An inconclusive check does not block the task or mark the agent as needing setup.
 Use targeted `harnessIds` for recovery checks. Unrelated blockers do not prevent work on usable requested routes.
 
-Rechecks, `ennodia_setup`, and blocked preflight responses include an embedded `ennodia://setup` resource with `text/markdown` content.
+Only `ennodia_setup` includes the embedded `ennodia://setup` resource with `text/markdown` content.
+Rechecks and blocked preflight responses return compact JSON diagnostics without creating another setup card.
 The JSON text response keeps its existing shape.
 
 The panel is a table of agents, with agents that need the user first. Each row gives the status in plain words and the next step.
 Sign-in commands follow the table, for login blockers only. Key expiry and quota blockers name their own recovery.
-Show the panel when the host displays no setup card. Recheck the same harness and model after recovery, then resume the original task.
+
+Show the full panel only for an explicit setup or status request.
+For a blocked task, report its cause and native recovery action briefly.
+Do not repeat unchanged warnings or automatically retry checks.
+Recheck the same harness and model after recovery, then resume the original task.
+
+When the installed package differs from the running process, `installation.restartRequired` is true.
+This is a reload notice, not a broken installation. Reconnect the MCP connection to load the installed version.
+Missing runtime files or an unsupported runtime still report a broken installation.
 
 `upgrade: true` runs supported updaters before rediscovery and recheck.
 This tool can change installed software and call providers, so it does not declare `readOnlyHint`.

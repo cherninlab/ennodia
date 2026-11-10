@@ -21,16 +21,16 @@ export const ACCESS_TEXT: Record<AccessKey, { label: string; next: string }> = {
   "quota-exhausted": { label: "Out of quota", next: "Restore credits or quota with the provider, then check again. Signing in does not help." },
   "model-unavailable": { label: "Model unavailable", next: "This agent cannot use this model. Pick another from its model list." },
   "setup-required": { label: "Needs setup", next: "Finish the agent's own setup, then check again." },
-  unreachable: { label: "Check failed", next: "The check did not finish. Look at the connection or the agent's setup, then check again." },
+  unreachable: { label: "Could not verify", next: "Model access is unknown. This does not confirm a sign-in or setup problem." },
   updating: { label: "Updating", next: "An update is running. Check again when it finishes." },
-  unverified: { label: "Not checked yet", next: "Ennodia checks it on first use." },
+  unverified: { label: "Not verified", next: "A task can run without a separate model check." },
   ready: { label: "Ready", next: "" },
   missing: { label: "Not available", next: "Not installed, or it cannot run without a terminal." },
 };
 
 /** Agents that need the user come first, unavailable ones last. */
 export function accessRank(key: AccessKey): number {
-  return key === "unverified" ? 1 : key === "ready" ? 2 : key === "missing" ? 3 : 0;
+  return key === "unverified" || key === "unreachable" ? 1 : key === "ready" ? 2 : key === "missing" ? 3 : 0;
 }
 
 export const HARNESS_GUIDE_URL = "https://ennodia.cherninlab.com/docs/reference/supported-harnesses/";
@@ -88,7 +88,7 @@ const SETUP_APP_SCRIPT = String.raw`
   function normalize(h) {
     var r = h.readiness || {};
     var key = h.runnable === false ? "missing" : (ACCESS[r.state] ? r.state : "unverified");
-    return { id: h.id, name: h.name || h.id, model: r.model || "", key: key,
+    return { id: h.id, name: h.name || h.id, model: r.model || "", message: r.message || "", key: key,
       command: key === "login-required" && r.recovery && Array.isArray(r.recovery.command) ? r.recovery.command : [] };
   }
   function find(id) { for (var i = 0; i < state.agents.length; i++) if (state.agents[i].id === id) return state.agents[i]; return null; }
@@ -125,7 +125,7 @@ const SETUP_APP_SCRIPT = String.raw`
       if (data.installation) state.installation = data.installation;
       merge(data.harnesses);
       var now = find(agent.id);
-      state.notes[agent.id] = now && now.key === "ready" ? "Ready now." : now && now.key === before ? "No change yet." : "";
+      state.notes[agent.id] = now && now.key === "ready" ? "Ready now." : "";
       if (now && now.key === "ready" && before !== "ready") state.newlyReady[agent.id] = true;
     }, function (error) { state.notes[agent.id] = error.message || "The check failed."; })
       .then(function () { delete state.busy[agent.id]; render(); });
@@ -178,12 +178,12 @@ const SETUP_APP_SCRIPT = String.raw`
     var head = el("div", "head");
     head.appendChild(el("span", "dot"));
     var name = el("span", "name", agent.name);
-    if (agent.model) name.appendChild(el("span", "model", agent.model));
+    if (agent.model) name.appendChild(el("span", "model", " · " + agent.model));
     head.appendChild(name);
     head.appendChild(el("span", "status", ACCESS[agent.key].label));
     item.appendChild(head);
-    // An unchecked agent needs nothing from the user; its button is enough.
-    if (ACCESS[agent.key].next && agent.key !== "unverified") item.appendChild(el("p", "next", ACCESS[agent.key].next));
+    var next = agent.key === "unverified" && agent.message ? agent.message : ACCESS[agent.key].next;
+    if (next) item.appendChild(el("p", "next", next));
     if (agent.command.length) {
       var row = el("div", "command");
       var code = el("code", "", shellQuote(agent.command));
@@ -216,11 +216,11 @@ const SETUP_APP_SCRIPT = String.raw`
     install.textContent = "";
     install.hidden = !report || report.status === "healthy";
     if (!install.hidden) {
-      install.appendChild(el("p", "", "Ennodia installation: " + report.status + "."));
+      install.appendChild(el("p", "", report.status !== "broken" && report.restartRequired ? "Ennodia update ready." : "Ennodia installation: " + report.status + "."));
       var notes = el("ul");
       (report.limitations || []).forEach(function (text) { notes.appendChild(el("li", "", text)); });
       install.appendChild(notes);
-      install.appendChild(button("Installation guide", "", function () { openLink(__INSTALL__); }));
+      if (!report.restartRequired || report.status === "broken") install.appendChild(button("Installation guide", "", function () { openLink(__INSTALL__); }));
     }
     document.getElementById("cost").hidden = !state.host.serverTools || !state.agents.some(function (a) { return a.key !== "ready" && a.key !== "missing"; });
     resize();
