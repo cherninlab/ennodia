@@ -97,6 +97,40 @@ describe("harness readiness", () => {
     await manager.check(harness, adapter, { verify: true, model: "two" });
     expect(probes).toBe(2);
   });
+  it.each([
+    { explicitCwd: false, model: undefined, expectedModel: "previous-model" },
+    { explicitCwd: true, model: undefined, expectedModel: "previous-model" },
+    { explicitCwd: false, model: "other-model", expectedModel: "other-model" },
+  ])("verifies the effective continuation model ($explicitCwd, $model)", async ({ explicitCwd, model, expectedModel }) => {
+    const probedModels: string[] = [];
+    const native: HarnessAdapter = {
+      ...adapter, id: "session-fixture", supportsSessionContinuation: true,
+      extractSessionId: stdout => stdout.includes("SESSION:owned") ? "owned" : undefined,
+      buildCommand: (_path, input) => ({ command: process.execPath, cwd: input.cwd,
+        args: ["-e", "console.log('SESSION:owned'); console.log(process.argv.at(-1))", input.prompt, input.model ?? "default"] }),
+    };
+    const core = new EnnodiaCore({ discoverHarnesses: async () => [{ ...harness, ...native }], findHarnessAdapter: () => native,
+      readinessOptions: { autoUpgrade: false, runCommand: async spec => {
+        const model = spec.args.at(-1)!;
+        probedModels.push(model);
+        if (model === "default") return { ...ok(), exitCode: 1, stderr: "unknown model" };
+        const nonce = /ENNODIA_READY_[a-f0-9]+/.exec(spec.args.join(" "))![0];
+        return ok(nonce);
+      } } });
+    try {
+      const first = await core.startRun({ prompt: "first", harnessId: native.id, model: "previous-model", cwd: process.cwd(), persistSession: true });
+      const settled = await core.waitForRun(first.id, 5_000);
+      const next = await core.startRun({ prompt: "continue", harnessId: native.id, continueTaskId: settled!.taskIds[0], model, ...(explicitCwd ? { cwd: process.cwd() } : {}) });
+      const continued = await core.waitForRun(next.id, 5_000);
+      expect(continued?.status).toBe("succeeded");
+      expect(continued?.model).toBe(expectedModel);
+      expect(continued?.preflight?.checks[0]?.readiness.model).toBe(expectedModel);
+      expect(core.getTask(continued!.taskIds[0])?.model).toBe(expectedModel);
+      expect(continued?.finalAnswer).toContain(expectedModel);
+      expect(probedModels).toContain(expectedModel);
+      expect(probedModels).not.toContain("default");
+    } finally { await core.shutdown(); }
+  });
   it("does not accept a prompt echo or zero-exit error as readiness", async () => {
     const echo = new HarnessReadinessManager({ autoUpgrade: false, runCommand: async spec => ok(spec.args.join(" ")) });
     expect((await echo.check(harness, adapter, { verify: true })).state).toBe("setup-required");
@@ -145,6 +179,30 @@ describe("harness readiness", () => {
     const manager = new HarnessReadinessManager({ autoUpgrade: false, runCommand: reply });
     manager.observe(harness, {}, { status: "succeeded", stdout: "Not logged in is the message shown by the old code", stderr: "", timedOut: false, hasOutput: true });
     expect((await manager.check(harness, adapter)).state).toBe("ready");
+  });
+  it("does not turn failed worker answer prose into a sign-in blocker", async () => {
+    const failing = { ...adapter, buildCommand: (_path: string, input: { prompt: string; cwd?: string }) => ({ command: process.execPath, args: ["-e", "console.log('401 responses are not retried'); process.exit(1)", input.prompt], cwd: input.cwd }) };
+    const core = new EnnodiaCore({ discoverHarnesses: async () => [harness], findHarnessAdapter: () => failing, readinessOptions: { autoUpgrade: false, runCommand: reply } });
+    try {
+      const started = await core.startRun({ prompt: "review", harnessId: "codex", compare: false });
+      const terminal = await core.waitForRun(started.id, 5_000);
+      expect(terminal?.status).toBe("failed");
+      expect(terminal?.actionRequired).toBeUndefined();
+      expect((await core.listHarnesses())[0]?.readiness?.state).toBe("ready");
+    } finally { await core.shutdown(); }
+  });
+  it("still recognizes plain stdout blockers during native status and model checks", async () => {
+    for (const phase of ["auth", "probe"] as const) {
+      const manager = new HarnessReadinessManager({ autoUpgrade: false, runCommand: async spec => {
+        const probe = spec.args.some(a => a.includes("ENNODIA_READY_"));
+        if (phase === "auth" && !probe) return ok("Not logged in");
+        if (phase === "probe" && probe) return ok("Add credits to continue");
+        return reply(spec, 0);
+      } });
+      try {
+        expect((await manager.check(harness, adapter, { verify: true })).state).toBe(phase === "auth" ? "login-required" : "quota-exhausted");
+      } finally { await manager.shutdown(); }
+    }
   });
   it("refuses readiness calls beyond the caller's preflight budget", async () => {
     let probes = 0;
@@ -204,6 +262,7 @@ describe("harness readiness", () => {
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
   it("recognizes structured native failures while ignoring quoted JSON in answers", () => {
+    expect(nativeReadinessFailure("401 responses are not retried\nUnauthorized requests fall through", "")).toBeUndefined();
     expect(nativeReadinessFailure('{"type":"turn.failed","error":{"message":"OAuth session expired"}}', "")).toBe("login-required");
     expect(nativeReadinessFailure('{"type":"item.completed","item":{"text":"Not logged in"}}', "")).toBeUndefined();
     expect(nativeReadinessFailure("", "No access token found for Nous Portal login. Run `hermes model` to re-authenticate.")).toBe("login-required");

@@ -732,6 +732,8 @@ After the worker settles, inspect its task receipt. If `canContinue` is true,
 pass that task ID as `continueTaskId` in the next run. The follow-up keeps the
 harness and directory. It inherits the model and reasoning effort unless you
 supply new values. Each follow-up has a new task ID and execution allowance.
+
+Readiness checks use the inherited or explicitly supplied model before the follow-up starts.
 An earlier turn cannot be used once a follow-up has started.
 
 Continuation requires a task still held by the same running Ennodia server.
