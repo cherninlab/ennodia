@@ -45,11 +45,13 @@ It does not guarantee media support, authentication, or access to a requested mo
 Plan Advisor receives this guidance in its harness inventory.
 
 Discovery checks installation and native login status through supported commands.
-Model access remains unverified until a small real request or a recent successful task returns an answer.
-A stalled check stops at its deadline and reports a blocker.
+Model access remains unverified until an explicit verification request or a successful task returns an answer.
+A stalled check stops at its deadline and leaves access unverified.
 Ennodia checks selected worker, Judge, and Advisor routes before execution.
 Known blockers prevent requested work from starting.
 Automatic routing excludes blocked routes and reports missing coverage.
+
+Normal runs check native status without making a separate model request.
 
 ## Media inputs
 
@@ -138,7 +140,7 @@ Call `ennodia_check_harnesses` after sign-in:
 ```
 
 Pass the same `model` and `cwd` when rechecking an explicit route.
-The check returns `actionRequired` for login, setup, model, capacity, and connectivity blockers.
+The check returns `actionRequired` for confirmed login, setup, model, and capacity blockers.
 A missing CLI requires installation. A capacity failure requires capacity recovery.
 Neither is fixed by repeated sign-in.
 
@@ -157,8 +159,8 @@ Native checks cache for 30 seconds. Verified routes cache for five minutes.
 A native authentication failure invalidates the route immediately.
 Concurrent checks of the same route share one request.
 
-`unverified` means unchecked. It does not mean a failed harness.
-`ennodia_run` verifies its selected routes before launching workers.
+`unverified` means model access is unknown. It does not mean a failed harness.
+`ennodia_run` lets the requested task verify model access after native status checks.
 Checking every supported harness is not a prerequisite for a run.
 
 Unrelated harness blockers do not prevent work on a usable requested route.
@@ -169,9 +171,9 @@ Ennodia does not require an additional approval step.
 Model probes run in an empty temporary directory with normal native permissions.
 A temporary directory is not a security sandbox.
 
-Probes use provider capacity and reserve 256 input tokens per route for budget checks.
-The reserve is an estimate, not a measurement of provider usage.
-Probe calls count toward `maxChildTasks`. Usage remains unknown when the provider reports no measurement.
+Explicit verification uses provider capacity independently of a run's budget.
+Normal runs add no model probe calls or input-token reserves.
+A verification timeout after 25 seconds does not block the requested task or imply a setup problem.
 
 Before ordinary execution, Ennodia attempts supported upgrades once per day while no Ennodia task is active.
 Homebrew installations use their installed formula or cask.

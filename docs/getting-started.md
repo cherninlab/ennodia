@@ -34,6 +34,9 @@ Start with one worker and a small set of files.
 Ennodia checks each selected agent before execution. Your agent hears nothing about Ennodia's status unless an agent you requested is blocked.
 A blocked agent comes with its exact fix, such as a sign-in command.
 
+The requested task verifies model access. Ennodia does not add a separate model call before it.
+An optional verification timeout leaves access unverified and does not prevent a task from starting.
+
 For setup or recovery, give your agent this request:
 
 ```text

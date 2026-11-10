@@ -28,7 +28,7 @@ export type HarnessReadinessOptions = {
   isBusy?: () => boolean;
 };
 
-const BLOCKED = new Set<ReadinessState>(["login-required", "credentials-expired", "setup-required", "model-unavailable", "quota-exhausted", "unreachable", "updating"]);
+const BLOCKED = new Set<ReadinessState>(["login-required", "credentials-expired", "setup-required", "model-unavailable", "quota-exhausted", "updating"]);
 export function readinessBlocked(readiness?: HarnessReadiness): boolean { return Boolean(readiness && BLOCKED.has(readiness.state)); }
 export function harnessAttention(harnesses: HarnessDiscovery[]): HarnessAttention[] {
   return harnesses.filter(h => readinessBlocked(h.readiness)).map(h => ({ harnessId: h.id, harnessName: h.name, readiness: h.readiness! }));
@@ -58,7 +58,7 @@ export function nativeReadinessFailure(stdout: string, stderr: string, allowPlai
     message = stripVTControlCharacters(message).trim();
     if (/^(?:Error:\s*)?(?:This |The |Your )?API key (?:has expired|is expired)\b/i.test(message)) return "credentials-expired";
     if (/^(?:(?:API )?Error:\s*)?(?:Failed to authenticate\b|OAuth session expired\b|Authentication failed\b|Not logged in\b|Unauthorized\b|401\b|Re-authentication required\b|No access token found\b|Token refresh failed\b|Failed to refresh (?:OAuth|token)\b|Your authentication token .*expired\b)/i.test(message)) return "login-required";
-    if (/^(?:Error:\s*)?(?:You've hit your usage limit\b|quota (?:exceeded|exhausted)\b|insufficient (?:credits|balance)\b|rate limit exceeded\b|Add credits to continue\b)/i.test(message)) return "quota-exhausted";
+    if (/^(?:Error:\s*)?(?:You've hit your (?:usage|\d+[ -]hour|weekly) limit\b|quota (?:exceeded|exhausted)\b|insufficient (?:credits|balance)\b|rate limit exceeded\b|Add credits to continue\b)/i.test(message)) return "quota-exhausted";
     if (/^(?:Error:\s*)?(?:model .* (?:not found|not available|not supported)|unknown model\b|ModelNotFoundError\b)/i.test(message)) return "model-unavailable";
     if (/^(?:Error:\s*)?(?:No (?:API key|provider|credentials)\b|Missing .*API.?KEY\b|unrecognized arguments\b|unknown (?:option|command)\b)/i.test(message)) return "setup-required";
   }
@@ -98,7 +98,7 @@ export function harnessUpgradeCommand(h: HarnessDiscovery): string[] | undefined
 }
 
 const messages: Record<ReadinessState, string> = {
-  unverified: "Model access is unverified; a small request is required before review.",
+  unverified: "Model access is unverified. A task can run without a separate model check.",
   ready: "The selected route returned a verified response.",
   "login-required": "Sign-in is required before review.",
   "credentials-expired": "The configured provider API key has expired. Replace the key in the native CLI/provider settings; signing in again will not renew it.",
@@ -137,10 +137,9 @@ export class HarnessReadinessManager {
   private value(h: HarnessDiscovery, state: ReadinessState, model?: string): HarnessReadiness {
     const r = recipe(h.id);
     const result: HarnessReadiness = { state, checkedAt: new Date(this.now()).toISOString(), model, message: messages[state], upgrade: this.updates.get(h.id) };
-    if (state !== "ready") result.recovery = {
-      command: h.commandPath ? [h.commandPath, ...(state === "login-required" || state === "credentials-expired" || state === "unverified" ? r.login : ["--help"])] : [],
+    if (state !== "ready" && state !== "unverified") result.recovery = {
+      command: h.commandPath ? [h.commandPath, ...(state === "login-required" || state === "credentials-expired" ? r.login : ["--help"])] : [],
       instruction: !h.commandPath ? "Install the supported native CLI, then recheck."
-        : state === "unverified" ? "Run the targeted recheck to verify model access. Sign in only when a login blocker is reported."
         : state === "login-required" ? "Run the native command in an interactive terminal using the intended account/provider, then recheck."
         : state === "credentials-expired" ? "Replace the expired API key through the native credential flow for the intended provider, then recheck the same route. Signing in again will not renew the key."
         : state === "quota-exhausted" ? "Restore credits or quota through the intended provider, then recheck the same route. Do not repeat sign-in or switch to a different model silently."
@@ -181,7 +180,7 @@ export class HarnessReadinessManager {
     const flightKey = `${key}:${Boolean(input.verify)}`;
     const flight = this.flights.get(flightKey);
     if (flight) return flight;
-    const pending = this.performCheck(h, adapter, input).catch(() => this.value(h, "unreachable", input.model)).then(value => {
+    const pending = this.performCheck(h, adapter, input).catch(() => ({ ...this.value(h, "unverified", input.model), message: "The native check could not complete. Model access remains unverified; a task can still run." })).then(value => {
       this.cache.set(key, { at: this.now(), value });
       return value;
     }).finally(() => this.flights.delete(flightKey));
@@ -201,8 +200,8 @@ export class HarnessReadinessManager {
       if (h.id === "claude-code") {
         try { if (JSON.parse(result.stdout).loggedIn === false) return this.value(h, "login-required", input.model); } catch { /* verification below */ }
       }
-      if (result.timedOut) return this.value(h, "unreachable", input.model);
-      if (result.exitCode !== 0) return this.value(h, ["codex", "claude-code", "kiro"].includes(h.id) ? "login-required" : "setup-required", input.model);
+      if (result.timedOut) return { ...this.value(h, "unverified", input.model), message: "The native sign-in check timed out. No sign-in or setup failure was confirmed." };
+      if (result.exitCode !== 0) return { ...this.value(h, "unverified", input.model), message: "The native check exited without a recognized blocker. A task can still run." };
     }
     if (!input.verify) return this.value(h, "unverified", input.model);
     const dir = mkdtempSync(join(tmpdir(), "ennodia-readiness-"));
@@ -212,11 +211,12 @@ export class HarnessReadinessManager {
       const result = await this.runner(spec, 25_000);
       const failure = nativeReadinessFailure(result.stdout, result.stderr, true);
       if (failure) return this.value(h, failure, input.model);
-      if (result.timedOut || result.exitCode !== 0 || adapter.failureReason?.(result.stdout, result.stderr)) return this.value(h, "unreachable", input.model);
+      if (result.timedOut) return { ...this.value(h, "unverified", input.model), message: "Model verification timed out after 25 seconds. A task can still run with its own time limit." };
+      if (result.exitCode !== 0 || adapter.failureReason?.(result.stdout, result.stderr)) return { ...this.value(h, "unverified", input.model), message: "Model verification did not complete. A task can still run." };
       let answer = adapter.readinessAnswer ? adapter.readinessAnswer(result.stdout) ?? "" : result.stdout;
       try { answer = readFileSync(join(dir, "answer.txt"), "utf8"); } catch { /* native text output */ }
       // An echoed prompt is not success. Require a standalone returned nonce.
-      if (!stripVTControlCharacters(answer).split(/\r?\n/).some(line => line.trim() === nonce)) return this.value(h, "setup-required", input.model);
+      if (!stripVTControlCharacters(answer).split(/\r?\n/).some(line => line.trim() === nonce)) return { ...this.value(h, "unverified", input.model), message: "Model verification did not return the expected response. A task can still run." };
       return this.value(h, "ready", input.model);
     } finally { rmSync(dir, { recursive: true, force: true }); }
   }
@@ -242,7 +242,8 @@ export class HarnessReadinessManager {
     const command = harnessUpgradeCommand(h);
     const checkedAt = new Date(this.now()).toISOString();
     const save = (status: NonNullable<HarnessReadiness["upgrade"]>["status"], message: string) => {
-      this.updates.set(h.id, { status, checkedAt, command, message }); this.invalidate(h.id);
+      this.updates.set(h.id, { status, checkedAt, command, message });
+      if (status === "succeeded" || status === "failed") this.invalidate(h.id);
     };
     if (!command) { save("unsupported", "No supported updater was found for this installation. Use its original installer."); return; }
     if (this.options.isBusy?.() || this.flights.size > 0) { save("deferred", "Upgrade deferred while Ennodia work is active."); return; }

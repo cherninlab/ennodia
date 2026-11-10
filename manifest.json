@@ -1,7 +1,7 @@
 {
   "manifest_version": "0.2",
   "name": "ennodia",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "Connects the AI agents you use: your agent hands a task to another and gets the answer back",
   "author": {
     "name": "Cherninlab"
@@ -63,7 +63,7 @@
     {
       "name": "ennodia_check_harnesses",
       "title": "Recheck or upgrade Ennodia harnesses",
-      "description": "Recheck Ennodia's installation and recover affected harnesses. Return installation scope, runtime/package/storage limitations, native recovery commands and actionRequired. Target affected harnessIds; unrelated blockers do not prevent authorized work on usable routes. verify makes a small real model call; upgrade runs supported updaters before rechecking. Never switch account/provider/model silently.",
+      "description": "Recheck selected harnesses and return compact diagnostics. Target affected harnessIds; unrelated blockers do not prevent work. verify makes an optional real model call; a timeout leaves access unverified and does not block tasks. upgrade runs supported updaters before rechecking. Never switch account/provider/model silently. Show a brief changed result; use ennodia_setup only when the user asks for the full setup view.",
       "inputSchema": {
         "type": "object",
         "properties": {

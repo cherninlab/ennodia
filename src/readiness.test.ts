@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { EnnodiaCore } from "./core";
 import { harnessAdapters, type HarnessAdapter, type HarnessDiscovery } from "./harnesses";
-import { HarnessReadinessError, HarnessReadinessManager, nativeReadinessFailure, runMaintenanceCommand, type MaintenanceCommandRunner, type CommandResult } from "./readiness";
+import { HarnessReadinessError, HarnessReadinessManager, nativeReadinessFailure, readinessBlocked, runMaintenanceCommand, type MaintenanceCommandRunner, type CommandResult } from "./readiness";
 
 const ok = (stdout = ""): CommandResult => ({ exitCode: 0, stdout, stderr: "", timedOut: false });
 const adapter: HarnessAdapter = {
@@ -21,6 +21,42 @@ function fixture(runCommand: MaintenanceCommandRunner = reply) {
 }
 
 describe("harness readiness", () => {
+  it("keeps a timed-out model check unverified and allows the real task without another probe", async () => {
+    let probes = 0;
+    const core = fixture(async spec => {
+      if (!spec.args.some(a => a.includes("ENNODIA_READY_"))) return reply(spec, 0);
+      probes++;
+      return { ...ok(), exitCode: null, timedOut: true };
+    });
+    try {
+      const checked = await core.checkHarnesses({ harnessIds: ["codex"], model: "slow-model", verify: true });
+      const readiness = checked.harnesses[0]?.readiness;
+      expect(readiness?.state).toBe("unverified");
+      expect(readiness?.message).toContain("timed out");
+      expect(readinessBlocked(readiness)).toBe(false);
+      expect(checked.actionRequired).toEqual([]);
+      const run = await core.startRun({ prompt: "review", harnessId: "codex", model: "slow-model", compare: false, budget: { maxChildTasks: 1 } });
+      expect((await core.waitForRun(run.id, 5_000))?.status).toBe("succeeded");
+      expect(run.preflight?.modelProbes).toBe(0);
+      expect(probes).toBe(1);
+    } finally { await core.shutdown(); }
+  });
+  it("does not confuse a slow native sign-in check with a confirmed setup failure", async () => {
+    const manager = new HarnessReadinessManager({ autoUpgrade: false, runCommand: async () => ({ ...ok(), timedOut: true, exitCode: null }) });
+    try {
+      const checked = await manager.check(harness, adapter);
+      expect(checked.state).toBe("unverified");
+      expect(readinessBlocked(checked)).toBe(false);
+    } finally { await manager.shutdown(); }
+  });
+  it("recognizes Claude's five-hour capacity message during native verification", async () => {
+    const core = fixture(async spec => spec.args.some(a => a.includes("ENNODIA_READY_"))
+      ? { ...ok("You've hit your 5-hour limit · resets 6:20pm (Europe/Amsterdam)"), exitCode: 1 } : reply(spec, 0));
+    try {
+      const checked = await core.checkHarnesses({ harnessIds: ["codex"], model: "exact-model", verify: true });
+      expect(checked.actionRequired[0]?.readiness.state).toBe("quota-exhausted");
+    } finally { await core.shutdown(); }
+  });
   it("verifies Cline's final JSON answer without accepting echoed or aborted events", async () => {
     const cline = harnessAdapters.find(a => a.id === "cline")!;
     const discovery = { ...harness, id: "cline", commandPath: "/fake/cline" };
@@ -32,7 +68,7 @@ describe("harness readiness", () => {
           : { type: "run_result", finishReason: kind === "aborted" ? "aborted" : "completed", text: nonce }));
       } });
       try {
-        expect((await manager.check(discovery, cline, { verify: true })).state).toBe(kind === "result" ? "ready" : "setup-required");
+        expect((await manager.check(discovery, cline, { verify: true })).state).toBe(kind === "result" ? "ready" : "unverified");
       } finally { await manager.shutdown(); }
     }
   });
@@ -101,7 +137,7 @@ describe("harness readiness", () => {
     { explicitCwd: false, model: undefined, expectedModel: "previous-model" },
     { explicitCwd: true, model: undefined, expectedModel: "previous-model" },
     { explicitCwd: false, model: "other-model", expectedModel: "other-model" },
-  ])("verifies the effective continuation model ($explicitCwd, $model)", async ({ explicitCwd, model, expectedModel }) => {
+  ])("uses the effective continuation model in preflight ($explicitCwd, $model)", async ({ explicitCwd, model, expectedModel }) => {
     const probedModels: string[] = [];
     const native: HarnessAdapter = {
       ...adapter, id: "session-fixture", supportsSessionContinuation: true,
@@ -127,13 +163,12 @@ describe("harness readiness", () => {
       expect(continued?.preflight?.checks[0]?.readiness.model).toBe(expectedModel);
       expect(core.getTask(continued!.taskIds[0])?.model).toBe(expectedModel);
       expect(continued?.finalAnswer).toContain(expectedModel);
-      expect(probedModels).toContain(expectedModel);
-      expect(probedModels).not.toContain("default");
+      expect(probedModels).toEqual([]);
     } finally { await core.shutdown(); }
   });
   it("does not accept a prompt echo or zero-exit error as readiness", async () => {
     const echo = new HarnessReadinessManager({ autoUpgrade: false, runCommand: async spec => ok(spec.args.join(" ")) });
-    expect((await echo.check(harness, adapter, { verify: true })).state).toBe("setup-required");
+    expect((await echo.check(harness, adapter, { verify: true })).state).toBe("unverified");
     const zeroError = new HarnessReadinessManager({ autoUpgrade: false, runCommand: async spec => spec.args.includes("status") ? ok("Logged in") : ok('{"type":"turn.failed","error":{"message":"You\'ve hit your usage limit"}}') });
     expect((await zeroError.check(harness, adapter, { verify: true })).state).toBe("quota-exhausted");
   });
@@ -188,7 +223,7 @@ describe("harness readiness", () => {
       const terminal = await core.waitForRun(started.id, 5_000);
       expect(terminal?.status).toBe("failed");
       expect(terminal?.actionRequired).toBeUndefined();
-      expect((await core.listHarnesses())[0]?.readiness?.state).toBe("ready");
+      expect((await core.listHarnesses())[0]?.readiness?.state).toBe("unverified");
     } finally { await core.shutdown(); }
   });
   it("still recognizes plain stdout blockers during native status and model checks", async () => {
@@ -204,13 +239,14 @@ describe("harness readiness", () => {
       } finally { await manager.shutdown(); }
     }
   });
-  it("refuses readiness calls beyond the caller's preflight budget", async () => {
+  it("uses the caller's one-worker budget without adding a model probe", async () => {
     let probes = 0;
     const core = fixture(async spec => { if (spec.args.some(a => a.includes("ENNODIA_READY_"))) probes++; return reply(spec, 0); });
     try {
-      await expect(core.startRun({ prompt: "review", harnessId: "codex", compare: false, budget: { maxChildTasks: 1 } })).rejects.toThrow("readiness probes");
+      const started = await core.startRun({ prompt: "review", harnessId: "codex", compare: false, budget: { maxChildTasks: 1 } });
+      expect((await core.waitForRun(started.id, 5_000))?.status).toBe("succeeded");
       expect(probes).toBe(0);
-      expect(core.listTasks()).toHaveLength(0);
+      expect(core.listTasks()).toHaveLength(1);
     } finally { await core.shutdown(); }
   });
   it("refreshes readiness after the TTL or installed version changes", async () => {
@@ -249,6 +285,20 @@ describe("harness readiness", () => {
       await new HarnessReadinessManager({ stateDir: dir, runCommand: runner }).upgrade(h, true);
       expect(upgrades).toBe(2);
     } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+  it("preserves verified access when maintenance is deferred without changing the installation", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "ennodia-deferred-access-"));
+    const path = join(dir, "agy"); writeFileSync(path, "fixture");
+    const h = { ...harness, id: "antigravity", commandPath: path };
+    let busy = false, probes = 0;
+    const manager = new HarnessReadinessManager({ stateDir: dir, isBusy: () => busy, runCommand: async spec => { probes++; return reply(spec, 0); } });
+    try {
+      expect((await manager.check(h, adapter, { verify: true })).state).toBe("ready");
+      busy = true;
+      await manager.upgrade(h, true);
+      expect((await manager.check(h, adapter, { verify: true })).state).toBe("ready");
+      expect(probes).toBe(1);
+    } finally { await manager.shutdown(); rmSync(dir, { recursive: true, force: true }); }
   });
   it("exposes failed upgrades without claiming that the harness is current", async () => {
     const dir = mkdtempSync(join(tmpdir(), "ennodia-update-fail-"));
@@ -344,7 +394,7 @@ describe("harness readiness", () => {
     const started = Date.now();
     await manager.shutdown();
     expect(Date.now() - started).toBeLessThan(1_000);
-    expect((await pending).state).toBe("unreachable");
+    expect((await pending).state).toBe("unverified");
   });
   it("blocks a cached ready route while another server owns its upgrade lease", async () => {
     const dir = mkdtempSync(join(tmpdir(), "ennodia-update-lease-"));
@@ -396,8 +446,9 @@ describe("harness readiness", () => {
       await core.waitForRun(second.id, 5_000);
       expect(version).toBe("2");
       expect(upgrades).toBe(1);
-      expect(probes).toBe(1);
+      expect(probes).toBe(0);
       expect(second.preflight?.modelProbes).toBe(0);
+      expect(second.preflight?.checks[0]?.readiness.state).toBe("ready");
     } finally { await core.shutdown(); rmSync(dir, { recursive: true, force: true }); }
   });
 });

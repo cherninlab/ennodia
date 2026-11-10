@@ -81,7 +81,9 @@ Tell the user which step is needed before trying to call Ennodia.
 
 Ennodia includes an installation self-check in run results and rechecks. Its MCP startup instructions carry only installation problems. It uses the loaded code location to identify a source checkout, project-local dependency, global installation, package cache, or unknown scope. It checks the Bun version, package version, core files, bundled skills, and filesystem access for temporary workspaces, history, and harness update receipts. Development files are not required for a packaged install. The npm launcher stops before startup if Bun is too old.
 
-Tell the user about reported installation problems before the first run. Call `ennodia_check_harnesses` with `refresh: true` to refresh the installation report and native harness status after a repair. Filesystem access checks do not prove free disk space or future writes. They do not verify provider access or the latest published package version. A global install gives no extra permissions. The user's normal permissions still apply.
+Report confirmed installation blockers briefly. A running process using an older version needs a reconnect. This does not mean the installation is broken. Do not repeat unchanged warnings.
+
+Call `ennodia_check_harnesses` with `refresh: true` to refresh the installation report and native harness status after a repair. Filesystem access checks do not prove free disk space or future writes. They do not verify provider access or the latest published package version. A global install gives no extra permissions. The user's normal permissions still apply.
 
 The report also identifies compiled code. A compiled executable does not need separate source entrypoints. Missing bundled skills remain a reported limitation. Compilation is currently an experimental build path.
 

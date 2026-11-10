@@ -13,6 +13,7 @@ export type InstallationReport = {
   status: "healthy" | "limited" | "broken";
   version: string;
   packageVersion?: string;
+  restartRequired?: boolean;
   distribution: "source" | "compiled";
   scope: InstallationScope;
   evidence: string;
@@ -59,7 +60,8 @@ export function inspectInstallation(options: InstallationOptions = {}): Installa
   const jsr = readMetadata(join(codeRoot, "jsr.json"));
   const metadata = npm?.name === "ennodia" ? npm : jsr?.name === "@cherninlab/ennodia" ? jsr : undefined;
   const packageVersion = typeof metadata?.version === "string" ? metadata.version : undefined;
-  add("package-version", packageVersion === ENNODIA_VERSION ? "pass" : packageVersion ? "fail" : "warning", packageVersion ? `Metadata ${packageVersion}; loaded code ${ENNODIA_VERSION}.` : "Package metadata is unavailable; only the loaded code version is known.");
+  const restartRequired = Boolean(packageVersion && packageVersion !== ENNODIA_VERSION);
+  add("package-version", packageVersion === ENNODIA_VERSION ? "pass" : "warning", restartRequired ? `Installed ${packageVersion}; running ${ENNODIA_VERSION}. Reconnect the Ennodia MCP connection to load the installed version.` : packageVersion ? `Metadata ${packageVersion}; loaded code ${ENNODIA_VERSION}.` : "Package metadata is unavailable; only the loaded code version is known.");
 
   // JSR does not ship the npm launcher. Development tooling is not required.
   const declaredModules = Array.isArray(npm?.files) ? npm.files.filter((p): p is string => typeof p === "string" && /^src\/[^/*]+\.ts$/.test(p)) : [];
@@ -99,7 +101,7 @@ export function inspectInstallation(options: InstallationOptions = {}): Installa
   const launcher = launcherPath && isAbsolute(launcherPath) && canonical(launcherPath) === canonical(join(codeRoot, "bin/ennodia")) ? launcherPath : undefined;
   return {
     checkedAt: new Date().toISOString(), status: checks.some(c => c.status === "fail") ? "broken" : limitations.length ? "limited" : "healthy",
-    version: ENNODIA_VERSION, packageVersion, distribution: compiled ? "compiled" : "source", scope, evidence, codeRoot, serverCwd, launcher,
+    version: ENNODIA_VERSION, packageVersion, ...(restartRequired ? { restartRequired } : {}), distribution: compiled ? "compiled" : "source", scope, evidence, codeRoot, serverCwd, launcher,
     runtime: { name: bunVersion ? "bun" : "unsupported", version: bunVersion, executable: process.execPath, minimumVersion: MIN_BUN_VERSION, platform: process.platform, arch: process.arch },
     checks, storage: { temporaryDirectory, history, harnessUpdates: updates }, limitations,
   };

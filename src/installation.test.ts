@@ -69,9 +69,19 @@ describe("Ennodia installation evidence", () => {
     rmSync(join(root, "src/readiness.ts")); rmSync(join(root, "skills/pragmatic/SKILL.md"));
     const report = inspectInstallation({ codeRoot: root, home, env: {} });
     expect(report.status).toBe("broken");
-    expect(report.checks.find(c => c.id === "package-version")?.status).toBe("fail");
+    expect(report.checks.find(c => c.id === "package-version")?.status).toBe("warning");
     expect(report.limitations.join(" ")).toContain("src/readiness.ts");
     expect(report.limitations.join(" ")).toContain("skills are incomplete");
+  });
+
+  it("reports an installed update as needing a reload rather than a broken installation", () => {
+    const { dir, home } = fixture(); const root = join(dir, "checkout"); distribution(root); put(join(root, ".git"));
+    put(join(root, "package.json"), JSON.stringify({ name: "ennodia", version: "99.0.0" }));
+    const report = inspectInstallation({ codeRoot: root, home, env: {} });
+    expect(report.status).toBe("limited");
+    expect(report).toMatchObject({ restartRequired: true, version: ENNODIA_VERSION, packageVersion: "99.0.0" });
+    expect(report.limitations.join(" ")).toContain("Reconnect");
+    expect(report.checks.some(c => c.status === "fail")).toBe(false);
   });
 
   it("does not require the npm launcher or development files from a JSR distribution", () => {
