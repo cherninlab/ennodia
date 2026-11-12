@@ -1,6 +1,6 @@
 {
   "name": "ennodia",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "mcpName": "io.github.cherninlab/ennodia",
   "description": "Connects the AI agents you use: your agent hands a task to another and gets the answer back",
   "license": "MIT",
