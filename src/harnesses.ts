@@ -95,6 +95,8 @@ export type HarnessAdapter = {
   extractSessionId?: (stdout: string) => string | undefined;
   /** Some public CLIs report a semantic failure with exit code zero. */
   failureReason?: (stdout: string, stderr: string) => string | undefined;
+  /** A confirmed native failure that must stop a still-running CLI. */
+  streamFailureReason?: (stdout: string, stderr: string) => string | undefined;
   /** The CLI accepts operator instructions separately from the prompt. A
    * worker then reads Ennodia's limits as its session's own, not as text
    * inside the task, which a careful model can distrust. */
@@ -312,8 +314,10 @@ export const harnessAdapters: HarnessAdapter[] = [
     notes: ["Runs through `opencode run` without permission-bypass flags."],
     // Concurrent starts can fail while another instance holds its database.
     startupConflict: /database is locked/i,
+    streamFailureReason: (_stdout, stderr) => openCodeQuotaError(stderr),
     buildCommand: (commandPath, input) => {
-      const args = ["run"];
+      // Retryable provider errors otherwise stay in OpenCode's private log.
+      const args = ["run", "--print-logs", "--log-level", "ERROR"];
 
       if (input.cwd) {
         args.push("--dir", input.cwd);
@@ -500,6 +504,24 @@ export const harnessAdapters: HarnessAdapter[] = [
     },
   },
 ];
+
+/** OpenCode's public --print-logs stderr; never inspect worker stdout here. */
+export function openCodeQuotaError(stderr: string): string | undefined {
+  for (const line of stderr.split(/\r?\n/)) {
+    if (!/^timestamp=\S+ level=ERROR /.test(line) ||
+        !/ message="stream error" /.test(line) ||
+        !/ small=false /.test(line) || !/ mode=primary /.test(line)) continue;
+    // Ignore small/title requests: they can fail while the main agent works.
+    const encoded = / error\.error=("(?:[^"\\]|\\.)*")(?= |$)/.exec(line)?.[1];
+    if (!encoded) continue;
+    let message: string;
+    try { message = JSON.parse(encoded); } catch { continue; }
+    if (/^AI_APICallError:\s*(?:OpenCode )?Go usage limit (?:reached|exceeded)\b/i.test(message)) {
+      return message.replace(/^AI_APICallError:\s*/i, "");
+    }
+  }
+  return undefined;
+}
 
 function extractCodexSessionId(stdout: string): string | undefined {
   for (const line of stdout.split(/\r?\n/)) {

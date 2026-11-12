@@ -4,6 +4,7 @@ import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { stripVTControlCharacters } from "node:util";
 import type { CommandSpec, HarnessAdapter, HarnessDiscovery, HarnessRunInput } from "./harnesses";
+import { openCodeQuotaError } from "./harnesses";
 import { signalOwnedProcess } from "./process";
 
 export type ReadinessState = "unverified" | "ready" | "login-required" | "credentials-expired" | "setup-required" | "model-unavailable" | "quota-exhausted" | "unreachable" | "updating";
@@ -42,6 +43,7 @@ export class HarnessReadinessError extends Error {
 
 /** Recognize native failure envelopes, never quoted prose inside an answer. */
 export function nativeReadinessFailure(stdout: string, stderr: string, allowPlainStdout = false): ReadinessState | undefined {
+  if (openCodeQuotaError(stderr)) return "quota-exhausted";
   const stderrLines = stripVTControlCharacters(stderr).split(/\r?\n/);
   const lines = [...stderrLines, ...stripVTControlCharacters(stdout).split(/\r?\n/)];
   for (const [index, line] of lines.entries()) {

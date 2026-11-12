@@ -21,6 +21,26 @@ function fixture(runCommand: MaintenanceCommandRunner = reply) {
 }
 
 describe("harness readiness", () => {
+  it("reports an OpenCode quota failure promptly and blocks repeat calls to the same exhausted route", async () => {
+    const log = 'timestamp=2026-11-11T17:01:04.854Z level=ERROR run=b901e653 message="stream error" providerID=opencode-go modelID=kimi-k3.1-pro session.id=ses_fixture small=false agent=build mode=primary error.error="AI_APICallError: OpenCode Go usage limit reached"';
+    const opencode = { ...harnessAdapters.find(a => a.id === "opencode")!, buildCommand: () => ({ command: process.execPath, args: ["-e", `process.stderr.write(${JSON.stringify(log + "\n")}); setInterval(() => {}, 1000)`] }) };
+    const discovery = { ...harness, id: opencode.id, name: opencode.name };
+    const core = new EnnodiaCore({ discoverHarnesses: async () => [discovery], findHarnessAdapter: () => opencode, readinessOptions: { autoUpgrade: false, runCommand: async () => ok() } });
+    try {
+      const input = { prompt: "review", harnessId: "opencode", model: "opencode-go/kimi-k3.1-pro", compare: false as const, timeoutMs: 1_800_000 };
+      const run = await core.startRun(input);
+      const result = await core.waitForRun(run.id, 3_000);
+      expect(result?.status).toBe("failed");
+      expect(result?.diagnosis?.likelyCause).toContain("capacity was exhausted");
+      const error = await core.startRun(input).catch(e => e);
+      expect(error).toBeInstanceOf(HarnessReadinessError);
+      expect(error.actionRequired[0].readiness.state).toBe("quota-exhausted");
+      expect(core.listTasks()).toHaveLength(1);
+      expect(nativeReadinessFailure(log, "")).toBeUndefined();
+      expect(nativeReadinessFailure("", log.replace("small=false", "small=true"))).toBeUndefined();
+    } finally { await core.shutdown(); }
+  });
+
   it("keeps a timed-out model check unverified and allows the real task without another probe", async () => {
     let probes = 0;
     const core = fixture(async spec => {

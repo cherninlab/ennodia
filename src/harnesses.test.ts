@@ -1,8 +1,22 @@
 import { describe, expect, it } from "bun:test";
-import { assertHarnessSettingsSupported, harnessAdapters, hasMultimodalInput, withInputGuidance } from "./harnesses";
+import { assertHarnessSettingsSupported, harnessAdapters, hasMultimodalInput, openCodeQuotaError, withInputGuidance } from "./harnesses";
 import { allPriorityHarnessIds } from "./priority";
 
 describe("harness adapters", () => {
+  it("exposes OpenCode errors and recognizes only primary native Go quota failures", () => {
+    const adapter = harnessAdapters.find(a => a.id === "opencode")!;
+    expect(adapter.buildCommand!("opencode", { prompt: "review", model: "opencode-go/kimi-k3.1-pro" }).args).toEqual([
+      "run", "--print-logs", "--log-level", "ERROR", "--model", "opencode-go/kimi-k3.1-pro", "--", "review",
+    ]);
+    const log = 'timestamp=2026-11-11T17:01:04.854Z level=ERROR run=b901e653 message="stream error" providerID=opencode-go modelID=kimi-k3.1-pro session.id=ses_fixture small=false agent=build mode=primary error.error="AI_APICallError: OpenCode Go usage limit reached"';
+    expect(openCodeQuotaError(log)).toBe("OpenCode Go usage limit reached");
+    expect(openCodeQuotaError(log.replace("OpenCode Go usage limit reached", "Go usage limit exceeded"))).toBe("Go usage limit exceeded");
+    for (const text of [log.slice(0, -1), `Quoted: ${log}`, log.replace("small=false", "small=true"), log.replace("mode=primary", "mode=subagent"), log.replace("usage limit reached", "temporary network failure")]) {
+      expect(openCodeQuotaError(text)).toBeUndefined();
+    }
+    expect(adapter.streamFailureReason!(log, "")).toBeUndefined();
+  });
+
   it("runs Kilo Code without auto-approval flags", () => {
     const adapter = harnessAdapters.find((candidate) => candidate.id === "kilo");
 

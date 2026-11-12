@@ -145,6 +145,8 @@ type InternalTask = Omit<
   isolatedCwd?: string;
   extractUsage?: HarnessAdapter["extractUsage"];
   failureReason?: HarnessAdapter["failureReason"];
+  streamFailureReason?: HarnessAdapter["streamFailureReason"];
+  streamFailure?: string;
   /** The exact spawn, kept so a start that met a startup conflict can run again. */
   spawnInput: TaskSpawnInput;
   stdinText?: string;
@@ -379,6 +381,7 @@ ${noticeLines.join("\n")}
       isolatedCwd,
       extractUsage: adapter.extractUsage,
       failureReason: adapter.failureReason,
+      streamFailureReason: adapter.streamFailureReason,
       spawnInput,
       stdinText: commandSpec.stdin,
       startupConflict: adapter.startupConflict,
@@ -407,7 +410,7 @@ ${noticeLines.join("\n")}
     ]).then(() => undefined);
 
     task.timeout = setTimeout(() => {
-      if (task.cancelRequested) {
+      if (task.cancelRequested || task.streamFailure) {
         return;
       }
 
@@ -549,7 +552,7 @@ ${noticeLines.join("\n")}
         terminalStatus = "cancelled";
       } else {
         terminalStatus =
-          exitCode === 0 && !task.timedOut && !task.drainTimedOut
+          exitCode === 0 && !task.timedOut && !task.drainTimedOut && !task.streamFailure
             ? "succeeded"
             : "failed";
       }
@@ -628,7 +631,7 @@ ${noticeLines.join("\n")}
   private metStartupConflict(task: InternalTask): boolean {
     return Boolean(task.startupConflict?.test(task.stderr)) &&
       !task.stdout.trim() &&
-      !task.cancelRequested && !task.timedOut && !task.drainTimedOut && !this.shuttingDown &&
+      !task.cancelRequested && !task.timedOut && !task.drainTimedOut && !task.streamFailure && !this.shuttingDown &&
       (task.startupRestarts ?? 0) < MAX_STARTUP_RESTARTS &&
       Date.now() - task.attemptStartedAtMs < STARTUP_CONFLICT_WINDOW_MS;
   }
@@ -903,6 +906,7 @@ ${noticeLines.join("\n")}
         }
         task.streamCaptureTruncated ||= task[streamName].length + chunk.length > MAX_CAPTURE_CHARS;
         task[streamName] = appendLimited(task[streamName], chunk);
+        this.checkStreamFailure(task);
         task.lastOutputAtMs = Date.now();
         this.pushEvent(task, { type: streamName, message: chunk });
         this.touch(task);
@@ -912,6 +916,7 @@ ${noticeLines.join("\n")}
       if (finalChunk) {
         task.streamCaptureTruncated ||= task[streamName].length + finalChunk.length > MAX_CAPTURE_CHARS;
         task[streamName] = appendLimited(task[streamName], finalChunk);
+        this.checkStreamFailure(task);
         task.lastOutputAtMs = Date.now();
         this.pushEvent(task, { type: streamName, message: finalChunk });
         this.touch(task);
@@ -919,6 +924,20 @@ ${noticeLines.join("\n")}
     } finally {
       task.streamReaders.delete(reader);
       reader.releaseLock();
+    }
+  }
+
+  private checkStreamFailure(task: InternalTask): void {
+    if (!task.streamFailureReason || task.streamFailure || task.cancelRequested || task.timedOut) return;
+    try {
+      const reason = task.streamFailureReason(task.stdout, task.stderr);
+      if (!reason) return;
+      task.streamFailure = reason;
+      this.pushEvent(task, { type: "error", message: reason });
+      this.terminate(task);
+    } catch (error) {
+      task.streamFailureReason = undefined;
+      this.pushEvent(task, { type: "error", message: `Adapter stream check failed: ${String(error)}` });
     }
   }
 

@@ -1,5 +1,6 @@
 import type { TaskView } from "./tasks";
 import { truncate } from "./internal";
+import { openCodeQuotaError } from "./harnesses";
 
 export type TaskOutputPreview = {
   harnessId: string;
@@ -150,7 +151,8 @@ export function hasCodexQuotaError(stdout: string): boolean {
 }
 
 function hasQuotaError(task: TaskView): boolean {
-  return task.harnessId === "codex" && (hasCodexQuotaError(task.stdout) || hasCodexQuotaError(task.stderr));
+  return task.harnessId === "opencode" ? Boolean(openCodeQuotaError(task.stderr))
+    : task.harnessId === "codex" && (hasCodexQuotaError(task.stdout) || hasCodexQuotaError(task.stderr));
 }
 
 function hasAuthenticationError(task: TaskView): boolean {

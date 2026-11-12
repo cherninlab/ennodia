@@ -14,6 +14,33 @@ import { harnessAdapters, type HarnessAdapter, type HarnessDiscovery } from "./h
 import { TaskManager, type TaskSpawn } from "./tasks";
 
 describe("TaskManager", () => {
+  it("fails promptly on a fragmented OpenCode quota log even when the CLI stays alive or exits zero", async () => {
+    const opencode = harnessAdapters.find(a => a.id === "opencode")!;
+    const log = 'timestamp=2026-11-11T17:01:04.854Z level=ERROR run=b901e653 message="stream error" providerID=opencode-go modelID=kimi-k3.1-pro session.id=ses_fixture small=false agent=build mode=primary error.error="AI_APICallError: OpenCode Go usage limit reached"';
+    for (const hang of [true, false]) {
+      const manager = new TaskManager();
+      const fixture: HarnessAdapter = { ...opencode, buildCommand: () => ({ command: process.execPath, args: ["-e", `
+        process.on('SIGTERM', () => {});
+        process.stderr.write(${JSON.stringify(log.slice(0, -1))});
+        setTimeout(() => {
+          process.stderr.write('"\\n');
+          ${hang ? "setInterval(() => {}, 1000);" : "process.exit(0);"}
+        }, 40);
+      `] }) };
+      try {
+        const { task } = manager.start(fixture, bunDiscovery, { prompt: "review", timeoutMs: 1_800_000 });
+        const result = await waitForTask(manager, task.id);
+        expect(result.status).toBe("failed");
+        expect(result.timedOut).toBe(false);
+        expect(result.cancelRequested).toBe(false);
+        expect(result.elapsedMs).toBeLessThan(2_000);
+        expect(result.events.filter(e => e.type === "error" && e.message === "OpenCode Go usage limit reached")).toHaveLength(1);
+        expect(result.events.some(e => e.message?.includes("Timed out after"))).toBe(false);
+        expect(() => process.kill(result.pid!, 0)).toThrow();
+      } finally { await manager.shutdown(); }
+    }
+  });
+
   it("rejects explicit reasoning effort for unsupported harnesses before spawning", () => {
     let spawned = false;
     const manager = new TaskManager({
