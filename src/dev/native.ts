@@ -2,6 +2,7 @@ import { copyFile, lstat, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { createHash } from "node:crypto";
 import { MIN_BUN_VERSION } from "../installation";
+import { parsePackResult } from "./npm-pack";
 
 export const NATIVE_TARGETS = [
   { id: "darwin-arm64", os: "darwin", cpu: "arm64", target: "bun-darwin-arm64" },
@@ -57,11 +58,11 @@ export async function buildNative(id = hostTargetId()): Promise<{ binary: string
 }
 
 export async function packNative(id = hostTargetId()): Promise<string> {
-  const { directory } = await buildNative(id);
+  const { directory, name } = await buildNative(id);
   const proc = Bun.spawn(["npm", "pack", "--json", "--pack-destination", nativeOutput], { cwd: directory, stdout: "pipe", stderr: "inherit" });
   const output = await new Response(proc.stdout).text();
   if (await proc.exited !== 0) throw new Error(`Native pack failed: ${id}`);
-  return join(nativeOutput, JSON.parse(output)[0].filename);
+  return join(nativeOutput, parsePackResult(output, name).filename);
 }
 
 if (import.meta.main) {
