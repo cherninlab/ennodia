@@ -3,48 +3,103 @@
   <img alt="Ennodia" src="docs/assets/logo.svg" width="235" height="50">
 </picture>
 
-**Ennodia isn't another agent. It connects the agents you use.**
+# Keep your favorite agent. Bring in the others
 
-Stay in Codex, Claude Code, or any agent you like.
-When a task needs another model, your agent hands that part over through Ennodia and brings the answer back.
-Ennodia runs on your computer, and each agent uses your own account.
+You like working in Claude Code, but you want Codex's opinion on a plan.
+Getting that opinion can mean copying context between apps, waiting, and carrying the answer back.
+Every exchange waits for your attention.
 
-```text
-Have Gemini listen to meeting.mp3 through Ennodia and tell me what was decided.
-```
-
-## Why use it
-
-- **Keep the app you like.** Ennodia has no window of its own. You work in your agent as before, and it can now reach the others.
-- **Your agents work together.** Any agent can hand part of a task to any other and get the answer back in your chat.
-- **Nothing to pay, nothing to join.** Ennodia is free and open source, with no account. It uses the agents and plans you have.
-- **It grows with your agents.** It is a set of tools, not a framework or a method. Each new model one agent gains becomes an ability for all of them.
-- **It stays on your computer.** Every handoff leaves a receipt there: who did the work, how long it took, and what came back.
-- **Less to keep up with.** You don't need to follow every new model. Name the task, and your agent hands it to one that can do it.
-
-Next on the [roadmap](https://ennodia.cherninlab.com/docs/roadmap/): Ennodia reads its receipts, so your agent stops repeating what failed.
-
-## What each agent adds
-
-No model leads every task, so each agent you connect brings an ability the others lack.
-
-- **Listen.** Gemini hears audio files. Codex hands it the file path and gets back what Gemini heard.
-- **Draw.** Codex draws with GPT Image. Claude Code can hand it a brief and get the images back.
-- **Review.** Two other agents review the same patch in fresh sessions. Compare maps where they agree and differ.
-- **Read.** Kimi K3 in OpenCode reads long documents. Your agent hands it a spec and gets back the rules, each with its line number.
-
-When your own agent has the ability, it does the task itself, with no handoff.
-[See each route](https://ennodia.cherninlab.com/#abilities) and the [public scores behind each strength](https://ennodia.cherninlab.com/#evidence).
-
-## Install
-
-Send this address to your agent:
+Ennodia lets your agent make that exchange for you.
+After setup, a request in Claude Code can be:
 
 ```text
-try-ennodia.cherninlab.com
+Ask Codex to review this plan through Ennodia.
 ```
 
-For manual setup, add this Model Context Protocol (MCP) server to your client:
+Claude Code prepares the context.
+Ennodia starts Codex with the task and returns its findings.
+Claude Code can use those findings to continue working with you in the same conversation.
+
+Ennodia is a free, open-source set of tools for calling other agents installed on your computer.
+It uses their configured access, including existing subscriptions where supported.
+The same connection works in other directions, across supported agents.
+
+[Get started](#try-it-with-your-agents) · [See recorded exchanges](https://ennodia.cherninlab.com/examples/exchanges/)
+
+## More than a second opinion
+
+An agent is more than its model.
+Its tools, instructions, skills, and permissions determine what it can do.
+Another agent may have a capability yours lacks.
+
+In one [recorded check](https://ennodia.cherninlab.com/articles/can-gemini-hear-this-file/), a Codex conversation got help from Gemini through Antigravity.
+The worker reported listening to an eight-second MP3 and returned the spoken words in about 20 seconds.
+The field note records that configuration, its evidence, and the limits of the result.
+
+An example request for that route:
+
+```text
+Use Gemini through Antigravity to transcribe clip.mp3 via Ennodia.
+Test a short excerpt first and report any access or format limits.
+```
+
+Available capabilities depend on the installed agent, model, tools, and permissions.
+
+Independent work can also run while you continue the conversation.
+Your agent can start another task, keep working with you, and collect its result later.
+Tasks that do not depend on each other can run in parallel.
+
+```text
+Send this specification to another agent through Ennodia.
+Have it list the open questions while we continue here.
+```
+
+You can name an agent, model, or installed skill, or let your main agent choose.
+
+## Try it with your agents
+
+Give the agent you work in this request:
+
+```text
+Help me set up Ennodia: https://try-ennodia.cherninlab.com
+Check which supported agents I can use on this computer.
+Tell me about any sign-in, configuration, or restart I need.
+```
+
+The address opens installation instructions your agent can follow.
+Setup can require your approval, native sign-in, configuration, or an app restart.
+
+You need:
+
+- **An app to work in** that can launch a local Model Context Protocol (MCP) server.
+- **A supported agent to call**, installed with working model access.
+
+The standard install downloads the executable for your platform.
+It includes its runtime and bundled skills.
+
+Ennodia calls each supported agent through its command-line interface (CLI).
+A browser-only chat cannot launch these local programs.
+
+Supported agents: Codex CLI, Claude Code, OpenCode, Kilo Code, Kiro CLI, Cline CLI, Hermes Agent, and Antigravity.
+Available models and tools depend on each installation.
+
+Then use the opening review request on a real plan or change.
+Check the findings against your work and decide what to use.
+
+Your main agent selects and sends the task context.
+The other agent does not automatically receive your full conversation.
+You may need to identify a missing file or decision, supply more context, or approve access.
+
+[Quickstart](https://ennodia.cherninlab.com/docs/getting-started/) ·
+[Agent compatibility and setup](https://ennodia.cherninlab.com/docs/reference/supported-harnesses/) ·
+[Troubleshooting](https://ennodia.cherninlab.com/docs/guides/troubleshooting/)
+
+<details>
+<summary>Manual MCP setup</summary>
+
+Ennodia runs as a local MCP server that your client starts.
+Add it through your client's supported configuration method.
+For clients using this JSON format:
 
 ```json
 {
@@ -57,105 +112,57 @@ For manual setup, add this Model Context Protocol (MCP) server to your client:
 }
 ```
 
-Ennodia loads eight core tools by default: about 13,000 characters of tool definitions in each session.
-Add `"--tools", "all"` to `args` for the [full tool set](https://ennodia.cherninlab.com/docs/reference/mcp-tools/#tool-sets).
+`npx` downloads Ennodia and selects the executable for your platform.
+It requires Node.js `18` or newer.
+For installation without npm, use a standalone executable from [GitHub Releases](https://github.com/cherninlab/ennodia/releases).
+Use its absolute path as the MCP server command.
 
-Requirements: Bun `1.3.14` or newer, a compatible MCP client, and a supported agent with working provider access.
-`npx` downloads Ennodia. Bun runs it. You can also use `bunx ennodia`.
+Preserve existing server entries.
+Reload tools or restart the client when required.
 
-[Get your first result](https://ennodia.cherninlab.com/docs/getting-started/) ·
-[Installation for agents](https://ennodia.cherninlab.com/docs/install/)
+[Installation instructions](https://ennodia.cherninlab.com/docs/install/) ·
+[Tool reference](https://ennodia.cherninlab.com/docs/reference/mcp-tools/)
 
-## How a handoff works
+</details>
 
-1. Your agent calls `ennodia_run` with the task, the agent or model to use, and a time limit.
-2. Ennodia checks the selected route, then starts that agent's own command-line tool in a fresh session, with its own tools and your account for it.
-3. The answer comes back to your conversation, with its status and a receipt saved on your computer.
+## Costs and data
 
-Your conversation history stays in your agent.
-For two or more answers, Compare maps agreements, contradictions, and gaps.
-When one answer is complete as it stands, Compare can choose it, and `ennodia_run` returns it unchanged.
+Tasks use the accounts and provider access configured in each agent.
+Their normal charges and usage limits apply.
+Ennodia requires no account or subscription of its own.
 
-Include relevant constraints and prior decisions in your task prompt under **Keep in mind**.
-Ennodia asks workers and Compare to return useful reminders with reasons and evidence.
-Your agent verifies them before carrying them into the next task.
-See [how to read these notes](https://ennodia.cherninlab.com/docs/guides/understand-results/#keep-in-mind).
+You can cap task counts and estimated input tokens before a run starts.
+Input estimates exclude work inside an agent and do not cap provider bills.
+The optional Compare step adds model passes and usage.
 
-## Supported agents
+Ennodia runs locally without an Ennodia-hosted backend.
+The agents it calls can send task material to their configured model providers.
+Run history is local by default.
+Set `ENNODIA_HISTORY=0` to disable durable history.
 
-Codex CLI, Claude Code, OpenCode, Kilo Code, Kiro CLI, Cline, Hermes Agent, and Antigravity.
-Model availability and tool permissions depend on the installed agent and its provider configuration.
-Discovery reports native login checks and confirmed recovery actions. The requested task verifies model access without a separate model call first.
-Codex workers use a read-only sandbox by default.
+[Budgets and limits](https://ennodia.cherninlab.com/docs/guides/budgets-and-limits/) ·
+[Data governance](https://ennodia.cherninlab.com/docs/concepts/data-governance/)
 
-Ennodia discovers native Agent Skills and can request them for specific tasks.
-A separate task keeps the trial outside the main conversation.
-Native agents can also select unrequested skills from their own environment.
+## Why I built Ennodia
 
-[Recipes](https://ennodia.cherninlab.com/docs/guides/recipes/) ·
-[Using skills](https://ennodia.cherninlab.com/docs/guides/agent-skills/) ·
-[Understand results](https://ennodia.cherninlab.com/docs/guides/understand-results/)
+Choosing an agent app often means choosing an interface, a model, a set of tools, and an ecosystem together.
+I wanted to keep the interface I like without giving up another agent's capabilities.
+I wanted my existing tools to work together.
 
-## Evidence
+In my own use, agents have used the connection differently.
+Some sought second opinions, some delegated parts of a task, and others made parallel calls.
+Their behavior depended on the model, instructions, and task.
 
-- [Can Gemini hear this file?](https://ennodia.cherninlab.com/articles/can-gemini-hear-this-file/): a Codex conversation hands an audio file to Gemini through Antigravity.
-- [Measurement plan](https://ennodia.cherninlab.com/docs/evidence/measurement/): how Ennodia compares single agents with teams on public benchmarks.
-- [Audio routing pilot](bench/audio-routing/pilot-2026-09-26.md): Codex got 10 of 10 speech questions right through Gemini, and 4 of 10 alone. Across all 30 clips the gain was not significant, and each answer took about twice as long.
+Ennodia connects separate agent environments.
+You or your agent can decide when to consult, delegate, or compare.
+Routing and planning tools are available, but you do not have to adopt a fixed team or collaboration strategy.
+Use it alongside built-in subagents or as a tool in a larger autonomous workflow.
 
-## Data and limits
+Start with two agents and one question.
 
-Ennodia runs locally without an Ennodia-hosted service.
-Selected agents can send material to their configured model providers.
-Terminal run history is stored locally and can be disabled with `ENNODIA_HISTORY=0`.
+Stay where you like.
 
-Each handoff costs time and uses your agents' own quotas and charges.
-General time or token savings have not been established.
-Ennodia can limit child tasks and estimated input tokens.
-Those estimates exclude internal harness work and are not provider bills.
-
-[Data governance](https://ennodia.cherninlab.com/docs/concepts/data-governance/) ·
-[Budgets](https://ennodia.cherninlab.com/docs/guides/budgets-and-limits/) ·
-[Roadmap](https://ennodia.cherninlab.com/docs/roadmap/)
-
-## Technical reference and contribution
-
-The main entry point is `ennodia_run`.
-The full tool set adds raw tasks, separate Compare calls, budget estimates, and the Plan Advisor, which proposes explicit tasks before execution.
-
-[MCP tools](https://ennodia.cherninlab.com/docs/reference/mcp-tools/) ·
-[Experimental Ennodia IO](https://ennodia.cherninlab.com/docs/reference/ennodia-io/) ·
+[Task recipes](https://ennodia.cherninlab.com/docs/guides/recipes/) ·
+[Agent Skills](https://ennodia.cherninlab.com/docs/guides/agent-skills/) ·
+[Documentation](https://ennodia.cherninlab.com/docs/) ·
 [Contributing](CONTRIBUTING.md) · [MIT license](LICENSE)
-
-```sh
-bun install
-bun run verify
-```
-
-### Experimental Pragmatic mode
-
-[Pragmatic mode](docs/guides/pragmatic-mode.md) runs independent model attempts, tailored plans, and skill trials, then compares the evidence.
-It keeps bulky evidence outside the main conversation and returns findings for your agent to verify.
-Savings are not yet validated.
-
-## Login recovery and updates
-
-Ennodia checks selected workers, Judge, and Advisor routes before execution.
-Blocked routes return a native recovery action before reviewers start.
-Ennodia says nothing about its own status unless an agent you asked for is blocked.
-Rechecks and blocked starts return compact diagnostics. The full setup panel appears only for an explicit setup request.
-
-Your agent calls `ennodia_setup` to show each agent's status and fix in your current session.
-Hosts that render MCP Apps, such as Claude Desktop and Visual Studio Code, can show it as a card with check buttons.
-Other hosts, such as Codex and Claude Code, show the Markdown panel.
-
-Run that action in an interactive terminal, then call `ennodia_check_harnesses` with the same harness and model and `refresh: true, verify: true`.
-Run receipts keep missing reviewer coverage visible, including in compact responses.
-
-Supported harness upgrades run once per day on use while Ennodia has no active tasks.
-Set `ENNODIA_AUTO_UPDATE=false` to disable them.
-Use `ennodia_check_harnesses` with `upgrade: true` to update and recheck immediately.
-
-Ennodia also checks its own installation automatically. Run results report the loaded code location, version, runtime, and installation scope. The report checks required files, bundled skills, and storage access. The recheck tool refreshes this report. MCP startup instructions carry only installation problems.
-
-Mention installation limitations when they affect the request. Cache installs can change on a future unpinned launch. These local checks do not verify the latest registry version or provider access.
-See [recovery and updates](https://ennodia.cherninlab.com/docs/reference/supported-harnesses/#recovery-and-updates).

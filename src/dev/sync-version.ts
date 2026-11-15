@@ -1,3 +1,5 @@
+import { NATIVE_TARGETS, nativePackageName } from "./native";
+
 type PackageJson = {
   description: string;
   name: string;
@@ -5,6 +7,7 @@ type PackageJson = {
   dependencies?: Record<string, string>;
   peerDependencies?: Record<string, string>;
   peerDependenciesMeta?: Record<string, unknown>;
+  optionalDependencies?: Record<string, string>;
 };
 
 type JsrJson = {
@@ -39,6 +42,8 @@ const version = packageJson.version;
 if (!version) {
   throw new Error("Root package.json is missing a version.");
 }
+packageJson.optionalDependencies = Object.fromEntries(NATIVE_TARGETS.map(t => [nativePackageName(t.id), version]));
+await writeTextIfChanged(packageJsonUrl, `${JSON.stringify(packageJson, null, 2)}\n`);
 
 const jsrJson = await readJson<JsrJson>(jsrJsonUrl);
 jsrJson.version = version;

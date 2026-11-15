@@ -20,7 +20,7 @@ The agent handles the setup steps below.
 
 1. Identify the user's client and the machine where Ennodia will run.
 2. Check that the client can launch a local standard input/output (stdio) MCP server.
-3. Check for Bun `1.3.14` or newer in that environment.
+3. Check for `npx` with Node.js `18` or newer, or use an official standalone executable.
 4. Check for a supported agent command-line interface (CLI) with working provider access.
 
 Use the client's supported configuration method and the tools' official installation instructions.
@@ -39,8 +39,17 @@ Use the npm package for normal MCP client installation:
 npx -y ennodia
 ```
 
-Ennodia requires Bun `1.3.14` or newer. `npx` downloads Ennodia. Bun runs it.
-If the client supports Bun directly, use `bunx ennodia`.
+`npx` downloads the executable for the user's platform.
+The executable includes its runtime, dependencies, and bundled skills.
+Keep npm optional dependencies enabled so npm can select the platform package.
+
+For installation without npm, download the matching executable from [GitHub Releases](https://github.com/cherninlab/ennodia/releases).
+Verify it against the release's `SHA256SUMS` file.
+Use its absolute path as the MCP server command, with an empty `args` array.
+On macOS and Linux, make the downloaded file executable before starting it.
+
+Standalone targets: macOS arm64 and x64, Linux arm64 and x64, and Windows x64.
+Linux builds are available for glibc and musl.
 
 ## MCP configuration
 
@@ -57,7 +66,7 @@ Add this server to the user's MCP client configuration:
 }
 ```
 
-For a local Ennodia checkout, use:
+For source development, install Bun `1.3.14` or newer and use a local Ennodia checkout:
 
 ```json
 {
@@ -79,13 +88,18 @@ Tell the user which step is needed before trying to call Ennodia.
 
 ## Get one useful result
 
-Ennodia includes an installation self-check in run results and rechecks. Its MCP startup instructions carry only installation problems. It uses the loaded code location to identify a source checkout, project-local dependency, global installation, package cache, or unknown scope. It checks the Bun version, package version, core files, bundled skills, and filesystem access for temporary workspaces, history, and harness update receipts. Development files are not required for a packaged install. The npm launcher stops before startup if Bun is too old.
+Ennodia includes an installation self-check in run results and rechecks.
+Its MCP startup instructions carry only installation problems.
+The report identifies standalone executables, source checkouts, package installations, and package caches.
+It checks the runtime, package version, bundled resources, and filesystem access for temporary workspaces, history, and harness update receipts.
+The npm launcher rejects missing or mismatched platform packages before startup.
 
 Report confirmed installation blockers briefly. A running process using an older version needs a reconnect. This does not mean the installation is broken. Do not repeat unchanged warnings.
 
 Call `ennodia_check_harnesses` with `refresh: true` to refresh the installation report and native harness status after a repair. Filesystem access checks do not prove free disk space or future writes. They do not verify provider access or the latest published package version. A global install gives no extra permissions. The user's normal permissions still apply.
 
-The report also identifies compiled code. A compiled executable does not need separate source entrypoints. Missing bundled skills remain a reported limitation. Compilation is currently an experimental build path.
+Standalone executables contain their core code, runtime, dependencies, and all six bundled skills.
+Separate source entrypoints are not required.
 
 After the client exposes Ennodia's tools, start with one small task:
 

@@ -8,6 +8,27 @@ review.
 - Bun `1.3.14` or newer
 - Local artificial intelligence (AI) tools only when you change or test their adapters
 
+Packaged MCP users run standalone executables and do not install Bun separately.
+Source development and the experimental IO package still use Bun.
+
+## Standalone distribution
+
+`bun run native:build` compiles and packs the current platform.
+Use `bun run native:build --all` for every supported platform.
+The artifacts and `SHA256SUMS` are in `dist/native/`.
+
+`bun run native:smoke` copies the executable outside the checkout and runs it with an empty `PATH`.
+It verifies MCP startup, embedded resources, and installation of all six bundled skills.
+CI also runs this check on macOS, Linux, and Windows.
+
+The root npm launcher selects a version-matched `@cherninlab/ennodia-*` optional package.
+These packages contain platform executables, with no installation scripts or extra runtime download.
+The release workflow publishes them before core and waits for public metadata and tarballs.
+The publication token must permit these packages in the `@cherninlab` scope.
+
+Use `bun run native:publish --dry-run` to check every native package without publishing.
+The release workflow also attaches standalone executables, platform tarballs, and checksums to the GitHub release.
+
 ## Local workflow
 
 ```sh
@@ -20,6 +41,7 @@ bun run verify
 - TypeScript typechecking
 - Oxlint
 - Bun tests
+- standalone executable smoke test
 - website build
 - controlled-English deterministic checks
 - task smoke test
@@ -68,6 +90,8 @@ root `package.json` version.
 `src/version.ts`, `server.json`, `manifest.json`, and the IO package version.
 It also derives the IO dependency on the core version. `bun test` verifies
 that the versions match.
+The command also pins every native optional package to the core version.
+After a version change, run `bun install --ignore-scripts` to refresh these pins in `bun.lock`.
 
 **Dist-tags.** Tags containing a hyphen publish to npm's `next` dist-tag.
 tags without a hyphen publish to `latest`:
@@ -84,13 +108,13 @@ exists solely on that channel.
 
 **Release checklist.**
 
-1. Update the root `package.json` version, then run `bun run version:sync`.
+1. Update the root `package.json` version, then run `bun run version:sync` and `bun install --ignore-scripts`.
 2. Run `bun run release:check`. It chains `bun run version:sync`,
    `bun run verify`,
    `npm pack --dry-run`, `npm publish --dry-run --tag next`,
    `npx jsr publish --dry-run --allow-dirty`, and a package smoke test that
-   packs a real tarball and MCP-handshakes it through `bunx`, `npm exec`,
-   and `npx`. It also runs the `@cherninlab/ennodia-io` typecheck, tests,
+   packs real tarballs and MCP-handshakes them through `npm exec` and `npx`.
+   It also runs the `@cherninlab/ennodia-io` typecheck, tests,
    pack dry-run, and npm publish dry-run.
 3. Commit the version change.
 4. Push a matching tag, for example `v0.1.0-rc.1`.

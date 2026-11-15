@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { inspectInstallation, MIN_BUN_VERSION } from "./installation";
@@ -96,7 +96,9 @@ describe("Ennodia installation evidence", () => {
   it("reports unsupported Bun versions, including a prerelease of the minimum", () => {
     for (const bunVersion of [null, "1.3.13", "1.3.14-canary", "invalid"]) expect(inspectInstallation({ bunVersion }).checks.find(c => c.id === "runtime")?.status).toBe("fail");
     for (const bunVersion of ["1.3.14", "1.4.0-canary", "2.0.0"]) expect(inspectInstallation({ bunVersion }).checks.find(c => c.id === "runtime")?.status).toBe("pass");
-    expect(JSON.parse(readFileSync(join(import.meta.dir, "../package.json"), "utf8")).engines.bun).toBe(`>=${MIN_BUN_VERSION}`);
+    const pkg = JSON.parse(readFileSync(join(import.meta.dir, "../package.json"), "utf8"));
+    expect(pkg.engines.node).toBe(">=18");
+    expect(pkg.packageManager).toBe(`bun@${MIN_BUN_VERSION}`);
   });
 
   it("recognizes embedded code and reports missing compiled resources without requiring separate source files", () => {
@@ -140,18 +142,24 @@ describe("Ennodia installation evidence", () => {
   });
 });
 
-describe("npm launcher runtime check", () => {
-  it("rejects an old runtime before launch and passes installation provenance on a supported runtime", () => {
-    const { dir } = fixture(); const bun = join(dir, "bun");
-    put(bun, '#!/usr/bin/env node\nif (process.argv[2] === "--version") console.log(process.env.FIXTURE_BUN_VERSION); else console.log(JSON.stringify({ launcher: process.env.ENNODIA_LAUNCHER_PATH, args: process.argv.slice(2) }));\n');
-    chmodSync(bun, 0o755);
-    const wrapper = join(import.meta.dir, "../bin/ennodia");
-    for (const version of ["1.3.13", "1.3.14-canary", "invalid"]) {
-      const result = Bun.spawnSync(["node", wrapper], { env: { ...process.env, PATH: `${dir}:${process.env.PATH}`, FIXTURE_BUN_VERSION: version }, stdout: "pipe", stderr: "pipe" });
-      expect(result.exitCode).toBe(1); expect(result.stderr.toString()).toContain("requires Bun >=1.3.14"); expect(result.stdout.toString()).toBe("");
-    }
-    const result = Bun.spawnSync(["node", wrapper, "--tools", "all"], { env: { ...process.env, PATH: `${dir}:${process.env.PATH}`, FIXTURE_BUN_VERSION: MIN_BUN_VERSION }, stdout: "pipe", stderr: "pipe" });
-    expect(result.exitCode).toBe(0);
-    expect(JSON.parse(result.stdout.toString())).toMatchObject({ launcher: wrapper, args: ["run", join(import.meta.dir, "cli.ts"), "--tools", "all"] });
+describe("npm standalone launcher", () => {
+  it("reports missing and mismatched platform packages without asking for a runtime", () => {
+    const { dir } = fixture();
+    const packageRoot = join(dir, "node_modules/ennodia");
+    const wrapper = join(packageRoot, "bin/ennodia");
+    put(wrapper, readFileSync(join(import.meta.dir, "../bin/ennodia"), "utf8"));
+    const musl = process.platform === "linux" && !(process.report.getReport() as { header: { glibcVersionRuntime?: string } }).header.glibcVersionRuntime;
+    const name = `@cherninlab/ennodia-${process.platform}-${process.arch}${musl ? "-musl" : ""}`;
+    put(join(packageRoot, "package.json"), JSON.stringify({ name: "ennodia", type: "module", version: ENNODIA_VERSION, optionalDependencies: { [name]: ENNODIA_VERSION } }));
+    const run = () => Bun.spawnSync([Bun.which("node")!, wrapper], { env: { ...process.env, PATH: dir }, stdout: "pipe", stderr: "pipe" });
+    const missing = run();
+    expect(missing.exitCode).toBe(1);
+    expect(missing.stderr.toString()).toContain("optional dependencies enabled");
+    expect(missing.stderr.toString()).not.toContain("Bun");
+    put(join(dir, "node_modules", name, "package.json"), JSON.stringify({ name, version: "0.0.0" }));
+    const mismatched = run();
+    expect(mismatched.exitCode).toBe(1);
+    expect(mismatched.stderr.toString()).toContain("executable version does not match");
+    expect(mismatched.stdout.toString()).toBe("");
   });
 });

@@ -14,6 +14,15 @@
         "oxlint": "^1.70.0",
         "typescript": "^6.0.3",
       },
+      "optionalDependencies": {
+        "@cherninlab/ennodia-darwin-arm64": "0.5.4",
+        "@cherninlab/ennodia-darwin-x64": "0.5.4",
+        "@cherninlab/ennodia-linux-arm64": "0.5.4",
+        "@cherninlab/ennodia-linux-arm64-musl": "0.5.4",
+        "@cherninlab/ennodia-linux-x64": "0.5.4",
+        "@cherninlab/ennodia-linux-x64-musl": "0.5.4",
+        "@cherninlab/ennodia-win32-x64": "0.5.4",
+      },
     },
     "website": {
       "name": "@ennodia/website",

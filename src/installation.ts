@@ -2,11 +2,11 @@ import { accessSync, constants, existsSync, readFileSync, realpathSync, statSync
 import { createRequire } from "node:module";
 import { homedir, tmpdir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
-import { fileURLToPath } from "node:url";
 import { ENNODIA_VERSION } from "./version";
+import { BUNDLED_ROOT, bundledText } from "./bundled";
 
 export const MIN_BUN_VERSION = "1.3.14";
-export type InstallationScope = "source-checkout" | "project-local" | "global" | "cache" | "unknown";
+export type InstallationScope = "source-checkout" | "project-local" | "global" | "cache" | "standalone" | "unknown";
 export type InstallationCheck = { id: string; status: "pass" | "warning" | "fail"; message: string };
 export type InstallationReport = {
   checkedAt: string;
@@ -44,7 +44,7 @@ export type InstallationOptions = {
 export function inspectInstallation(options: InstallationOptions = {}): InstallationReport {
   const env = options.env ?? process.env;
   const home = canonical(options.home ?? homedir());
-  const codeRoot = canonical(options.codeRoot ?? fileURLToPath(new URL("..", import.meta.url)));
+  const codeRoot = canonical(options.codeRoot ?? BUNDLED_ROOT);
   const compiled = /(?:^|\/)\$bunfs(?:\/|$)/.test(codeRoot.replaceAll("\\", "/"));
   const serverCwd = canonical(options.cwd ?? process.cwd());
   const bunVersion = options.bunVersion === undefined ? process.versions.bun : options.bunVersion ?? undefined;
@@ -54,11 +54,12 @@ export function inspectInstallation(options: InstallationOptions = {}): Installa
   const updates = { enabled: options.autoUpgrade ?? env.ENNODIA_AUTO_UPDATE !== "false", directory: resolve(options.upgradeStateDirectory ?? join(env.XDG_STATE_HOME ?? join(home, ".local", "state"), "ennodia", "harnesses")) };
   const checks: InstallationCheck[] = [];
   const add = (id: string, status: InstallationCheck["status"], message: string) => checks.push({ id, status, message });
-  add("runtime", bunVersion && atLeast(bunVersion, MIN_BUN_VERSION) ? "pass" : "fail", bunVersion ? `Bun ${bunVersion}; requires >=${MIN_BUN_VERSION}.` : `Bun >=${MIN_BUN_VERSION} is required.`);
+  add("runtime", bunVersion && atLeast(bunVersion, MIN_BUN_VERSION) ? "pass" : "fail", compiled && bunVersion ? `Embedded runtime ${bunVersion}. No separate runtime installation is needed.` : bunVersion ? `Bun ${bunVersion}; requires >=${MIN_BUN_VERSION}.` : `Bun >=${MIN_BUN_VERSION} is required.`);
 
   const npm = readMetadata(join(codeRoot, "package.json"));
   const jsr = readMetadata(join(codeRoot, "jsr.json"));
-  const metadata = npm?.name === "ennodia" ? npm : jsr?.name === "@cherninlab/ennodia" ? jsr : undefined;
+  const native = compiled ? readMetadata(join(dirname(process.execPath), "..", "package.json")) : undefined;
+  const metadata = typeof native?.name === "string" && native.name.startsWith("@cherninlab/ennodia-") ? native : npm?.name === "ennodia" ? npm : jsr?.name === "@cherninlab/ennodia" ? jsr : undefined;
   const packageVersion = typeof metadata?.version === "string" ? metadata.version : undefined;
   const restartRequired = Boolean(packageVersion && packageVersion !== ENNODIA_VERSION);
   add("package-version", packageVersion === ENNODIA_VERSION ? "pass" : "warning", restartRequired ? `Installed ${packageVersion}; running ${ENNODIA_VERSION}. Reconnect the Ennodia MCP connection to load the installed version.` : packageVersion ? `Metadata ${packageVersion}; loaded code ${ENNODIA_VERSION}.` : "Package metadata is unavailable; only the loaded code version is known.");
@@ -71,14 +72,14 @@ export function inspectInstallation(options: InstallationOptions = {}): Installa
   const skillFiles = ["pragmatic", "compositional-audit"].map(id => join(codeRoot, "skills", id, "SKILL.md"));
   add("bundled-skills", skillFiles.every(readableFile) ? "pass" : "warning", skillFiles.every(readableFile) ? "Bundled skills are readable." : "Bundled skills are incomplete; skill discovery or installation may be limited.");
   const dependencies = ["@modelcontextprotocol/sdk/server/mcp.js", "zod"];
-  if (compiled) add("dependencies", "warning", "Executable uses bundled dependencies; separate dependency-file integrity cannot be checked.");
+  if (compiled) add("dependencies", "pass", "MCP dependencies are embedded in the executable.");
   else {
     const require = createRequire(join(codeRoot, "src/index.ts"));
     const unresolved = dependencies.filter(id => { try { return !readableFile(require.resolve(id)); } catch { return true; } });
     add("dependencies", unresolved.length ? "warning" : "pass", unresolved.length ? `Dependencies cannot be resolved from the code location: ${unresolved.join(", ")}. Install dependencies for this source distribution.` : "MCP dependencies resolve from the code location.");
   }
 
-  const { scope, evidence } = installationScope(codeRoot, home, env);
+  const { scope, evidence } = compiled ? { scope: "standalone" as const, evidence: "Loaded code and runtime are embedded in the executable." } : installationScope(codeRoot, home, env);
   if (scope === "unknown") add("installation-scope", "warning", "Global versus local scope could not be established from filesystem evidence.");
   else add("installation-scope", "pass", evidence);
   const temporaryAccessible = writableDirectory(temporaryDirectory, false);
@@ -125,10 +126,10 @@ function installationScope(root: string, home: string, env: Record<string, strin
 }
 
 function readMetadata(path: string): Record<string, unknown> | undefined {
-  try { const value: unknown = JSON.parse(readFileSync(path, "utf8")); return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : undefined; } catch { return undefined; }
+  try { const value: unknown = JSON.parse(bundledText(path) ?? readFileSync(path, "utf8")); return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : undefined; } catch { return undefined; }
 }
 function canonical(path: string): string { try { return realpathSync(path); } catch { return resolve(path); } }
-function readableFile(path: string): boolean { try { accessSync(path, constants.R_OK); return statSync(path).isFile(); } catch { return false; } }
+function readableFile(path: string): boolean { if (bundledText(path) !== undefined) return true; try { accessSync(path, constants.R_OK); return statSync(path).isFile(); } catch { return false; } }
 function writableExistingFile(path: string): boolean { try { accessSync(path, constants.R_OK | constants.W_OK); return statSync(path).isFile(); } catch (error) { return (error as NodeJS.ErrnoException).code === "ENOENT"; } }
 function writableDirectory(path: string, allowMissing = true): boolean {
   let ancestor = resolve(path);

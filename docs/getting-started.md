@@ -66,7 +66,6 @@ For a local development checkout, run `bun run verify` before relying on changes
 
 ### Requirements
 
-- Bun `1.3.14` or newer
 - An MCP client that can launch a standard input/output (stdio) server
 - At least one supported artificial intelligence (AI) command-line tool with
   working provider access
@@ -81,15 +80,26 @@ Install the stable release from npm:
 npx -y ennodia
 ```
 
-Ennodia requires Bun `1.3.14` or newer. `npx` downloads Ennodia. Bun runs it.
-To use Bun directly, run `bunx ennodia`.
+`npx` requires Node.js `18` or newer.
+It downloads the executable for your platform, including its runtime and bundled skills.
+No separate runtime installation is required for that executable.
+
+For installation without npm, download a standalone executable from [GitHub Releases](https://github.com/cherninlab/ennodia/releases).
+Use its absolute path as the MCP server command, with an empty `args` array.
+The release includes checksums for each executable.
+
+Standalone targets: macOS arm64 and x64, Linux arm64 and x64, and Windows x64.
+Linux builds are available for glibc and musl.
 
 The JSR package `@cherninlab/ennodia` exposes TypeScript modules for import.
+Programmatic imports use Bun.
 Use the npm package for the stdio MCP executable.
 
 ### Local checkout
 
 Use a checkout to modify Ennodia:
+
+Source development requires Bun `1.3.14` or newer.
 
 ```sh
 git clone https://github.com/cherninlab/ennodia
