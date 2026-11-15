@@ -1,9 +1,11 @@
 import { expect, test } from "bun:test";
 import { ENNODIA_VERSION } from "./version";
+import { NATIVE_TARGETS, nativePackageName } from "./dev/native";
 
 type PackageJson = {
   description: string;
   version: string;
+  optionalDependencies?: Record<string, string>;
 };
 
 type JsrJson = {
@@ -58,4 +60,13 @@ test("runtime version matches package and JSR versions", () => {
   ).toBe(packageJson.version);
   expect(manifestJson.version).toBe(packageJson.version);
   expect(manifestJson.description).toBe(packageJson.description);
+});
+
+test("standalone package pins and lockfile match the runtime version", async () => {
+  const expected = Object.fromEntries(NATIVE_TARGETS.map(t => [nativePackageName(t.id), ENNODIA_VERSION]));
+  expect(packageJson.optionalDependencies).toEqual(expected);
+  const lock = Bun.JSON5.parse(await Bun.file(new URL("../bun.lock", import.meta.url)).text()) as {
+    workspaces: Record<string, { optionalDependencies?: Record<string, string> }>;
+  };
+  expect(lock.workspaces[""].optionalDependencies).toEqual(expected);
 });

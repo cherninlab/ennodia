@@ -11,7 +11,7 @@ Ennodia adds a few tools to it, and your agent calls another agent only when a t
 ## Where does Ennodia run?
 
 On your computer. Your agent starts it as a local Model Context Protocol (MCP) server.
-It needs Bun 1.3.14 or newer.
+The packaged executable includes its runtime and bundled skills.
 Your agent can [set it up for you](/docs/install/), or you can [add the server entry yourself](/docs/getting-started/#manual-setup).
 
 ## Which agents can I use?

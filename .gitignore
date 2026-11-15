@@ -9,6 +9,7 @@ node_modules/
 
 # Build output
 dist/
+*.bun-build
 website/.astro/
 website/src/content/docs/docs/
 bench/results/*

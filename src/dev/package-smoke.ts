@@ -4,19 +4,15 @@ import { tmpdir } from "node:os";
 import { ENNODIA_VERSION } from "../version";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { packNative } from "./native";
+import { parsePackResult } from "./npm-pack";
 
 const HANDSHAKE_TIMEOUT_MS = 10_000;
-
-type PackResult = {
-  filename: string;
-  files: { path: string }[];
-  name: string;
-  version: string;
-};
 
 const tempDir = await mkdtemp(join(tmpdir(), "ennodia-package-smoke-"));
 
 try {
+  const nativeTarball = await packNative();
   const pack = await runCapture([
     "npm",
     "pack",
@@ -35,13 +31,14 @@ try {
   assertPackedFiles(packResult.files.map((file) => file.path));
 
   const tarball = join(tempDir, basename(packResult.filename));
-  await assertMcpHandshake("bunx", ["bunx", "--package", tarball, "ennodia"]);
   await assertMcpHandshake("npm exec", [
     "npm",
     "exec",
     "--yes",
     "--package",
     tarball,
+    "--package",
+    nativeTarball,
     "--",
     "ennodia",
   ]);
@@ -50,6 +47,9 @@ try {
     "--yes",
     "--package",
     tarball,
+    "--package",
+    nativeTarball,
+    "--",
     "ennodia",
   ]);
 
@@ -73,9 +73,12 @@ try {
   await mkdir(consumerDir);
   await runCapture(["npm", "init", "--yes"], { cwd: consumerDir });
   const installArgs = ["--ignore-scripts", "--no-audit", "--no-fund"];
-  await runCapture(["npm", "install", ...installArgs, tarball], {
+  await runCapture(["npm", "install", ...installArgs, nativeTarball, tarball], {
     cwd: consumerDir,
   });
+  const emptyPath = join(tempDir, "no-runtime-on-path");
+  await mkdir(emptyPath);
+  await assertMcpHandshake("installed npm package without Bun", [Bun.which("node")!, join(consumerDir, "node_modules/ennodia/bin/ennodia")], { cwd: consumerDir, env: { PATH: emptyPath } });
   await runCapture(["npm", "install", ...installArgs, ioTarball], {
     cwd: consumerDir,
   });
@@ -95,7 +98,7 @@ try {
         package: packResult.name,
         version: packResult.version,
         tarball: basename(tarball),
-        smoke: ["bunx", "npm exec", "npx"],
+        smoke: ["npm exec", "npx"],
         ioPackage: ioPackResult.name,
         ioTarball: basename(ioTarball),
         ioSmoke: "fresh tarball install and import",
@@ -135,36 +138,6 @@ function assertIoPackedFiles(paths: string[]): void {
   }
 }
 
-function parsePackResult(stdout: string, expectedName: string): PackResult {
-  const parsed: unknown = JSON.parse(stdout);
-  const candidate = Array.isArray(parsed)
-    ? parsed[0]
-    : isRecord(parsed)
-      ? parsed[expectedName]
-      : undefined;
-
-  if (
-    !isRecord(candidate) ||
-    candidate.name !== expectedName ||
-    typeof candidate.version !== "string" ||
-    typeof candidate.filename !== "string" ||
-    !Array.isArray(candidate.files) ||
-    !candidate.files.every(
-      (file) => isRecord(file) && typeof file.path === "string",
-    )
-  ) {
-    throw new Error(
-      `npm pack did not return valid package metadata for ${expectedName}.`,
-    );
-  }
-
-  return candidate as PackResult;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
 function assertPackedFiles(paths: string[]): void {
   const expected = [
     "package.json",
@@ -182,6 +155,7 @@ function assertPackedFiles(paths: string[]): void {
     "src/harnesses.ts",
     "src/history.ts",
     "src/installation.ts",
+    "src/bundled.ts",
     "src/index.ts",
     "src/internal.ts",
     "src/planner.ts",
@@ -229,10 +203,10 @@ function assertPackedFiles(paths: string[]): void {
   }
 }
 
-async function assertMcpHandshake(label: string, command: string[]): Promise<void> {
+async function assertMcpHandshake(label: string, command: string[], options: { cwd?: string; env?: Record<string, string> } = {}): Promise<void> {
   const client = new Client({ name: "ennodia-package-smoke", version: "0" });
   const transport = new StdioClientTransport({
-    command: command[0], args: command.slice(1), stderr: "pipe",
+    command: command[0], args: command.slice(1), stderr: "pipe", ...options,
   });
   try {
     // Keep the connection open until initialization completes. EOF now means
@@ -247,8 +221,8 @@ async function assertMcpHandshake(label: string, command: string[]): Promise<voi
     const result = await client.callTool({ name: "ennodia_check_harnesses", arguments: { verify: false, upgrade: false } });
     const content = result.content as { type: string; text?: string }[];
     const report = JSON.parse(content.find(block => block.type === "text")?.text ?? "null")?.installation;
-    if (!report || report.status === "broken" || report.version !== ENNODIA_VERSION || report.scope !== "cache" || !report.launcher || report.checks.find((c: { id: string; status: string }) => c.id === "runtime-files")?.status !== "pass") {
-      throw new Error(`${label} did not report a usable cached installation: ${JSON.stringify(report)}`);
+    if (!report || report.status === "broken" || report.version !== ENNODIA_VERSION || report.distribution !== "compiled" || report.checks.find((c: { id: string; status: string }) => c.id === "bundled-skills")?.status !== "pass") {
+      throw new Error(`${label} did not report a usable standalone installation: ${JSON.stringify(report)}`);
     }
   } finally {
     await client.close();

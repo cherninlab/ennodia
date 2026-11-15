@@ -1,10 +1,10 @@
-import { homedir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { basename, dirname, extname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { existsSync, readdirSync } from "node:fs";
-import { cp, mkdir, readFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { errorMessage } from "./internal";
+import { BUNDLED_ROOT, bundledFilesUnder, bundledText } from "./bundled";
 
 export type SkillSource = "project" | "user" | "builtin" | "legacy";
 export type SkillScope = "project" | "user" | "builtin" | "legacy";
@@ -108,7 +108,7 @@ type LoadedSkillDiscovery = {
 
 const MAX_SKILL_INSTRUCTIONS_CHARS = 80_000;
 const SKILL_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-const BUNDLED_SKILLS_DIR = fileURLToPath(new URL("../skills", import.meta.url));
+const BUNDLED_SKILLS_DIR = join(BUNDLED_ROOT, "skills");
 
 export function getSkillsDirectories(cwd?: string): string[] {
   return getSkillDirectories(cwd).map((dir) => dir.path);
@@ -120,7 +120,7 @@ export async function loadSkillFromFile(
   harnessIds: string[] = ["generic"],
   native = true,
 ): Promise<Skill> {
-  const content = await readFile(filePath, "utf-8");
+  const content = bundledText(filePath) ?? await readFile(filePath, "utf-8");
   const extension = extname(filePath).toLowerCase();
   const raw = extension === ".json"
     ? parseJsonSkill(content, filePath)
@@ -289,11 +289,25 @@ export async function installBundledSkills(
 
       if (!dryRun && status === "installed") {
         await mkdir(target.directory, { recursive: true });
-        await cp(sourcePath, targetPath, {
-          recursive: true,
-          force: input.overwrite ?? false,
-          errorOnExist: !(input.overwrite ?? false),
-        });
+        const embedded = bundledFilesUnder(sourcePath);
+        const staging = embedded ? await mkdtemp(join(tmpdir(), "ennodia-skill-")) : undefined;
+        try {
+          if (staging && embedded) {
+            for (const file of embedded) {
+              const destination = join(staging, file.path.slice(sourcePath.length + 1));
+              await mkdir(dirname(destination), { recursive: true });
+              await writeFile(destination, file.content, { flag: "wx" });
+            }
+          }
+          // Keep the same copy and overwrite semantics for both distributions.
+          await cp(staging ?? sourcePath, targetPath, {
+            recursive: true,
+            force: input.overwrite ?? false,
+            errorOnExist: !(input.overwrite ?? false),
+          });
+        } finally {
+          if (staging) await rm(staging, { recursive: true, force: true });
+        }
       }
 
       actions.push(action);
@@ -350,7 +364,7 @@ function getSkillDirectories(cwd?: string): SkillDirectory[] {
 
   const seen = new Set<string>();
   return directories.filter((directory) => {
-    if (!existsSync(directory.path)) {
+    if (!existsSync(directory.path) && !(directory.scope === "builtin" && bundledFilesUnder(directory.path)?.length)) {
       return false;
     }
 
@@ -490,6 +504,8 @@ async function loadAvailableSkills(cwd?: string): Promise<LoadedSkillDiscovery> 
 }
 
 function listSkillFiles(directory: SkillDirectory): string[] {
+  const embedded = directory.scope === "builtin" ? bundledFilesUnder(directory.path) : undefined;
+  if (embedded) return embedded.map(f => f.path).filter(path => basename(path) === "SKILL.md").sort();
   const entries = readdirSync(directory.path, { withFileTypes: true });
   const files: string[] = [];
 

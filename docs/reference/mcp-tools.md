@@ -830,7 +830,7 @@ It never collects credentials.
 
 `ennodia_check_harnesses` is part of the default tool set.
 
-The result includes `installation`, a local self-check of Ennodia's loaded code root, version, installation scope, Bun runtime, core files, bundled skills, and storage access. MCP initialization sends only its problems to the host, and a healthy installation adds nothing. `ennodia_run` and `ennodia_get_run` include the full report even in compact results. Mention its limitations when they affect the request.
+The result includes `installation`, a local self-check of Ennodia's loaded code root, version, installation scope, runtime, core files, bundled skills, and storage access. MCP initialization sends only its problems to the host, and a healthy installation adds nothing. `ennodia_run` and `ennodia_get_run` include the full report even in compact results. Mention its limitations when they affect the request.
 
 `refresh: true` refreshes installation evidence as well as harness readiness. Scope remains `unknown` when filesystem evidence is insufficient. The report does not verify registry freshness, provider access, disk capacity, or future writes.
 

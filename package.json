@@ -1,13 +1,13 @@
 {
   "name": "ennodia",
-  "version": "0.5.3",
+  "version": "0.5.5",
   "mcpName": "io.github.cherninlab/ennodia",
   "description": "Connects the AI agents you use: your agent hands a task to another and gets the answer back",
   "license": "MIT",
   "type": "module",
   "packageManager": "bun@1.3.14",
   "engines": {
-    "bun": ">=1.3.14"
+    "node": ">=18"
   },
   "repository": {
     "type": "git",
@@ -35,6 +35,7 @@
     "src/budget.ts",
     "src/compare.ts",
     "src/compositional.ts",
+    "src/bundled.ts",
     "src/core.ts",
     "src/diagnosis.ts",
     "src/harnesses.ts",
@@ -94,8 +95,11 @@
     "website:dev": "bun run --cwd website dev",
     "website:build": "bun run --cwd website build",
     "website:deploy": "bun run --cwd website deploy",
-    "verify": "bun run check && bun run lint && bun run test && bun run website:build && bun run controlled-english:check && bun run task:smoke && bun run mcp:smoke && bun run io:smoke",
-    "mobile:verify": "cd apps/mobile && flutter analyze && flutter test"
+    "verify": "bun run check && bun run lint && bun run test && bun run website:build && bun run controlled-english:check && bun run native:smoke && bun run task:smoke && bun run mcp:smoke && bun run io:smoke",
+    "mobile:verify": "cd apps/mobile && flutter analyze && flutter test",
+    "native:build": "bun run src/dev/native.ts",
+    "native:smoke": "bun run src/dev/native-smoke.ts",
+    "native:publish": "bun run src/dev/publish-native.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
@@ -106,5 +110,14 @@
     "fantasticon": "4.1.0",
     "oxlint": "^1.70.0",
     "typescript": "^6.0.3"
+  },
+  "optionalDependencies": {
+    "@cherninlab/ennodia-darwin-arm64": "0.5.5",
+    "@cherninlab/ennodia-darwin-x64": "0.5.5",
+    "@cherninlab/ennodia-linux-arm64": "0.5.5",
+    "@cherninlab/ennodia-linux-x64": "0.5.5",
+    "@cherninlab/ennodia-linux-arm64-musl": "0.5.5",
+    "@cherninlab/ennodia-linux-x64-musl": "0.5.5",
+    "@cherninlab/ennodia-win32-x64": "0.5.5"
   }
 }
